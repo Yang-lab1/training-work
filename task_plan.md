@@ -97,3 +97,15 @@
 - [x] 扩展训练记录与 JSON 备份，兼容旧记录。
 - [x] 完成 lint、build、API 单测和生产 HTTP 验收。
 - [x] 部署 Vercel production。
+
+## V0.2B + V0.2C + V0.3A 任务计划补充
+
+- [x] 删除人工自评分、问题标签、状态和改进建议入口。
+- [x] 新记录不再生成 `review`，旧 review 仅作历史兼容。
+- [x] 恢复六项顶部导航与独立产品分区。
+- [x] 首页只保留岗位、今日进度、训练入口、反馈状态和下一步。
+- [x] Mock AI 不依赖人工标签，并扩展流畅度、背稿风险和具体性反馈。
+- [x] 新增 `/api/transcribe` 和 Mock ASR。
+- [x] 预留 OpenAI、豆包、火山、讯飞、阿里云、腾讯云 ASR Provider。
+- [x] 完成 lint、build、API 测试和 Headless 响应式验收。
+- [x] 部署 Vercel production 并验证线上 API。

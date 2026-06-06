@@ -7,11 +7,12 @@ import type { AnalyzeAnswerProvider } from '../provider.js'
 import { normalizeModelFeedback, parseModelJson } from '../response.js'
 
 const SYSTEM_PROMPT = `你是一名严格的中文面试教练。请分析候选人的一次训练回答，并只输出合法 JSON。
-必须具体结合训练类型、目标公司、目标岗位、回答文本、自评标签和时长。
+必须具体结合训练类型、目标公司、目标岗位、回答文本和时长。
 禁止空泛鼓励，必须指出可执行修改。
 JSON 字段必须为：
 score, summary, strengths, problems, roleFitFeedback, structureFeedback,
-expressionFeedback, timingFeedback, improvedShortVersion, improvedLongVersion, nextTasks。
+expressionFeedback, timingFeedback, fluencyFeedback, memorizationRisk,
+specificityFeedback, improvedShortVersion, improvedLongVersion, nextTasks。
 score 为 0-100 数字；strengths、problems、nextTasks 为字符串数组；其余字段为字符串。
 分析维度：是否回答问题、岗位贴合、结构、表达、时长、AI/项目能力、具体证据，以及 30 秒和 90 秒修改稿。`
 

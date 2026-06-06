@@ -31,12 +31,6 @@ export interface AnalyzeJobContext {
   businessDirection?: string
 }
 
-export interface AnalyzeReviewInput {
-  selfScore?: number
-  issueTags: string[]
-  nextActionChoice?: string
-}
-
 export interface AnalyzeAnswerRequest {
   taskType?: 'analyze_answer'
   trainingRecordId: string
@@ -45,7 +39,6 @@ export interface AnalyzeAnswerRequest {
   transcript: string
   durationSeconds: number
   targetSeconds: number
-  review: AnalyzeReviewInput
   cvText?: string
   scriptText?: string
 }
@@ -63,6 +56,9 @@ export interface AnalyzeAnswerSuccess {
   structureFeedback: string
   expressionFeedback: string
   timingFeedback: string
+  fluencyFeedback: string
+  memorizationRisk: string
+  specificityFeedback: string
   improvedShortVersion: string
   improvedLongVersion: string
   nextTasks: string[]
@@ -80,8 +76,26 @@ export type AnalyzeAnswerResponse = AnalyzeAnswerSuccess | AnalyzeAnswerFailure
 
 export interface TranscriptData {
   text: string
-  source: 'manual' | 'mock'
+  source: 'manual' | 'mock' | 'asr'
   updatedAt: string
+  provider?: string
+  language?: 'zh' | 'en' | 'mixed'
 }
 
 export type StoredAIFeedback = Omit<AnalyzeAnswerSuccess, 'success'>
+
+export type TranscriptStatus =
+  | 'not_started'
+  | 'mock_ready'
+  | 'manual_ready'
+  | 'transcribing'
+  | 'completed'
+  | 'failed'
+
+export type AIFeedbackStatus =
+  | 'not_ready'
+  | 'transcript_needed'
+  | 'ready_to_analyze'
+  | 'analyzing'
+  | 'completed'
+  | 'failed'

@@ -81,6 +81,18 @@
 ---
 *每个阶段完成后或遇到错误时更新此文件*
 
+## 2026-06-06 V0.2B + V0.2C + V0.3A
+
+- 删除新训练流程中的自评分、问题标签、状态选择、语音自评和改进建议。
+- 新训练记录改为 `transcriptStatus` + `aiFeedbackStatus` 状态机；旧 `review` 仅在历史详情折叠兼容。
+- 恢复顶部导航：今日训练、资料与岗位、训练、历史、AI 反馈、数据备份。
+- 首页缩减为岗位、今日进度、三个训练入口、反馈状态和下一步任务。
+- Mock AI 改为仅根据 transcript、时长、岗位、训练类型、CV 和参考稿生成反馈。
+- 新增 `/api/transcribe`、Mock ASR、ASR Router 及六种真实 Provider 预留。
+- 验证通过：lint、build、AI/ASR 路由测试、Headless 六导航检查、390px 无横向滚动。
+- Production 已部署：`dpl_BPj81mk2oFPZy3zwoSFPffsvUYcZ`，公开地址 `https://interview-os-pi.vercel.app`。
+- 线上 `/api/transcribe`、`/api/analyze-answer`、六导航和移动端检查通过。
+
 ## 2026-06-06 Interview OS V0.1.6 + V0.2A
 
 - 新增 `POST /api/analyze-answer` Vercel Function。

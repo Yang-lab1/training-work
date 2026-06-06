@@ -86,3 +86,11 @@
 - Vercel Function 强制使用 NodeNext 解析，服务端相对导入必须写 `.js` 运行时后缀。
 - 本地 Git 仓库未关联 Vercel 项目时，CLI 会携带 GitHub metadata 并触发 `BLOCKED`；从不含 `.git` 的临时副本部署可避免误判。
 - `xlsx@0.18.5` 存在上游无修复的高危审计项。本轮增加 10 MB 文件限制作为部分缓解，后续应评估替换解析库。
+
+## V0.2B + V0.2C + V0.3A 发现与决策
+
+- 人工自评不能只在 UI 隐藏：旧实现同时污染记录结构、流程完成判断、下一步任务、Mock Provider 和 API 请求，因此本轮从整条链路移除。
+- 新评价唯一来源是 `aiFeedback`；首页下一步任务只读取转写/反馈状态和 `aiFeedback.nextTasks`。
+- 旧 `review` 继续可导入和展示，但只放在“旧版自评数据”折叠区，不参与新分析。
+- ASR 前端以统一 `/api/transcribe` 契约工作。真实 Provider 接入时只需替换服务端 Provider，不修改训练记录和页面状态机。
+- 当前浏览器录音 Blob 未发送到后端，Mock ASR 只验证流程，不得描述为真实语音识别。

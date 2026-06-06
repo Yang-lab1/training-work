@@ -1,7 +1,6 @@
 import type {
   AnalyzeAnswerRequest,
   AnalyzeJobContext,
-  AnalyzeReviewInput,
   TrainingType,
 } from '../../../src/lib/ai/types.js'
 
@@ -34,23 +33,6 @@ function safeJob(value: unknown): AnalyzeJobContext | null {
   }
 }
 
-function safeReview(value: unknown): AnalyzeReviewInput {
-  const review = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  const issueTags = Array.isArray(review.issueTags)
-    ? review.issueTags
-      .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim().slice(0, 60))
-      .filter(Boolean)
-      .slice(0, 20)
-    : []
-  const selfScore = safeNumber(review.selfScore, 5)
-  return {
-    selfScore: selfScore || undefined,
-    issueTags,
-    nextActionChoice: safeText(review.nextActionChoice, 100),
-  }
-}
-
 export function validateAnalyzeAnswerRequest(value: unknown): AnalyzeAnswerRequest {
   if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
   const input = value as Record<string, unknown>
@@ -70,7 +52,6 @@ export function validateAnalyzeAnswerRequest(value: unknown): AnalyzeAnswerReque
     transcript,
     durationSeconds: safeNumber(input.durationSeconds, 3600),
     targetSeconds: safeNumber(input.targetSeconds, 3600),
-    review: safeReview(input.review),
     cvText: safeText(input.cvText, 6000),
     scriptText: safeText(input.scriptText, 8000),
   }
