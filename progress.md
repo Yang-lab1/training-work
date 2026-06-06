@@ -81,6 +81,17 @@
 ---
 *每个阶段完成后或遇到错误时更新此文件*
 
+## 2026-06-06 Interview OS V0.1.6 + V0.2A
+
+- 新增 `POST /api/analyze-answer` Vercel Function。
+- 新增统一 AI 类型、Provider Router、可用 Mock Provider 和真实 DeepSeek Provider。
+- `AI_PROVIDER` 未设置时默认 Mock；选择真实 Provider 但缺 Key、超时或调用失败时返回 `mock_fallback`。
+- 训练历史详情新增回答文本、模拟文本、AI 反馈生成与完整报告。
+- `transcript` 与 `aiFeedback` 直接保存在训练记录，旧备份没有新字段时继续兼容。
+- 已通过 `npm run lint`、`npm run build`、`npm run test:ai`。
+- 生产部署：`dpl_DtR6pCqGPXtTSeNQxoQ1oBM593LE`，公开地址仍为 `https://interview-os-pi.vercel.app`。
+- 生产 API 已验证 Mock、岗位关联、超时、结构反馈和非法输入。
+
 ## 2026-06-05 Interview OS V0.1.3
 
 - 完成 V0.1.3 训练体验增强 + 简历解析状态透明版。

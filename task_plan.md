@@ -86,3 +86,14 @@
 - [x] 增加 JSON 导出、导入和清空本地数据。
 - [x] 修复新增闭环页面的移动端和长文本排版问题。
 - [x] 完成 lint/build、本地 QA、生产 QA 和 Vercel 部署。
+
+## V0.1.6 + V0.2A 任务计划补充
+
+- [x] 保留 V0.1.5 上传、岗位选择、录音、复盘、历史与备份。
+- [x] 新增统一 AI 类型与 `analyze_answer` Provider Router。
+- [x] 实现 Mock Provider 和 DeepSeek Provider。
+- [x] 新增 `/api/analyze-answer`，包含输入限制、同源检查、超时与自动回退。
+- [x] 在训练历史详情新增 transcript 保存、模拟文本和 AI 反馈报告。
+- [x] 扩展训练记录与 JSON 备份，兼容旧记录。
+- [x] 完成 lint、build、API 单测和生产 HTTP 验收。
+- [x] 部署 Vercel production。

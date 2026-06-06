@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   BriefcaseBusiness,
+  BrainCircuit,
   CheckCircle2,
   ChevronDown,
   Download,
@@ -16,9 +17,15 @@ import {
 } from 'lucide-react'
 import { parseJobWorkbook } from './jobParser'
 import type { JobRecord } from './jobParser'
+import type {
+  AnalyzeAnswerResponse,
+  StoredAIFeedback,
+  TrainingType,
+  TranscriptData,
+} from './lib/ai/types'
 import './App.css'
 
-const APP_VERSION = '0.1.5'
+const APP_VERSION = '0.2A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -101,6 +108,8 @@ interface TrainingRecord {
   recordingName?: string
   hasDownload: boolean
   review: TrainingReview
+  transcript?: TranscriptData
+  aiFeedback?: StoredAIFeedback
 }
 
 interface StoredMvpState {
@@ -337,6 +346,10 @@ function App() {
     if (!file) return
 
     if (category === 'job' && file.name.toLowerCase().endsWith('.xlsx')) {
+      if (file.size > 10 * 1024 * 1024) {
+        setJobError('岗位表不能超过 10 MB，请精简后重新上传。')
+        return
+      }
       try {
         setJobError('')
         const parsedJobs = await parseJobWorkbook(file)
@@ -427,6 +440,13 @@ function App() {
           ? { ...record, review: updater(record.review) }
           : record
       )),
+    }))
+  }
+
+  function updateTrainingRecord(recordId: string, updater: (record: TrainingRecord) => TrainingRecord) {
+    commitState((current) => ({
+      ...current,
+      history: current.history.map((record) => record.id === recordId ? updater(record) : record),
     }))
   }
 
@@ -678,7 +698,7 @@ function App() {
   return (
     <main className="mvp-shell">
       <header className="mvp-hero">
-        <div className="brand-line"><span className="brand-dot">IO</span><span>Interview OS · V0.1.5</span></div>
+        <div className="brand-line"><span className="brand-dot">IO</span><span>Interview OS · V0.2A</span></div>
         <h1>上传岗位库，选择岗位，直接开口练</h1>
         <p className="hero-copy">主流程不需要填写岗位、个人背景或长篇复盘。</p>
       </header>
@@ -810,7 +830,26 @@ function App() {
 
         <section className="history-panel full-section">
           <SectionTitle step="最近 5 条" title="训练历史" icon={<FileText size={22} />} />
-          {recentHistory.length ? <div className="history-list">{recentHistory.map((record) => <HistoryRow key={record.id} record={record} expanded={expandedHistoryId === record.id} onToggle={() => setExpandedHistoryId(expandedHistoryId === record.id ? null : record.id)} onDelete={() => commitState((current) => ({ ...current, history: current.history.filter((item) => item.id !== record.id) }))} />)}</div> : <p className="empty-state">还没有训练记录。</p>}
+          {recentHistory.length ? (
+            <div className="history-list">
+              {recentHistory.map((record) => (
+                <HistoryRow
+                  key={record.id}
+                  record={record}
+                  selectedJob={selectedJob}
+                  cvText={cvTextState.text}
+                  scriptText={getScriptTextForTask(record.taskId, state.tasks, scriptTemplates, selectedJob)}
+                  expanded={expandedHistoryId === record.id}
+                  onToggle={() => setExpandedHistoryId(expandedHistoryId === record.id ? null : record.id)}
+                  onUpdate={(updater) => updateTrainingRecord(record.id, updater)}
+                  onDelete={() => commitState((current) => ({
+                    ...current,
+                    history: current.history.filter((item) => item.id !== record.id),
+                  }))}
+                />
+              ))}
+            </div>
+          ) : <p className="empty-state">还没有训练记录。</p>}
         </section>
 
         <section className="backup-panel full-section">
@@ -841,8 +880,226 @@ function ReviewPicker({ review, onChange }: { review: TrainingReview; onChange: 
   return <div className="review-picker"><div><span>自评分</span><div className="score-buttons">{[1, 2, 3, 4, 5].map((score) => <button className={review.selfScore === score ? 'active' : ''} type="button" key={score} onClick={() => onChange({ ...review, selfScore: score, createdAt: review.createdAt || new Date().toISOString() })}>{score}</button>)}</div></div><div><span>本次问题标签</span><div className="issue-tags">{issueTags.map((tag) => <button className={review.issueTags.includes(tag) ? 'active' : ''} type="button" key={tag} onClick={() => toggleTag(tag)}>{tag}</button>)}</div></div><div><span>本次状态</span><div className="choice-buttons">{nextActionChoices.map((choice) => <button className={review.nextActionChoice === choice ? 'active' : ''} type="button" key={choice} onClick={() => onChange({ ...review, nextActionChoice: choice, createdAt: review.createdAt || new Date().toISOString() })}>{choice}</button>)}</div></div></div>
 }
 
-function HistoryRow({ record, expanded, onToggle, onDelete }: { record: TrainingRecord; expanded: boolean; onToggle: () => void; onDelete: () => void }) {
-  return <article className="history-row"><div><strong>{record.title}</strong><span>{formatDateTime(record.savedAt)} · {formatDuration(record.durationSeconds)} · {record.review.selfScore ? `${record.review.selfScore} 分` : '未评分'} · {record.review.issueTags.join('、') || '无标签'}</span>{expanded ? <div className="history-detail"><p>状态：{record.review.nextActionChoice || '未选择'}</p><p>语音备注：{record.review.voiceNoteMetadata ? `${formatDuration(record.review.voiceNoteMetadata.durationSeconds)}，保存在本地浏览器` : '无'}</p>{record.review.legacyBiggestProblem ? <p>旧版最大问题：{record.review.legacyBiggestProblem}</p> : null}{record.review.legacyNextImprovement ? <p>旧版下次改进：{record.review.legacyNextImprovement}</p> : null}<p>音频长期保存以下载文件为准，本地仅保存训练记录。</p></div> : null}</div><div className="history-actions"><button type="button" onClick={onToggle}>{expanded ? '收起' : '查看详情'}</button><button className="danger-text" type="button" onClick={onDelete}>删除记录</button></div></article>
+function HistoryRow({
+  record,
+  selectedJob,
+  cvText,
+  scriptText,
+  expanded,
+  onToggle,
+  onUpdate,
+  onDelete,
+}: {
+  record: TrainingRecord
+  selectedJob: JobRecord | null
+  cvText: string
+  scriptText: string
+  expanded: boolean
+  onToggle: () => void
+  onUpdate: (updater: (record: TrainingRecord) => TrainingRecord) => void
+  onDelete: () => void
+}) {
+  const [transcriptDraft, setTranscriptDraft] = useState(record.transcript?.text || '')
+  const [transcriptSource, setTranscriptSource] = useState<'manual' | 'mock'>(record.transcript?.source || 'manual')
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+
+  function saveTranscript() {
+    const text = transcriptDraft.trim()
+    if (!text) {
+      setFeedbackMessage('请先粘贴回答文本，或使用模拟文本。')
+      return
+    }
+    const transcript: TranscriptData = {
+      text,
+      source: transcriptSource,
+      updatedAt: new Date().toISOString(),
+    }
+    onUpdate((current) => ({
+      ...current,
+      transcript,
+      aiFeedback: current.transcript?.text === text ? current.aiFeedback : undefined,
+    }))
+    setFeedbackMessage('回答文本已保存。')
+  }
+
+  function useMockTranscript() {
+    const text = createMockTranscript(record, selectedJob)
+    const transcript: TranscriptData = {
+      text,
+      source: 'mock',
+      updatedAt: new Date().toISOString(),
+    }
+    setTranscriptDraft(text)
+    setTranscriptSource('mock')
+    onUpdate((current) => ({ ...current, transcript, aiFeedback: undefined }))
+    setFeedbackMessage('已载入模拟文本，可直接生成反馈。')
+  }
+
+  function clearTranscript() {
+    setTranscriptDraft('')
+    setTranscriptSource('manual')
+    onUpdate((current) => ({ ...current, transcript: undefined, aiFeedback: undefined }))
+    setFeedbackMessage('回答文本和旧反馈已清空。')
+  }
+
+  async function generateFeedback() {
+    const text = transcriptDraft.trim()
+    if (!text) {
+      setFeedbackMessage('请先粘贴回答文本，或使用模拟文本。')
+      return
+    }
+    setFeedbackLoading(true)
+    setFeedbackMessage('')
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 25_000)
+    try {
+      const transcript: TranscriptData = {
+        text,
+        source: transcriptSource,
+        updatedAt: new Date().toISOString(),
+      }
+      const response = await fetch('/api/analyze-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          taskType: 'analyze_answer',
+          trainingRecordId: record.id,
+          trainingType: taskIdToTrainingType(record.taskId),
+          selectedJob,
+          transcript: text,
+          durationSeconds: record.durationSeconds,
+          targetSeconds: record.targetSeconds,
+          review: record.review,
+          cvText: cvText.slice(0, 6000),
+          scriptText: scriptText.slice(0, 8000),
+        }),
+      })
+      const result = await response.json() as AnalyzeAnswerResponse
+      if (!response.ok || !result.success) {
+        throw new Error(result.success ? '反馈生成失败。' : result.error)
+      }
+      const { success: _success, ...aiFeedback } = result
+      void _success
+      try {
+        window.localStorage.setItem('interview_os_feedback_save_probe', JSON.stringify({ transcript, aiFeedback }))
+        window.localStorage.removeItem('interview_os_feedback_save_probe')
+      } catch {
+        setFeedbackMessage('反馈已生成，但浏览器本地空间不足，未能保存。请先导出备份并清理旧记录。')
+        return
+      }
+      onUpdate((current) => ({ ...current, transcript, aiFeedback }))
+      setFeedbackMessage('AI 反馈已保存到本条训练记录。')
+    } catch (error) {
+      setFeedbackMessage(
+        error instanceof Error && error.name === 'AbortError'
+          ? '请求超时，请稍后重试。训练记录没有丢失。'
+          : error instanceof Error
+            ? error.message
+            : '反馈生成失败，请稍后重试。',
+      )
+    } finally {
+      window.clearTimeout(timeout)
+      setFeedbackLoading(false)
+    }
+  }
+
+  return (
+    <article className="history-row">
+      <div className="history-main">
+        <strong>{record.title}</strong>
+        <span>
+          {formatDateTime(record.savedAt)} · {formatDuration(record.durationSeconds)} ·
+          {record.review.selfScore ? ` ${record.review.selfScore} 分` : ' 未评分'} ·
+          {record.review.issueTags.join('、') || '无标签'}
+        </span>
+        <span className={record.aiFeedback ? 'feedback-status ready' : 'feedback-status'}>
+          {record.aiFeedback
+            ? `已生成 AI 反馈 · ${record.aiFeedback.score} 分 · ${record.aiFeedback.provider}`
+            : '未生成反馈'}
+        </span>
+        {expanded ? (
+          <div className="history-detail">
+            <p>状态：{record.review.nextActionChoice || '未选择'}</p>
+            <p>语音备注：{record.review.voiceNoteMetadata ? `${formatDuration(record.review.voiceNoteMetadata.durationSeconds)}，保存在本地浏览器` : '无'}</p>
+            {record.review.legacyBiggestProblem ? <p>旧版最大问题：{record.review.legacyBiggestProblem}</p> : null}
+            {record.review.legacyNextImprovement ? <p>旧版下次改进：{record.review.legacyNextImprovement}</p> : null}
+            <p>音频长期保存以下载文件为准，本地仅保存训练记录。</p>
+
+            <section className="ai-analysis">
+              <div className="ai-analysis-heading">
+                <BrainCircuit size={20} />
+                <div><strong>回答文本与 AI 反馈</strong><span>当前暂未自动转写录音，可粘贴文本或使用模拟文本。</span></div>
+              </div>
+              <textarea
+                value={transcriptDraft}
+                onChange={(event) => {
+                  setTranscriptDraft(event.target.value)
+                  setTranscriptSource('manual')
+                }}
+                rows={7}
+                maxLength={20_000}
+                placeholder="粘贴这次回答的转写文本"
+              />
+              <div className="inline-actions">
+                <button type="button" onClick={saveTranscript}>保存文本</button>
+                <button type="button" onClick={useMockTranscript}>使用模拟文本</button>
+                <button type="button" className="danger-text" onClick={clearTranscript}>清空文本</button>
+                <button type="button" className="primary-button" onClick={() => void generateFeedback()} disabled={feedbackLoading}>
+                  <BrainCircuit size={15} />{feedbackLoading ? '正在分析…' : '生成 AI 反馈'}
+                </button>
+              </div>
+              {feedbackMessage ? <p className={feedbackMessage.includes('失败') || feedbackMessage.includes('超时') ? 'error-line' : 'success-line'}>{feedbackMessage}</p> : null}
+              {record.aiFeedback ? <AIFeedbackReport feedback={record.aiFeedback} /> : null}
+            </section>
+          </div>
+        ) : null}
+      </div>
+      <div className="history-actions">
+        <button type="button" onClick={onToggle}>{expanded ? '收起' : '查看详情'}</button>
+        <button className="danger-text" type="button" onClick={onDelete}>删除记录</button>
+      </div>
+    </article>
+  )
+}
+
+function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
+  const isMock = feedback.provider === 'mock' || feedback.provider === 'mock_fallback'
+  return (
+    <div className="ai-report">
+      <header>
+        <div><span>总分</span><strong>{feedback.score}</strong></div>
+        <p>{feedback.summary}</p>
+        <em>{feedback.provider} · {feedback.model}</em>
+      </header>
+      {isMock ? <p className="mock-notice">当前为模拟反馈，仅用于测试流程。接入真实模型后会生成真实分析。</p> : null}
+      {feedback.rawProviderNote ? <p className="provider-note">{feedback.rawProviderNote}</p> : null}
+      <div className="feedback-columns">
+        <FeedbackList title="做得好的地方" items={feedback.strengths} />
+        <FeedbackList title="主要问题" items={feedback.problems} />
+      </div>
+      <dl className="feedback-detail-list">
+        <div><dt>岗位匹配</dt><dd>{feedback.roleFitFeedback}</dd></div>
+        <div><dt>结构</dt><dd>{feedback.structureFeedback}</dd></div>
+        <div><dt>表达</dt><dd>{feedback.expressionFeedback}</dd></div>
+        <div><dt>时长</dt><dd>{feedback.timingFeedback}</dd></div>
+      </dl>
+      <details>
+        <summary>查看 30 秒优化版</summary>
+        <p>{feedback.improvedShortVersion}</p>
+      </details>
+      <details>
+        <summary>查看 90 秒优化版</summary>
+        <p>{feedback.improvedLongVersion}</p>
+      </details>
+      <FeedbackList title="下一步任务" items={feedback.nextTasks} />
+    </div>
+  )
+}
+
+function FeedbackList({ title, items }: { title: string; items: string[] }) {
+  return <section><strong>{title}</strong><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></section>
 }
 
 function readStoredState(): StoredMvpState {
@@ -984,6 +1241,35 @@ function getFlowSteps(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: C
     { label: '点击标签复盘', status: reviewed ? '已完成' : '未开始' },
     { label: '查看下一步任务', status: records.length === 3 ? '已完成' : '未开始' },
   ]
+}
+
+function taskIdToTrainingType(taskId: TaskId): TrainingType {
+  if (taskId === 'en-intro') return 'englishIntro'
+  if (taskId === 'miro-project') return 'miroProject'
+  return 'chineseIntro'
+}
+
+function getScriptTextForTask(
+  taskId: TaskId,
+  tasks: TrainingTask[],
+  templates: ScriptTemplates,
+  selectedJob: JobRecord | null,
+) {
+  const task = tasks.find((item) => item.id === taskId) || getDefaultTask(taskId)
+  const template = templates[task.scriptKey] || task.defaultReferenceTemplate
+  return selectedJob ? renderScript(template, selectedJob) : template
+}
+
+function createMockTranscript(record: TrainingRecord, selectedJob: JobRecord | null) {
+  const company = selectedJob?.companyName || '目标公司'
+  const role = selectedJob?.jobTitle || '目标岗位'
+  if (record.taskId === 'en-intro') {
+    return `Hi, I am preparing for the ${role} role at ${company}. My background combines AI learning, product experience, and industrial design. In the Miro project, I identified a collaboration problem, defined the core user scenario, and turned the idea into a testable MVP. I hope to bring this combination of user insight and practical delivery to the role.`
+  }
+  if (record.taskId === 'miro-project') {
+    return `Miro 项目关注多人协作时信息分散、讨论难以转成行动的问题。我负责梳理用户场景、确定功能优先级并设计 MVP。方案中加入了 AI 辅助整理，但我没有把 AI 当作装饰，而是明确它在信息归纳和下一步行动生成中的作用。完成原型后，我根据用户反馈调整了信息结构。这个项目能证明我与${company}${role}所需的用户理解、产品拆解和验证能力匹配。`
+  }
+  return `我正在准备${company}的${role}。我的背景结合了 AI 学习、产品体验和工业设计。在 Miro 项目中，我从用户协作痛点出发，完成需求拆解、原型设计和 MVP 验证；在硬件项目中，我也积累了跨团队沟通和落地经验。我希望把这种复合能力用于目标岗位，连接用户需求、业务目标和可执行的产品方案。`
 }
 
 function createPreview(blob: Blob): AudioPreview { return { url: URL.createObjectURL(blob), size: blob.size } }

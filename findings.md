@@ -77,3 +77,12 @@
 - 参考稿自定义只覆盖模板文本，目标岗位占位符替换在渲染时执行，因此用户自定义稿仍可使用 `【XXX岗位】` 和 `[XXX role]`。
 - 下一步任务完全基于本地规则，不声称 AI 分析。
 - 清空全部本地数据必须同时清 localStorage 和 IndexedDB 录音库，避免历史音频 Blob 残留。
+
+## V0.1.6 + V0.2A 发现与决策
+
+- Vite 前端与 Vercel Function 共享纯 TypeScript 类型；Provider 实现只由 `/api` 引用，API Key 不进入前端 bundle。
+- DeepSeek 使用官方 `POST /chat/completions`、`response_format: { type: "json_object" }` 和服务端超时控制。
+- Mock 不是空壳：根据岗位、训练类型、时长与复盘标签生成完整统一报告。
+- Vercel Function 强制使用 NodeNext 解析，服务端相对导入必须写 `.js` 运行时后缀。
+- 本地 Git 仓库未关联 Vercel 项目时，CLI 会携带 GitHub metadata 并触发 `BLOCKED`；从不含 `.git` 的临时副本部署可避免误判。
+- `xlsx@0.18.5` 存在上游无修复的高危审计项。本轮增加 10 MB 文件限制作为部分缓解，后续应评估替换解析库。
