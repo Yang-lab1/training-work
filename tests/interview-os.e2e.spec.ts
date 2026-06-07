@@ -111,6 +111,63 @@ test.beforeEach(async ({ page }) => {
       }),
     })
   })
+
+  await page.route('**/api/generate-mock-interview', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-interview-v1',
+        generatedAt: new Date().toISOString(),
+        questions: [
+          { id: 'q-1', type: 'self_intro', question: '请用中文做一个 90 秒自我介绍。', source: 'selectedJob', expectedFocus: '背景、AI 学习、项目证据、岗位匹配。', followUpPolicy: '追问项目证据。' },
+          { id: 'q-2', type: 'role_fit', question: '为什么选择测试科技公司和 AI产品实习生？', source: 'selectedJob', expectedFocus: '公司业务、岗位动机、个人贡献。', followUpPolicy: '追问公司理解。' },
+          { id: 'q-3', type: 'project', question: '请讲一下 Miro 项目。', source: 'miroProject', expectedFocus: '用户、场景、AI作用、MVP取舍。', followUpPolicy: '追问验证结果。' },
+          { id: 'q-4', type: 'role_fit', question: '你从设计转 AI 产品的优势是什么？', source: 'selectedJob', expectedFocus: '迁移能力和风险认知。', followUpPolicy: '追问短板。' },
+          { id: 'q-5', type: 'technical_basic', question: '你如何验证 AI 产品功能有效？', source: 'selectedJob', expectedFocus: '假设、指标、MVP。', followUpPolicy: '追问指标。' },
+          { id: 'q-6', type: 'pressure', question: '如果认为你经验不够，你怎么回应？', source: 'mockProvider', expectedFocus: '承认差距、迁移证据。', followUpPolicy: '追问最强证据。' },
+        ],
+      }),
+    })
+  })
+
+  await page.route('**/api/generate-follow-up', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-follow-up-v1',
+        generatedAt: new Date().toISOString(),
+        followUpQuestion: { id: 'q-follow', type: 'follow_up', question: '请补充一个具体结果。', source: 'mockProvider', expectedFocus: '具体结果。', followUpPolicy: '追问验证证据。' },
+      }),
+    })
+  })
+
+  await page.route('**/api/generate-interview-report', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-interview-report-v1',
+        generatedAt: new Date().toISOString(),
+        finalReport: {
+          overallScore: 84,
+          summary: '整场模拟面试已完成，岗位匹配基本清楚。',
+          strongestAnswer: '中文自我介绍',
+          weakestAnswer: 'Miro 项目讲解',
+          recurringProblems: ['项目结果还可以更具体'],
+          roleFitAssessment: '需要持续回到测试科技公司和 AI产品实习生。',
+          communicationAssessment: '表达清楚，铺垫可减少。',
+          projectDepthAssessment: '补充用户、场景和验证指标。',
+          englishAssessment: '英文短句清楚即可。',
+          nextTrainingPlan: ['重练 Miro 项目', '准备为什么选择公司'],
+        },
+      }),
+    })
+  })
 })
 
 test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page }, testInfo) => {
@@ -118,7 +175,7 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   await writeJobFixture(fixturePath)
 
   await page.goto('/')
-  await expect(page.locator('.top-nav nav button')).toHaveCount(7)
+  await expect(page.locator('.top-nav nav button')).toHaveCount(8)
   await expect(page.getByText('今日训练')).toBeVisible()
 
   await page.getByRole('button', { name: /资料与岗位/ }).click()
@@ -175,6 +232,28 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   await page.getByRole('button', { name: /岗位准备包/ }).click()
   await expect(page.getByText(/测试科技公司主要做企业 AI 办公产品/)).toBeVisible()
 
+  await page.getByRole('button', { name: /模拟面试/ }).click()
+  await expect(page.getByText(/岗位定向模拟/)).toBeVisible()
+  await page.getByRole('button', { name: /开始一轮模拟面试/ }).click()
+  await expect(page.getByText(/请用中文做一个 90 秒自我介绍/)).toBeVisible()
+  await expect(page.getByText(/1\/6/)).toBeVisible()
+  await page.getByRole('button', { name: /回答本题/ }).click()
+  await page.waitForTimeout(900)
+  await page.getByRole('button', { name: /^停止$/ }).click()
+  await expect(page.getByText(/已保存本题录音/)).toBeVisible()
+  await page.getByRole('button', { name: /生成转写/ }).click()
+  await expect(page.getByText(/已生成模拟转写/)).toBeVisible()
+  await page.getByRole('button', { name: /生成单题反馈/ }).click()
+  await expect(page.getByText(/本题 AI 反馈已保存/)).toBeVisible()
+  await page.getByRole('button', { name: /下一题/ }).click()
+  await expect(page.getByText(/为什么选择测试科技公司/)).toBeVisible()
+  await page.getByRole('button', { name: /结束并生成整场复盘/ }).click()
+  await expect(page.getByText(/整场复盘已生成/)).toBeVisible()
+  await expect(page.getByText(/整场分数/)).toBeVisible()
+
+  const mockInterviewState = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]'))
+  expect(mockInterviewState[0].finalReport.report.overallScore).toBe(84)
+
   await page.getByRole('button', { name: /数据备份/ }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /导出 JSON/ }).click()
@@ -186,6 +265,7 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   expect(backup.trainingRecords[0].transcript.text).toContain('测试科技公司')
   expect(backup.trainingRecords[0].aiFeedback.score).toBe(82)
   expect(backup.jobPacks[0].jobPack.companySummary).toContain('测试科技公司')
+  expect(backup.mockInterviews[0].finalReport.report.overallScore).toBe(84)
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(hasHorizontalOverflow).toBe(false)

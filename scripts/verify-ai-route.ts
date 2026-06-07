@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import analyzeAnswerRoute from '../api/analyze-answer.ts'
+import generateFollowUpRoute from '../api/generate-follow-up.ts'
+import generateInterviewReportRoute from '../api/generate-interview-report.ts'
 import generateJobPackRoute from '../api/generate-job-pack.ts'
+import generateMockInterviewRoute from '../api/generate-mock-interview.ts'
 import transcribeRoute from '../api/transcribe.ts'
 
 function request(path: string, body: unknown) {
@@ -22,8 +25,35 @@ async function withFakeDeepSeekServer<T>(handler: (baseUrl: string) => Promise<T
     let body = ''
     req.on('data', (chunk) => { body += chunk })
     req.on('end', () => {
+      const isMockInterview = body.includes('questions') && body.includes('followUpPolicy')
+      const isFollowUp = body.includes('followUpQuestion')
+      const isInterviewReport = body.includes('overallScore')
       const isJobPack = body.includes('companySummary')
-      const content = isJobPack ? {
+      const content = isMockInterview ? {
+        questions: Array.from({ length: 6 }, (_, index) => ({
+          id: `deep-q-${index + 1}`,
+          type: index === 0 ? 'self_intro' : index === 2 ? 'project' : 'role_fit',
+          question: `DeepSeek 面试问题 ${index + 1}`,
+          source: index === 2 ? 'miroProject' : 'selectedJob',
+          expectedFocus: '结合岗位和项目证据。',
+          followUpPolicy: '追问具体行动和结果。',
+        })),
+      } : isFollowUp ? {
+        followUpQuestion: 'DeepSeek 追问：你能补充一个具体结果吗？',
+        expectedFocus: '具体结果。',
+        followUpPolicy: '继续追问验证证据。',
+      } : isInterviewReport ? {
+        overallScore: 84,
+        summary: 'DeepSeek 整场复盘。',
+        strongestAnswer: '自我介绍',
+        weakestAnswer: '项目题',
+        recurringProblems: ['项目结果不够具体'],
+        roleFitAssessment: '岗位匹配清晰。',
+        communicationAssessment: '表达自然。',
+        projectDepthAssessment: '项目深度可加强。',
+        englishAssessment: '英文短句清楚。',
+        nextTrainingPlan: ['重练项目题'],
+      } : isJobPack ? {
         companySummary: '示例科技是一家企业 AI 办公产品公司。',
         productAndBusiness: '核心业务是 AI 办公产品和企业效率工具。',
         jobRequirementBreakdown: ['理解 AI 办公产品', '能拆解需求', '能讲清项目证据'],
@@ -225,4 +255,51 @@ const jobPackFallbackPayload = await jobPackFallbackResponse.json()
 assert.equal(jobPackFallbackPayload.success, true)
 assert.equal(jobPackFallbackPayload.provider, 'mock_fallback')
 
-console.log('AI, ASR and job pack routes: mock, configurable provider fallback, validation passed')
+process.env.AI_PROVIDER = 'mock'
+const mockInterviewResponse = await generateMockInterviewRoute.fetch(request('/api/generate-mock-interview', {
+  selectedJob: baseInput.selectedJob,
+  jobPack: jobPackPayload.jobPack,
+  trainingRecords: [{ title: '中文自我介绍', transcript: { text: baseInput.transcript } }],
+  interviewType: 'job_pack_mock',
+}))
+const mockInterviewPayload = await mockInterviewResponse.json()
+assert.equal(mockInterviewPayload.success, true)
+assert.equal(mockInterviewPayload.provider, 'mock')
+assert.ok(mockInterviewPayload.questions.length >= 6)
+
+const followUpResponse = await generateFollowUpRoute.fetch(request('/api/generate-follow-up', {
+  selectedJob: baseInput.selectedJob,
+  question: mockInterviewPayload.questions[0],
+  transcript: baseInput.transcript,
+  aiFeedback: mockPayload,
+}))
+const followUpPayload = await followUpResponse.json()
+assert.equal(followUpPayload.success, true)
+assert.match(followUpPayload.followUpQuestion.question, /具体|岗位|项目/)
+
+const reportResponse = await generateInterviewReportRoute.fetch(request('/api/generate-interview-report', {
+  selectedJob: baseInput.selectedJob,
+  jobPack: jobPackPayload.jobPack,
+  questions: mockInterviewPayload.questions,
+  answers: [{
+    questionId: mockInterviewPayload.questions[0].id,
+    question: mockInterviewPayload.questions[0].question,
+    transcript: { text: baseInput.transcript, source: 'mock', updatedAt: new Date().toISOString() },
+    aiFeedback: mockPayload,
+    durationSeconds: 90,
+  }],
+}))
+const reportPayload = await reportResponse.json()
+assert.equal(reportPayload.success, true)
+assert.equal(reportPayload.provider, 'mock')
+assert.ok(reportPayload.finalReport.nextTrainingPlan.length)
+
+process.env.AI_PROVIDER = 'agnes'
+const agnesFallbackResponse = await generateMockInterviewRoute.fetch(request('/api/generate-mock-interview', {
+  selectedJob: baseInput.selectedJob,
+}))
+const agnesFallbackPayload = await agnesFallbackResponse.json()
+assert.equal(agnesFallbackPayload.success, true)
+assert.equal(agnesFallbackPayload.provider, 'mock_fallback')
+
+console.log('AI, ASR, job pack and mock interview routes: mock, configurable provider fallback, validation passed')

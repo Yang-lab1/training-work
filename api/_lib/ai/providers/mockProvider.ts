@@ -2,10 +2,16 @@ import type {
   AIProviderName,
   AnalyzeAnswerRequest,
   AnalyzeAnswerSuccess,
+  GenerateFollowUpRequest,
+  GenerateFollowUpSuccess,
+  GenerateInterviewReportRequest,
+  GenerateInterviewReportSuccess,
   GenerateJobPackRequest,
   GenerateJobPackSuccess,
+  GenerateMockInterviewRequest,
+  GenerateMockInterviewSuccess,
 } from '../../../../src/lib/ai/types.js'
-import { normalizeJobPack, normalizeModelFeedback } from '../response.js'
+import { normalizeFollowUp, normalizeInterviewReport, normalizeJobPack, normalizeMockInterviewQuestions, normalizeModelFeedback } from '../response.js'
 
 function shortVersion(input: AnalyzeAnswerRequest) {
   const company = input.selectedJob?.companyName || '目标公司'
@@ -197,4 +203,74 @@ export function generateJobPackWithMock(
       '把自我介绍最后 20 秒改成岗位匹配总结。',
     ],
   }, provider, 'mock-job-pack-v1', note)
+}
+
+export function generateMockInterviewWithMock(
+  input: GenerateMockInterviewRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): GenerateMockInterviewSuccess {
+  const job = input.selectedJob
+  const company = job.companyName || '目标公司'
+  const role = job.jobTitle || '目标岗位'
+  const business = job.companyBusiness || job.mainTrack || job.businessDirection || '相关业务'
+  const fromPack = (input.jobPack?.likelyQuestions || [])
+    .slice(0, 3)
+    .map((item, index) => ({
+      id: `pack-${index + 1}`,
+      type: index === 0 ? 'role_fit' : 'technical_basic',
+      question: item?.question || `你如何理解${business}？`,
+      source: 'jobPack',
+      expectedFocus: item?.whyItMatters || '结合准备包方向和个人经历作答。',
+      followUpPolicy: item?.framework || '如果回答空泛，追问项目证据。',
+    }))
+  const questions = [
+    { id: 'q-1', type: 'self_intro', question: `请用中文做一个 90 秒自我介绍，并说明你为什么适合${company}的${role}。`, source: 'selectedJob', expectedFocus: '背景、AI 学习、项目证据、岗位匹配。', followUpPolicy: '追问最能证明岗位匹配的一段经历。' },
+    { id: 'q-2', type: 'role_fit', question: `你为什么选择${company}和${role}？`, source: 'selectedJob', expectedFocus: `公司业务 ${business}、岗位动机、个人贡献。`, followUpPolicy: '追问公司业务与项目经历的关系。' },
+    { id: 'q-3', type: 'project', question: '请讲一下 Miro 项目，你负责了什么关键决策？', source: 'miroProject', expectedFocus: '用户、场景、AI 作用、MVP 取舍、结果。', followUpPolicy: '追问具体用户和验证证据。' },
+    ...fromPack,
+    { id: 'q-4', type: 'role_fit', question: '你从设计背景转向 AI 产品，优势和短板分别是什么？', source: 'selectedJob', expectedFocus: '迁移能力、风险认知、补齐计划。', followUpPolicy: '追问短板如何在入职后补齐。' },
+    { id: 'q-5', type: 'technical_basic', question: '如果要验证一个 AI 产品功能是否有效，你会看哪些指标？', source: 'selectedJob', expectedFocus: '假设、指标、MVP、反馈闭环。', followUpPolicy: '追问具体指标和实验设计。' },
+    { id: 'q-6', type: input.interviewType === 'pressure_mock' ? 'pressure' : 'english', question: input.interviewType === 'pressure_mock' ? '如果面试官认为你经验不够，你会怎么回应？' : 'Please briefly explain why you are a good fit for this role.', source: 'mockProvider', expectedFocus: '承认差距、迁移证据、学习计划。', followUpPolicy: '追问最强证据。' },
+  ].slice(0, 8)
+  return normalizeMockInterviewQuestions({ questions }, provider, 'mock-interview-v1', note)
+}
+
+export function generateFollowUpWithMock(
+  input: GenerateFollowUpRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): GenerateFollowUpSuccess {
+  const problems = (input.aiFeedback?.problems || []).join(' ')
+  const role = input.selectedJob.jobTitle || '这个岗位'
+  let question = `你能不能用一个更具体的项目例子，说明自己为什么适合${role}？`
+  if (/过短|太短/.test(problems) || input.transcript.length < 80) question = '你刚才回答偏短，能不能补充一个具体行动和结果？'
+  else if (/具体|项目/.test(problems)) question = '你刚才讲到项目时，用户是谁、场景是什么、你做了哪一个关键取舍？'
+  else if (/岗位|匹配/.test(problems)) question = `你能不能把这段经历和${role}的日常工作直接连起来？`
+  else if (/逻辑|结构/.test(problems)) question = '请按“背景、行动、结果、岗位关系”重新补充一遍。'
+  return normalizeFollowUp({ followUpQuestion: question }, provider, 'mock-follow-up-v1', note)
+}
+
+export function generateInterviewReportWithMock(
+  input: GenerateInterviewReportRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): GenerateInterviewReportSuccess {
+  const scores = input.answers.map((answer) => answer.aiFeedback?.score).filter((score): score is number => typeof score === 'number')
+  const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 70
+  const company = input.selectedJob.companyName || '目标公司'
+  const role = input.selectedJob.jobTitle || '目标岗位'
+  const problems = input.answers.flatMap((answer) => answer.aiFeedback?.problems || []).slice(0, 6)
+  return normalizeInterviewReport({
+    overallScore: average,
+    summary: `本场模拟面试围绕${company}的${role}展开，已完成 ${input.answers.length}/${input.questions.length} 个问题。下一步重点是把岗位关键词、项目证据和回答结构讲得更直接。`,
+    strongestAnswer: input.answers[0]?.question || '自我介绍题',
+    weakestAnswer: input.answers.find((answer) => (answer.aiFeedback?.score || 100) < average)?.question || input.questions[2]?.question || '项目讲解题',
+    recurringProblems: problems.length ? problems : ['岗位匹配表达不够直接', '项目证据还可以更具体'],
+    roleFitAssessment: `回答需要持续回到${company}、${role}和公司业务，不要只讲个人背景。`,
+    communicationAssessment: '表达已能完成一问一答，但建议减少铺垫，优先给结论。',
+    projectDepthAssessment: 'Miro 项目需要讲清用户、场景、AI 作用、MVP 取舍和验证结果。',
+    englishAssessment: '英文回答先保证短句清楚，再补充岗位关键词。',
+    nextTrainingPlan: ['重练 90 秒中文自我介绍', '用项目七步法重讲 Miro 项目', '准备“为什么选择公司和岗位”', '补一版英文 60 秒回答'],
+  }, provider, 'mock-interview-report-v1', note)
 }

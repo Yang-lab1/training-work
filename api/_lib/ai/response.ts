@@ -1,9 +1,14 @@
 import type {
   AIProviderName,
   AnalyzeAnswerSuccess,
+  GenerateFollowUpSuccess,
+  GenerateInterviewReportSuccess,
   GenerateJobPackSuccess,
+  GenerateMockInterviewSuccess,
+  InterviewFinalReport,
   JobPackAnswerFramework,
   JobPackQuestion,
+  MockInterviewQuestion,
 } from '../../../src/lib/ai/types.js'
 
 type ModelFeedback = Omit<
@@ -106,6 +111,19 @@ function normalizeAnswerFramework(item: Record<string, unknown>): JobPackAnswerF
   }
 }
 
+function normalizeMockQuestion(item: Record<string, unknown>, index: number): MockInterviewQuestion {
+  const type = text(item.type, index === 0 ? 'self_intro' : index === 2 ? 'project' : index === 5 ? 'pressure' : 'role_fit') as MockInterviewQuestion['type']
+  const source = text(item.source, 'mockProvider') as MockInterviewQuestion['source']
+  return {
+    id: text(item.id, `q-${index + 1}`),
+    type: ['self_intro', 'project', 'role_fit', 'technical_basic', 'pressure', 'english', 'follow_up'].includes(type) ? type : 'role_fit',
+    question: text(item.question, '请介绍一下你为什么适合这个岗位。'),
+    source: ['jobPack', 'selectedJob', 'miroProject', 'mockProvider'].includes(source) ? source : 'mockProvider',
+    expectedFocus: text(item.expectedFocus, '回答需要结合公司业务、岗位要求和自己的项目证据。'),
+    followUpPolicy: text(item.followUpPolicy, '如果回答空泛，继续追问具体项目、行动和结果。'),
+  }
+}
+
 export function normalizeJobPack(
   value: unknown,
   provider: AIProviderName,
@@ -142,6 +160,90 @@ export function normalizeJobPack(
       })), normalizeAnswerFramework).slice(0, 8),
       preparationTasks: list(input.preparationTasks, ['用 90 秒讲一遍自我介绍。', '用项目七步法重讲 Miro 项目。', '准备 3 个岗位相关追问。']).slice(0, 5),
     },
+    rawProviderNote,
+  }
+}
+
+export function normalizeMockInterviewQuestions(
+  value: unknown,
+  provider: AIProviderName,
+  model: string,
+  rawProviderNote?: string,
+): GenerateMockInterviewSuccess {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const fallback = [
+    { id: 'q-1', type: 'self_intro', question: '请用中文做一个 90 秒自我介绍，并说明你和这个岗位的匹配点。', source: 'mockProvider', expectedFocus: '背景、AI 学习、项目证据、岗位匹配。', followUpPolicy: '追问最能证明岗位匹配的一段经历。' },
+    { id: 'q-2', type: 'role_fit', question: '你为什么选择这家公司和这个岗位？', source: 'selectedJob', expectedFocus: '公司业务理解、岗位动机、个人贡献。', followUpPolicy: '追问公司业务与你项目的关系。' },
+    { id: 'q-3', type: 'project', question: '请讲一下 Miro 项目，你负责了什么关键决策？', source: 'miroProject', expectedFocus: '用户、场景、MVP 取舍、结果。', followUpPolicy: '追问具体用户和验证证据。' },
+    { id: 'q-4', type: 'role_fit', question: '你从设计背景转向 AI 产品，优势和短板分别是什么？', source: 'selectedJob', expectedFocus: '迁移能力、风险认知、补齐计划。', followUpPolicy: '追问短板如何在入职后补齐。' },
+    { id: 'q-5', type: 'technical_basic', question: '如果要验证一个 AI 产品功能是否有效，你会看哪些指标？', source: 'selectedJob', expectedFocus: '假设、指标、MVP、反馈闭环。', followUpPolicy: '追问具体指标和实验设计。' },
+    { id: 'q-6', type: 'pressure', question: '如果面试官认为你经验不够，你会怎么回应？', source: 'mockProvider', expectedFocus: '承认差距、迁移证据、学习计划。', followUpPolicy: '追问最强证据。' },
+  ]
+  const rawQuestions = Array.isArray(input.questions) ? input.questions : Array.isArray(value) ? value : fallback
+  const questions = rawQuestions
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map(normalizeMockQuestion)
+    .slice(0, 10)
+  return {
+    success: true,
+    provider,
+    model,
+    generatedAt: new Date().toISOString(),
+    questions: questions.length >= 6 ? questions : fallback.map(normalizeMockQuestion),
+    rawProviderNote,
+  }
+}
+
+export function normalizeFollowUp(
+  value: unknown,
+  provider: AIProviderName,
+  model: string,
+  rawProviderNote?: string,
+): GenerateFollowUpSuccess {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    success: true,
+    provider,
+    model,
+    generatedAt: new Date().toISOString(),
+    followUpQuestion: normalizeMockQuestion({
+      id: text(input.id, `follow-up-${Date.now()}`),
+      type: 'follow_up',
+      question: text(input.followUpQuestion || input.question, '你刚才提到的项目结果能不能再具体一点？'),
+      source: 'mockProvider',
+      expectedFocus: text(input.expectedFocus, '补充具体用户、行动、结果和岗位关系。'),
+      followUpPolicy: text(input.followUpPolicy, '继续追问可验证证据。'),
+    }, 0),
+    rawProviderNote,
+  }
+}
+
+export function normalizeInterviewReport(
+  value: unknown,
+  provider: AIProviderName,
+  model: string,
+  rawProviderNote?: string,
+): GenerateInterviewReportSuccess {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const rawScore = typeof input.overallScore === 'number' ? input.overallScore : Number(input.overallScore)
+  const finalReport: InterviewFinalReport = {
+    overallScore: Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : 72,
+    summary: text(input.summary, '本场模拟面试已完成，下一步重点是提高岗位证据密度和项目具体性。'),
+    strongestAnswer: text(input.strongestAnswer, '自我介绍已形成基本结构。'),
+    weakestAnswer: text(input.weakestAnswer, '项目回答需要更具体的用户、行动和结果。'),
+    recurringProblems: list(input.recurringProblems, ['岗位关键词不够直接', '项目结果还不够具体']).slice(0, 6),
+    roleFitAssessment: text(input.roleFitAssessment, '岗位匹配需要在开头和结尾更明确地连接公司业务。'),
+    communicationAssessment: text(input.communicationAssessment, '表达整体可理解，建议减少铺垫和重复。'),
+    projectDepthAssessment: text(input.projectDepthAssessment, '项目深度需要补充决策过程、MVP 取舍和验证证据。'),
+    englishAssessment: text(input.englishAssessment, '英文问题可先用短句保证清晰度。'),
+    nextTrainingPlan: list(input.nextTrainingPlan, ['重练 90 秒自我介绍', '用项目七步法重讲 Miro 项目', '准备为什么选择公司和岗位']).slice(0, 6),
+  }
+  return {
+    success: true,
+    provider,
+    model,
+    generatedAt: new Date().toISOString(),
+    finalReport,
     rawProviderNote,
   }
 }

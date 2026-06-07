@@ -11,6 +11,7 @@ import {
   FileText,
   History,
   Home,
+  MessagesSquare,
   Mic,
   RotateCcw,
   Save,
@@ -24,8 +25,14 @@ import type { JobRecord } from './jobParser'
 import type {
   AIFeedbackStatus,
   AnalyzeAnswerResponse,
+  GenerateFollowUpResponse,
+  GenerateInterviewReportResponse,
   GenerateJobPackResponse,
+  GenerateMockInterviewResponse,
+  InterviewFinalReport,
   JobPackContent,
+  MockInterviewQuestion,
+  MockInterviewType,
   StoredAIFeedback,
   TrainingType,
   TranscriptData,
@@ -34,7 +41,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '0.3A'
+const APP_VERSION = '0.6A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -44,10 +51,11 @@ const CV_TEXT_KEY = 'interview_os_cv_text'
 const SCRIPT_TEMPLATES_KEY = 'interview_os_script_templates'
 const TRAINING_RECORDS_KEY = 'interview_os_training_records'
 const JOB_PACKS_KEY = 'interview_os_job_packs'
+const MOCK_INTERVIEWS_KEY = 'interview_os_mock_interviews'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'backup'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'backup'
 type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -153,6 +161,7 @@ interface BackupPayload {
   scriptTemplates: ScriptTemplates
   trainingRecords: TrainingRecord[]
   jobPacks: StoredJobPack[]
+  mockInterviews: MockInterviewSession[]
 }
 
 interface StoredJobPack {
@@ -164,6 +173,40 @@ interface StoredJobPack {
   generatedAt: string
   jobPack: JobPackContent
   rawProviderNote?: string
+}
+
+interface MockInterviewAnswer {
+  id: string
+  questionId: string
+  audioMetadata?: TrainingRecord['audioMetadata']
+  recordingId?: string
+  recordingName?: string
+  transcript?: TranscriptData
+  transcriptStatus: TranscriptStatus
+  aiFeedback?: StoredAIFeedback
+  aiFeedbackStatus: AIFeedbackStatus
+  durationSeconds: number
+  createdAt: string
+}
+
+interface MockInterviewSession {
+  id: string
+  selectedJob: JobRecord
+  jobPackId?: string
+  status: 'not_started' | 'in_progress' | 'completed'
+  createdAt: string
+  completedAt?: string
+  interviewType: MockInterviewType
+  currentQuestionIndex: number
+  questions: MockInterviewQuestion[]
+  answers: MockInterviewAnswer[]
+  finalReport?: {
+    provider: string
+    model: string
+    generatedAt: string
+    report: InterviewFinalReport
+    rawProviderNote?: string
+  }
 }
 
 const defaultTasks: TrainingTask[] = [
@@ -211,6 +254,7 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
   { id: 'history', label: '历史', icon: <History size={17} /> },
   { id: 'feedback', label: 'AI 反馈', icon: <BrainCircuit size={17} /> },
   { id: 'jobPack', label: '岗位准备包', icon: <Sparkles size={17} /> },
+  { id: 'mockInterview', label: '模拟面试', icon: <MessagesSquare size={17} /> },
   { id: 'backup', label: '数据备份', icon: <Archive size={17} /> },
 ]
 
@@ -222,6 +266,7 @@ function App() {
   const [cvTextState, setCvTextState] = useState<CvTextState>(readCvTextState)
   const [scriptTemplates, setScriptTemplates] = useState<ScriptTemplates>(readScriptTemplates)
   const [jobPacks, setJobPacks] = useState<StoredJobPack[]>(readJobPacks)
+  const [mockInterviews, setMockInterviews] = useState<MockInterviewSession[]>(readMockInterviews)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
@@ -237,6 +282,10 @@ function App() {
   const [filters, setFilters] = useState({ company: '', title: '', city: '', jobType: '', priority: '', mainTrack: '' })
   const [jobPackMessage, setJobPackMessage] = useState('')
   const [jobPackLoading, setJobPackLoading] = useState(false)
+  const [mockInterviewMessage, setMockInterviewMessage] = useState('')
+  const [mockInterviewLoading, setMockInterviewLoading] = useState('')
+  const [recordingInterviewQuestionId, setRecordingInterviewQuestionId] = useState<string | null>(null)
+  const [interviewAudioPreviews, setInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -255,6 +304,10 @@ function App() {
   const currentJobPack = useMemo(
     () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
     [jobPacks, selectedJob],
+  )
+  const activeMockInterview = useMemo(
+    () => mockInterviews.find((session) => session.status === 'in_progress') || mockInterviews[0],
+    [mockInterviews],
   )
 
   function commitState(updater: (current: StoredMvpState) => StoredMvpState) {
@@ -281,6 +334,7 @@ function App() {
   useEffect(() => { localStorage.setItem(CV_TEXT_KEY, JSON.stringify(cvTextState)) }, [cvTextState])
   useEffect(() => { localStorage.setItem(SCRIPT_TEMPLATES_KEY, JSON.stringify(scriptTemplates)) }, [scriptTemplates])
   useEffect(() => { localStorage.setItem(JOB_PACKS_KEY, JSON.stringify(jobPacks)) }, [jobPacks])
+  useEffect(() => { localStorage.setItem(MOCK_INTERVIEWS_KEY, JSON.stringify(mockInterviews)) }, [mockInterviews])
 
   useEffect(() => {
     let disposed = false
@@ -298,12 +352,29 @@ function App() {
   }, [state.tasks])
 
   useEffect(() => {
-    if (!recordingTaskId) return undefined
+    let disposed = false
+    async function loadInterviewAudio() {
+      const previews: Record<string, AudioPreview> = {}
+      for (const session of mockInterviews) {
+        for (const answer of session.answers) {
+          if (!answer.recordingId) continue
+          const blob = await readRecordingBlob(answer.recordingId)
+          if (blob && !disposed) previews[answer.questionId] = createPreview(blob)
+        }
+      }
+      if (!disposed) setInterviewAudioPreviews(previews)
+    }
+    void loadInterviewAudio()
+    return () => { disposed = true }
+  }, [mockInterviews])
+
+  useEffect(() => {
+    if (!recordingTaskId && !recordingInterviewQuestionId) return undefined
     const timer = window.setInterval(() => {
       setRecordingSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000))
     }, 250)
     return () => window.clearInterval(timer)
-  }, [recordingTaskId])
+  }, [recordingTaskId, recordingInterviewQuestionId])
 
   useEffect(() => () => stopStream(), [])
 
@@ -396,7 +467,7 @@ function App() {
   }
 
   async function startRecording(taskId: TaskId) {
-    if (recordingTaskId) return
+    if (recordingTaskId || recordingInterviewQuestionId) return
     setRecorderError('')
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setRecorderError('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari。')
@@ -411,6 +482,7 @@ function App() {
       mediaRecorderRef.current = recorder
       startedAtRef.current = Date.now()
       setRecordingTaskId(taskId)
+      setRecordingInterviewQuestionId(null)
       setRecordingSeconds(0)
       recorder.addEventListener('dataavailable', (event) => {
         if (event.data.size) chunksRef.current.push(event.data)
@@ -436,6 +508,45 @@ function App() {
   function stopRecording() {
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') recorder.stop()
+  }
+
+  async function startInterviewAnswerRecording(questionId: string) {
+    if (recordingTaskId || recordingInterviewQuestionId) return
+    setRecorderError('')
+    setMockInterviewMessage('')
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setRecorderError('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari。')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = getSupportedAudioMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      chunksRef.current = []
+      streamRef.current = stream
+      mediaRecorderRef.current = recorder
+      startedAtRef.current = Date.now()
+      setRecordingInterviewQuestionId(questionId)
+      setRecordingSeconds(0)
+      recorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size) chunksRef.current.push(event.data)
+      })
+      recorder.addEventListener('stop', () => {
+        const duration = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000))
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        void finishInterviewAnswerRecording(questionId, blob, duration)
+        stopStream()
+        mediaRecorderRef.current = null
+        chunksRef.current = []
+        setRecordingInterviewQuestionId(null)
+        setRecordingSeconds(0)
+      })
+      recorder.start()
+    } catch (error) {
+      stopStream()
+      setRecordingInterviewQuestionId(null)
+      setRecorderError(error instanceof Error ? error.message : '录音权限被拒绝。')
+    }
   }
 
   async function finishRecording(taskId: TaskId, blob: Blob, duration: number) {
@@ -475,6 +586,249 @@ function App() {
       } : item),
       history: [record, ...current.history].slice(0, 50),
     }))
+  }
+
+  async function startMockInterview(interviewType: MockInterviewType = 'job_pack_mock') {
+    if (!selectedJob) {
+      setMockInterviewMessage('请先选择目标岗位。')
+      setActiveView('materials')
+      return
+    }
+    setMockInterviewLoading('start')
+    setMockInterviewMessage('')
+    try {
+      const response = await fetch('/api/generate-mock-interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'generate_mock_interview',
+          selectedJob,
+          jobPack: currentJobPack?.jobPack,
+          cvText: cvTextState.text.slice(0, 6000),
+          trainingRecords: state.history.slice(0, 20),
+          interviewType,
+        }),
+      })
+      const result = await response.json() as GenerateMockInterviewResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '模拟面试生成失败。' : result.error)
+      const session: MockInterviewSession = {
+        id: `mock-interview-${Date.now()}`,
+        selectedJob,
+        jobPackId: currentJobPack?.id,
+        status: 'in_progress',
+        createdAt: new Date().toISOString(),
+        interviewType,
+        currentQuestionIndex: 0,
+        questions: result.questions,
+        answers: [],
+      }
+      setMockInterviews((current) => [session, ...current].slice(0, 20))
+      setMockInterviewMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟面试问题。' : '模拟面试已生成。')
+    } catch (error) {
+      setMockInterviewMessage(error instanceof Error ? error.message : '模拟面试生成失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
+  }
+
+  async function finishInterviewAnswerRecording(questionId: string, blob: Blob, duration: number) {
+    const session = activeMockInterview
+    const question = session?.questions.find((item) => item.id === questionId)
+    if (!session || !question) return
+    const recordingId = `mock-answer-${questionId}-${Date.now()}`
+    const recordingName = `模拟面试-${questionId}-${formatDateForFile(new Date())}.webm`
+    await saveRecordingBlob(recordingId, blob)
+    setInterviewAudioPreviews((current) => ({ ...current, [questionId]: createPreview(blob) }))
+    const answer: MockInterviewAnswer = {
+      id: `answer-${questionId}-${Date.now()}`,
+      questionId,
+      audioMetadata: { recordingId, recordingName, durationSeconds: duration, mimeType: blob.type },
+      recordingId,
+      recordingName,
+      transcriptStatus: 'not_started',
+      aiFeedbackStatus: 'transcript_needed',
+      durationSeconds: duration,
+      createdAt: new Date().toISOString(),
+    }
+    setMockInterviews((current) => current.map((item) => item.id === session.id ? {
+      ...item,
+      answers: [answer, ...item.answers.filter((existing) => existing.questionId !== questionId)],
+    } : item))
+    setMockInterviewMessage('已保存本题录音。下一步生成转写。')
+  }
+
+  async function generateInterviewAnswerTranscript(sessionId: string, questionId: string) {
+    const session = mockInterviews.find((item) => item.id === sessionId)
+    const answer = session?.answers.find((item) => item.questionId === questionId)
+    if (!session || !answer) return
+    setMockInterviewLoading(`transcript-${questionId}`)
+    setMockInterviewMessage('')
+    setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'transcribing' })))
+    try {
+      const payload = {
+        trainingRecordId: answer.id,
+        trainingType: questionToTrainingType(session.questions.find((question) => question.id === questionId)?.type),
+        audioMetadata: answer.audioMetadata,
+        selectedJob: session.selectedJob,
+      }
+      const blob = answer.recordingId ? await readRecordingBlob(answer.recordingId) : null
+      if (answer.recordingId && !blob) setMockInterviewMessage('该记录没有可用音频 Blob，请重新录制或使用模拟转写测试流程。')
+      const requestInit: RequestInit = blob
+        ? (() => {
+          const form = new FormData()
+          form.append('payload', JSON.stringify(payload))
+          form.append('audio', blob, answer.recordingName || 'mock-answer.webm')
+          return { method: 'POST', body: form }
+        })()
+        : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+      const response = await fetch('/api/transcribe', requestInit)
+      const result = await response.json() as TranscribeResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '转写失败。' : result.error)
+      const transcript: TranscriptData = {
+        text: result.transcript,
+        source: result.provider === 'mock' || result.provider === 'mock_fallback' ? 'mock' : 'asr',
+        updatedAt: result.generatedAt,
+        generatedAt: result.generatedAt,
+        provider: result.provider,
+        language: result.language,
+      }
+      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({
+        ...item,
+        transcript,
+        transcriptStatus: transcript.source === 'mock' ? 'mock_ready' : 'completed',
+        aiFeedback: undefined,
+        aiFeedbackStatus: 'ready_to_analyze',
+      })))
+      setMockInterviewMessage(transcript.source === 'mock' ? '已生成模拟转写。' : '本题转写完成。')
+    } catch (error) {
+      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'failed', aiFeedbackStatus: 'transcript_needed' })))
+      setMockInterviewMessage(error instanceof Error ? error.message : '转写失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
+  }
+
+  async function generateInterviewAnswerFeedback(sessionId: string, questionId: string) {
+    const session = mockInterviews.find((item) => item.id === sessionId)
+    const answer = session?.answers.find((item) => item.questionId === questionId)
+    const question = session?.questions.find((item) => item.id === questionId)
+    const text = answer?.transcript?.text?.trim()
+    if (!session || !answer || !question || !text) {
+      setMockInterviewMessage('请先生成本题转写文本。')
+      return
+    }
+    setMockInterviewLoading(`feedback-${questionId}`)
+    setMockInterviewMessage('')
+    setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'analyzing' })))
+    try {
+      const response = await fetch('/api/analyze-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'analyze_answer',
+          trainingRecordId: answer.id,
+          trainingType: questionToTrainingType(question.type),
+          selectedJob: session.selectedJob,
+          transcript: text,
+          durationSeconds: answer.durationSeconds,
+          targetSeconds: question.type === 'project' ? 180 : 90,
+          cvText: cvTextState.text.slice(0, 6000),
+          scriptText: `面试官问题：${question.question}\n期待重点：${question.expectedFocus}\n准备包：${currentJobPack?.jobPack.selfIntroductionStrategy || ''}\n${currentJobPack?.jobPack.miroProjectStrategy || ''}`,
+        }),
+      })
+      const result = await response.json() as AnalyzeAnswerResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '反馈生成失败。' : result.error)
+      const { success: _success, ...aiFeedback } = result
+      void _success
+      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedback, aiFeedbackStatus: 'completed' })))
+      setMockInterviewMessage('本题 AI 反馈已保存。')
+    } catch (error) {
+      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'failed' })))
+      setMockInterviewMessage(error instanceof Error ? error.message : '反馈生成失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
+  }
+
+  async function generateFollowUpQuestion(sessionId: string, questionId: string) {
+    const session = mockInterviews.find((item) => item.id === sessionId)
+    const question = session?.questions.find((item) => item.id === questionId)
+    const answer = session?.answers.find((item) => item.questionId === questionId)
+    if (!session || !question || !answer?.transcript || !answer.aiFeedback) {
+      setMockInterviewMessage('需要先完成本题转写和 AI 反馈。')
+      return
+    }
+    setMockInterviewLoading(`follow-${questionId}`)
+    try {
+      const response = await fetch('/api/generate-follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskType: 'generate_follow_up', selectedJob: session.selectedJob, question, transcript: answer.transcript.text, aiFeedback: answer.aiFeedback }),
+      })
+      const result = await response.json() as GenerateFollowUpResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '追问生成失败。' : result.error)
+      setMockInterviews((current) => current.map((item) => item.id === sessionId ? { ...item, questions: [...item.questions, result.followUpQuestion], currentQuestionIndex: item.questions.length } : item))
+      setMockInterviewMessage('已生成追问。')
+    } catch (error) {
+      setMockInterviewMessage(error instanceof Error ? error.message : '追问生成失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
+  }
+
+  function nextInterviewQuestion(sessionId: string) {
+    setMockInterviews((current) => current.map((session) => session.id === sessionId ? { ...session, currentQuestionIndex: Math.min(session.currentQuestionIndex + 1, session.questions.length - 1) } : session))
+  }
+
+  async function finishMockInterview(sessionId: string) {
+    const session = mockInterviews.find((item) => item.id === sessionId)
+    if (!session) return
+    setMockInterviewLoading('report')
+    setMockInterviewMessage('')
+    try {
+      const response = await fetch('/api/generate-interview-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'generate_interview_report',
+          selectedJob: session.selectedJob,
+          jobPack: currentJobPack?.jobPack,
+          questions: session.questions,
+          answers: session.answers.map((answer) => ({
+            questionId: answer.questionId,
+            question: session.questions.find((question) => question.id === answer.questionId)?.question || '',
+            transcript: answer.transcript,
+            transcriptStatus: answer.transcriptStatus,
+            aiFeedback: answer.aiFeedback,
+            aiFeedbackStatus: answer.aiFeedbackStatus,
+            durationSeconds: answer.durationSeconds,
+          })),
+        }),
+      })
+      const result = await response.json() as GenerateInterviewReportResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '整场复盘生成失败。' : result.error)
+      setMockInterviews((current) => current.map((item) => item.id === sessionId ? {
+        ...item,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        finalReport: {
+          provider: result.provider,
+          model: result.model,
+          generatedAt: result.generatedAt,
+          report: result.finalReport,
+          rawProviderNote: result.rawProviderNote,
+        },
+      } : item))
+      setMockInterviewMessage('整场复盘已生成。')
+    } catch (error) {
+      setMockInterviewMessage(error instanceof Error ? error.message : '整场复盘生成失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
+  }
+
+  function deleteMockInterview(sessionId: string) {
+    setMockInterviews((current) => current.filter((session) => session.id !== sessionId))
   }
 
   async function resetTask(taskId: TaskId) {
@@ -525,6 +879,7 @@ function App() {
       scriptTemplates,
       trainingRecords: state.history,
       jobPacks,
+      mockInterviews,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -544,6 +899,7 @@ function App() {
       setCvTextState(parsed.cvText)
       setScriptTemplates(parsed.scriptTemplates)
       setJobPacks(normalizeJobPacks(parsed.jobPacks))
+      setMockInterviews(normalizeMockInterviews(parsed.mockInterviews))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -569,7 +925,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -579,6 +935,7 @@ function App() {
     setCvTextState({ text: '', source: 'upload' })
     setScriptTemplates({})
     setJobPacks([])
+    setMockInterviews([])
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
@@ -837,6 +1194,56 @@ function App() {
           </Page>
         )}
 
+        {activeView === 'mockInterview' && (
+          <Page title="模拟面试" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先从岗位库选择目标岗位'}>
+            {!selectedJob ? (
+              <section className="primary-flow">
+                <div>
+                  <span className="eyebrow">尚未选择岗位</span>
+                  <h2>先选择目标岗位</h2>
+                  <p>模拟面试必须基于 job.xlsx 中的岗位。</p>
+                </div>
+                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
+              </section>
+            ) : (
+              <>
+                <section className="primary-flow">
+                  <div>
+                    <span className="eyebrow">岗位定向模拟</span>
+                    <h2>{selectedJob.companyName} · {selectedJob.jobTitle}</h2>
+                    <p>{currentJobPack ? '已读取岗位准备包。' : '建议先生成岗位准备包，也可以直接用岗位信息开始。'}</p>
+                  </div>
+                  <div className="inline-actions">
+                    <button className="primary-button" type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}><MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '开始一轮模拟面试'}</button>
+                    {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>先生成准备包</button>}
+                  </div>
+                </section>
+                {recorderError && <p className="error-line">{recorderError}</p>}
+                {mockInterviewMessage && <p className={mockInterviewMessage.includes('失败') || mockInterviewMessage.includes('缺少') ? 'error-line' : 'success-line'}>{mockInterviewMessage}</p>}
+                {activeMockInterview ? (
+                  <MockInterviewPanel
+                    session={activeMockInterview}
+                    currentQuestion={activeMockInterview.questions[activeMockInterview.currentQuestionIndex]}
+                    currentAnswer={activeMockInterview.answers.find((answer) => answer.questionId === activeMockInterview.questions[activeMockInterview.currentQuestionIndex]?.id)}
+                    preview={interviewAudioPreviews[activeMockInterview.questions[activeMockInterview.currentQuestionIndex]?.id]}
+                    loading={mockInterviewLoading}
+                    recordingQuestionId={recordingInterviewQuestionId}
+                    recordingSeconds={recordingSeconds}
+                    onStartRecording={(questionId) => void startInterviewAnswerRecording(questionId)}
+                    onStopRecording={stopRecording}
+                    onTranscript={(questionId) => void generateInterviewAnswerTranscript(activeMockInterview.id, questionId)}
+                    onFeedback={(questionId) => void generateInterviewAnswerFeedback(activeMockInterview.id, questionId)}
+                    onFollowUp={(questionId) => void generateFollowUpQuestion(activeMockInterview.id, questionId)}
+                    onNext={() => nextInterviewQuestion(activeMockInterview.id)}
+                    onFinish={() => void finishMockInterview(activeMockInterview.id)}
+                    onDelete={() => deleteMockInterview(activeMockInterview.id)}
+                  />
+                ) : <p className="empty-state">还没有模拟面试。点击上方按钮生成问题。</p>}
+              </>
+            )}
+          </Page>
+        )}
+
         {activeView === 'backup' && (
           <Page title="数据备份" subtitle="备份包含资料 metadata、岗位、转写状态和 AI 反馈；不包含音频 Blob。">
             <section className="backup-actions">
@@ -871,6 +1278,110 @@ function UploadRow({ title, hint, file, button, accept, onChange, onRemove }: { 
 
 function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
   return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">全部</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+}
+
+function MockInterviewPanel({
+  session,
+  currentQuestion,
+  currentAnswer,
+  preview,
+  loading,
+  recordingQuestionId,
+  recordingSeconds,
+  onStartRecording,
+  onStopRecording,
+  onTranscript,
+  onFeedback,
+  onFollowUp,
+  onNext,
+  onFinish,
+  onDelete,
+}: {
+  session: MockInterviewSession
+  currentQuestion?: MockInterviewQuestion
+  currentAnswer?: MockInterviewAnswer
+  preview?: AudioPreview
+  loading: string
+  recordingQuestionId: string | null
+  recordingSeconds: number
+  onStartRecording: (questionId: string) => void
+  onStopRecording: () => void
+  onTranscript: (questionId: string) => void
+  onFeedback: (questionId: string) => void
+  onFollowUp: (questionId: string) => void
+  onNext: () => void
+  onFinish: () => void
+  onDelete: () => void
+}) {
+  const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
+  const canGoNext = session.currentQuestionIndex < session.questions.length - 1
+  return (
+    <section className="mock-interview-panel">
+      <header>
+        <div>
+          <span className="eyebrow">{session.status === 'completed' ? '已完成' : '进行中'} · {session.currentQuestionIndex + 1}/{session.questions.length}</span>
+          <h2>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</h2>
+          <p>{session.interviewType === 'pressure_mock' ? '压力追问' : session.interviewType === 'quick_mock' ? '快速模拟' : '岗位准备包模拟'}</p>
+        </div>
+        <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+      </header>
+      {currentQuestion && (
+        <article className="interview-question">
+          <span>{currentQuestion.type} · {currentQuestion.source}</span>
+          <h3>{currentQuestion.question}</h3>
+          <p>{currentQuestion.expectedFocus}</p>
+        </article>
+      )}
+      {currentQuestion && (
+        <div className="recorder-controls">
+          <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId)}>
+            <Mic size={16} />{isRecording ? `录音中 ${formatDuration(recordingSeconds)}` : '回答本题'}
+          </button>
+          <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />停止</button>
+          <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
+            <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '转写中…' : '生成转写'}
+          </button>
+          <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
+            <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '分析中…' : '生成单题反馈'}
+          </button>
+        </div>
+      )}
+      {preview && currentAnswer && <div className="audio-result"><audio controls src={preview.url} /><a href={preview.url} download={currentAnswer.recordingName}><Download size={15} />下载</a><span>{formatDuration(currentAnswer.durationSeconds)} · {formatFileSize(preview.size)}</span></div>}
+      {currentAnswer?.transcript && <div className="transcript-preview"><span>{transcriptStatusLabel(currentAnswer.transcriptStatus)} · {currentAnswer.transcript.provider || currentAnswer.transcript.source}</span><p>{currentAnswer.transcript.text}</p></div>}
+      {currentAnswer?.aiFeedback && <AIFeedbackReport feedback={currentAnswer.aiFeedback} />}
+      <div className="inline-actions">
+        {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={!currentAnswer?.aiFeedback || loading === `follow-${currentQuestion.id}`}>生成追问</button>}
+        <button type="button" onClick={onNext} disabled={!canGoNext}>下一题</button>
+        <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '结束并生成整场复盘'}</button>
+      </div>
+      {session.finalReport && <InterviewFinalReportView finalReport={session.finalReport} />}
+    </section>
+  )
+}
+
+function InterviewFinalReportView({ finalReport }: { finalReport: NonNullable<MockInterviewSession['finalReport']> }) {
+  const isMock = finalReport.provider === 'mock' || finalReport.provider === 'mock_fallback'
+  return (
+    <article className="ai-report">
+      <header>
+        <div><span>整场分数</span><strong>{finalReport.report.overallScore}</strong></div>
+        <p>{finalReport.report.summary}</p>
+        <em>{finalReport.provider} · {finalReport.model} · {formatDateTime(finalReport.generatedAt)}</em>
+      </header>
+      {isMock && <p className="mock-notice">当前为模拟复盘，仅用于测试流程。</p>}
+      {finalReport.rawProviderNote && <p className="provider-note">{finalReport.rawProviderNote}</p>}
+      <dl className="feedback-detail-list">
+        <div><dt>最强回答</dt><dd>{finalReport.report.strongestAnswer}</dd></div>
+        <div><dt>最弱回答</dt><dd>{finalReport.report.weakestAnswer}</dd></div>
+        <div><dt>岗位匹配</dt><dd>{finalReport.report.roleFitAssessment}</dd></div>
+        <div><dt>沟通表达</dt><dd>{finalReport.report.communicationAssessment}</dd></div>
+        <div><dt>项目深度</dt><dd>{finalReport.report.projectDepthAssessment}</dd></div>
+        <div><dt>英文</dt><dd>{finalReport.report.englishAssessment}</dd></div>
+      </dl>
+      <FeedbackList title="反复出现的问题" items={finalReport.report.recurringProblems} />
+      <FeedbackList title="下一轮训练计划" items={finalReport.report.nextTrainingPlan} />
+    </article>
+  )
 }
 
 function RecordList({
@@ -978,6 +1489,9 @@ function RecordRow({
         selectedJob: job,
       }
       const blob = record.recordingId ? await readRecordingBlob(record.recordingId) : null
+      if (record.recordingId && !blob) {
+        setMessage('该记录没有可用音频 Blob，请重新录制或使用模拟转写测试流程。')
+      }
       const requestInit: RequestInit = blob
         ? (() => {
           const form = new FormData()
@@ -1242,6 +1756,7 @@ function readSelectedJob() { try { const raw = localStorage.getItem(SELECTED_JOB
 function readCvTextState(): CvTextState { try { const raw = localStorage.getItem(CV_TEXT_KEY); return raw ? { text: '', source: 'upload', ...JSON.parse(raw) } : { text: '', source: 'upload' } } catch { return { text: '', source: 'upload' } } }
 function readScriptTemplates(): ScriptTemplates { try { const raw = localStorage.getItem(SCRIPT_TEMPLATES_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} } }
 function readJobPacks() { return normalizeJobPacks(readArray<StoredJobPack>(JOB_PACKS_KEY)) }
+function readMockInterviews() { return normalizeMockInterviews(readArray<MockInterviewSession>(MOCK_INTERVIEWS_KEY)) }
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
 
@@ -1294,6 +1809,36 @@ function normalizeJobPacks(packs?: StoredJobPack[]) {
     model: pack.model || 'unknown',
     generatedAt: pack.generatedAt || new Date().toISOString(),
   }))
+}
+function normalizeMockInterviews(sessions?: MockInterviewSession[]) {
+  return (Array.isArray(sessions) ? sessions : []).filter((session) => session?.selectedJob && Array.isArray(session.questions)).map((session) => ({
+    ...session,
+    id: session.id || `mock-interview-${Date.now()}`,
+    status: session.status || 'in_progress',
+    createdAt: session.createdAt || new Date().toISOString(),
+    interviewType: session.interviewType || 'job_pack_mock',
+    currentQuestionIndex: Math.max(0, Math.min(session.currentQuestionIndex || 0, Math.max(0, session.questions.length - 1))),
+    questions: session.questions,
+    answers: Array.isArray(session.answers) ? session.answers.map((answer) => ({
+      ...answer,
+      transcriptStatus: answer.transcriptStatus || (answer.transcript ? answer.transcript.source === 'mock' ? 'mock_ready' : 'completed' : 'not_started'),
+      aiFeedbackStatus: answer.aiFeedbackStatus || (answer.aiFeedback ? 'completed' : answer.transcript ? 'ready_to_analyze' : 'transcript_needed'),
+      durationSeconds: answer.durationSeconds || answer.audioMetadata?.durationSeconds || 0,
+      createdAt: answer.createdAt || new Date().toISOString(),
+    })) : [],
+  })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+function updateMockAnswer(
+  sessions: MockInterviewSession[],
+  sessionId: string,
+  questionId: string,
+  updater: (answer: MockInterviewAnswer) => MockInterviewAnswer,
+) {
+  return sessions.map((session) => session.id !== sessionId ? session : {
+    ...session,
+    answers: session.answers.map((answer) => answer.questionId === questionId ? updater(answer) : answer),
+  })
 }
 function getFileByCategory(files: UploadedFileMeta[], category: UploadCategory) { return files.find((file) => file.category === category) }
 function getDefaultTask(id: TaskId) { return defaultTasks.find((task) => task.id === id) || defaultTasks[0] }
@@ -1349,6 +1894,12 @@ function renderScript(template: string, job: JobRecord) {
 function taskIdToTrainingType(taskId: TaskId): TrainingType {
   if (taskId === 'en-intro') return 'englishIntro'
   if (taskId === 'miro-project') return 'miroProject'
+  return 'chineseIntro'
+}
+
+function questionToTrainingType(type?: MockInterviewQuestion['type']): TrainingType {
+  if (type === 'english') return 'englishIntro'
+  if (type === 'project') return 'miroProject'
   return 'chineseIntro'
 }
 

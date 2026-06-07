@@ -10,6 +10,8 @@
 4. 保存本地录音记录
 5. 调用 `/api/transcribe` 生成转写
 6. 调用 `/api/analyze-answer` 生成 AI 评分、诊断、修改稿和下一步任务
+7. 生成岗位准备包
+8. 进入岗位定向模拟面试，完成一问一答和整场复盘
 
 用户不需要填写自评分、问题标签、训练状态或改进建议。旧记录中的 `review` 只作为兼容数据展示。
 
@@ -33,13 +35,16 @@ DOUBAO_API_KEY=
 DOUBAO_ENDPOINT=
 OPENAI_API_KEY=
 GEMINI_API_KEY=
+AGNES_API_KEY=
+AGNES_BASE_URL=
+AGNES_MODEL=
 ```
 
 - 默认使用 Mock，不需要 Key。
 - DeepSeek 文本 Provider 已实现。
-- 设置 `AI_PROVIDER=deepseek` 且提供 `DEEPSEEK_API_KEY` 时，`/api/analyze-answer` 和 `/api/generate-job-pack` 会走 DeepSeek OpenAI-compatible chat completion。
+- 设置 `AI_PROVIDER=deepseek` 且提供 `DEEPSEEK_API_KEY` 时，文本反馈、岗位准备包、模拟面试问题、追问和整场复盘都会走 DeepSeek OpenAI-compatible chat completion。
 - Key 缺失、Key 错误、请求超时、HTTP 错误、输出非 JSON 或字段缺失时自动回退 `mock_fallback`。
-- 豆包、OpenAI、Gemini 已预留；未启用时回退 Mock。
+- 豆包、OpenAI、Gemini、AGNES 已预留；未启用时回退 Mock。
 - Key 只从服务端环境变量读取，不进入前端 Bundle。
 
 ## ASR Provider
@@ -56,7 +61,8 @@ TENCENT_ASR_API_KEY=
 
 - `/api/transcribe` 和 Mock ASR 已实现。
 - OpenAI、豆包、火山、讯飞、阿里云、腾讯云 Provider 接口已预留。
-- 当前真实音频仍保存在浏览器 IndexedDB，没有上传到 ASR 服务。
+- 前端已能从 IndexedDB 读取录音 Blob，并用 `multipart/form-data` 发送到 `/api/transcribe`。
+- 当前真实 ASR Provider 尚未消费音频内容，Mock ASR 用于验证“录音 → 转写 → AI 反馈”闭环。
 - 配置未实现的真实 Provider 或缺少 Key 时返回 `mock_fallback`，不会阻断训练。
 
 ## API
@@ -94,6 +100,18 @@ TENCENT_ASR_API_KEY=
 
 准备包是学习资料和高概率方向，不是面试舱固定题库。
 
+### `POST /api/generate-mock-interview`
+
+根据 `selectedJob`、岗位准备包、CV 文本和训练记录生成岗位定向模拟面试问题。Mock 至少返回 6 个问题。
+
+### `POST /api/generate-follow-up`
+
+根据当前问题、回答转写和单题 AI 反馈生成一个追问。
+
+### `POST /api/generate-interview-report`
+
+根据整场问题、回答转写和单题反馈生成整场复盘报告。
+
 ## 验证
 
 ```bash
@@ -110,9 +128,10 @@ npm run test:ai
 
 - 训练记录、转写状态和 AI 反馈保存在 `localStorage`。
 - 岗位准备包保存在 `localStorage` key `interview_os_job_packs`。
+- 模拟面试 session 保存在 `localStorage` key `interview_os_mock_interviews`。
 - 音频 Blob 保存在 IndexedDB `interview-os-recordings`。
 - JSON 备份不包含音频 Blob。
-- 当前没有账号、云数据库、真实 ASR、RAG 或完整面试舱。
+- 当前没有账号、云数据库、真实 ASR、RAG 或实时视频面试舱。
 
 ## xlsx 风险隔离
 
@@ -127,7 +146,7 @@ npm run test:ai
 
 后续如果出现维护更活跃、兼容浏览器端并能读取多 sheet 的替代库，再评估迁移。
 
-## V0.3B + V0.3C 严格验收
+## V0.4C + V0.5A + V0.6A 严格验收
 
 本轮交付新增 Playwright 端到端 dogfood：
 
@@ -138,4 +157,4 @@ npm run test:ai
 npx playwright test
 ```
 
-`tests/interview-os.e2e.spec.ts` 会自动生成 `job.xlsx` fixture，验证上传岗位表、解析岗位、选择岗位、刷新持久化、训练稿岗位替换、录音保存、模拟转写、Mock AI 反馈、刷新后反馈保留，以及导出 JSON 包含 `selectedJob`、`trainingRecords`、`transcript` 和 `aiFeedback`。
+`tests/interview-os.e2e.spec.ts` 会自动生成 `job.xlsx` fixture，验证上传岗位表、解析岗位、选择岗位、刷新持久化、训练稿岗位替换、录音保存、模拟转写、Mock AI 反馈、岗位准备包、模拟面试一题一答、整场复盘，以及导出 JSON 包含 `selectedJob`、`trainingRecords`、`transcript`、`aiFeedback`、`jobPacks` 和 `mockInterviews`。
