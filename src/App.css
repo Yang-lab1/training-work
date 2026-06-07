@@ -323,6 +323,68 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .ai-report details summary { cursor: pointer; font-weight: 700; }
 .ai-report details p { color: var(--muted); line-height: 1.65; white-space: pre-wrap; }
 
+.job-pack-report {
+  display: grid;
+  gap: 30px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.job-pack-report > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+}
+.job-pack-report h2,
+.job-pack-report h3 {
+  margin: 6px 0 0;
+}
+.job-pack-report header p,
+.brief-section p,
+.question-list p {
+  color: var(--muted);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px 36px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.brief-grid ul,
+.job-pack-report > section ul,
+.question-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.brief-section {
+  display: grid;
+  gap: 8px;
+}
+.question-list {
+  display: grid;
+  gap: 12px;
+}
+.question-list details {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.question-list details:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.question-list summary {
+  cursor: pointer;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
 .success-line, .error-line { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .success-line { color: var(--success); }
 .error-line { color: var(--danger); }
@@ -334,6 +396,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .top-nav nav button span { display: none; }
   .job-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .training-detail, .feedback-columns { grid-template-columns: 1fr; }
+  .brief-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 680px) {
@@ -344,6 +407,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .today-overview, .feedback-summary, .training-shortcuts { grid-template-columns: 1fr; }
   .training-shortcuts button { min-height: 95px; border-right: 0; border-bottom: 1px solid var(--line); }
   .primary-flow, .job-upload-line, .workflow-heading { align-items: stretch; flex-direction: column; }
+  .job-pack-report > header { flex-direction: column; }
   .primary-flow .primary-button, .workflow-heading .primary-button { width: 100%; }
   .upload-row, .job-row, .record-row { grid-template-columns: 1fr; }
   .upload-row .small-upload-button, .job-row button { width: 100%; }

@@ -105,6 +105,20 @@
 - 生产 assets：JS `/assets/index-BnQD6uWH.js`，CSS `/assets/index-Bx1Yxbkl.css`，Last-Modified `Sun, 07 Jun 2026 13:55:23 GMT`。
 - 生产 smoke 通过：`/api/transcribe`、`/api/analyze-answer`、六项顶部导航、桌面/移动端无横向溢出。
 
+## 2026-06-07 V0.4A + V0.4B
+
+- DeepSeek 真实文本 Provider 联调增强：`DEEPSEEK_BASE_URL`、请求超时、JSON fence 清理、JSON 子串修复、字段缺失补默认值和 `mock_fallback` 均已覆盖。
+- `npm run test:ai` 新增本地 OpenAI-compatible fake DeepSeek 服务，验证设置 `AI_PROVIDER=deepseek`、`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL` 时确实返回 provider `deepseek`。
+- 新增 `POST /api/generate-job-pack`，支持 mock、deepseek、mock_fallback。
+- 新增岗位准备包本地能力：顶部导航新增“岗位准备包”；基于 `selectedJob`、CV 文本、训练记录、AI 反馈和参考稿生成公司业务总结、岗位拆解、自我介绍策略、Miro 讲法、高频问题、满分回答框架和准备任务。
+- 岗位准备包保存到 `localStorage` key `interview_os_job_packs`，备份 JSON 已包含 `jobPacks`。
+- `/api/transcribe` 支持 multipart/form-data 预留；前端有录音 Blob 时会构造 `FormData(payload + audio)`，当前仍由 Mock ASR 返回模拟转写。
+- README 补充 xlsx advisory 隔离策略：仅本地用户选择文件、不可远程拉取、不执行公式、不注入 HTML、React 文本转义、10 MB 限制。
+- 验证通过：`npm run lint`、`npm run build`、`npm run test:ai`、`npx playwright test`。
+- Production 已部署：`dpl_2aZ6DDt8ii7CHaNWuLAjhwwMj66P`，公开地址 `https://interview-os-pi.vercel.app`。
+- 生产 assets：JS `/assets/index-CAW033m1.js`，CSS `/assets/index-VGe-KSyx.css`，Last-Modified `Sun, 07 Jun 2026 14:27:33 GMT`。
+- 生产 smoke 通过：`/api/analyze-answer`、`/api/generate-job-pack`、七项顶部导航、桌面/移动端无横向溢出。
+
 ## 2026-06-06 Interview OS V0.1.6 + V0.2A
 
 - 新增 `POST /api/analyze-answer` Vercel Function。

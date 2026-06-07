@@ -24,6 +24,8 @@ import type { JobRecord } from './jobParser'
 import type {
   AIFeedbackStatus,
   AnalyzeAnswerResponse,
+  GenerateJobPackResponse,
+  JobPackContent,
   StoredAIFeedback,
   TrainingType,
   TranscriptData,
@@ -41,10 +43,11 @@ const LEGACY_TARGET_ROLE_KEY = 'interview_os_target_role'
 const CV_TEXT_KEY = 'interview_os_cv_text'
 const SCRIPT_TEMPLATES_KEY = 'interview_os_script_templates'
 const TRAINING_RECORDS_KEY = 'interview_os_training_records'
+const JOB_PACKS_KEY = 'interview_os_job_packs'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'backup'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'backup'
 type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -149,6 +152,18 @@ interface BackupPayload {
   cvText: CvTextState
   scriptTemplates: ScriptTemplates
   trainingRecords: TrainingRecord[]
+  jobPacks: StoredJobPack[]
+}
+
+interface StoredJobPack {
+  id: string
+  selectedJobId: string
+  selectedJob: JobRecord
+  provider: string
+  model: string
+  generatedAt: string
+  jobPack: JobPackContent
+  rawProviderNote?: string
 }
 
 const defaultTasks: TrainingTask[] = [
@@ -195,6 +210,7 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
   { id: 'training', label: '训练', icon: <Mic size={17} /> },
   { id: 'history', label: '历史', icon: <History size={17} /> },
   { id: 'feedback', label: 'AI 反馈', icon: <BrainCircuit size={17} /> },
+  { id: 'jobPack', label: '岗位准备包', icon: <Sparkles size={17} /> },
   { id: 'backup', label: '数据备份', icon: <Archive size={17} /> },
 ]
 
@@ -205,6 +221,7 @@ function App() {
   const [selectedJob, setSelectedJob] = useState<JobRecord | null>(readSelectedJob)
   const [cvTextState, setCvTextState] = useState<CvTextState>(readCvTextState)
   const [scriptTemplates, setScriptTemplates] = useState<ScriptTemplates>(readScriptTemplates)
+  const [jobPacks, setJobPacks] = useState<StoredJobPack[]>(readJobPacks)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
@@ -218,6 +235,8 @@ function App() {
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [audioPreviews, setAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const [filters, setFilters] = useState({ company: '', title: '', city: '', jobType: '', priority: '', mainTrack: '' })
+  const [jobPackMessage, setJobPackMessage] = useState('')
+  const [jobPackLoading, setJobPackLoading] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -233,6 +252,10 @@ function App() {
   const filteredJobs = useMemo(() => filterJobs(jobPool, filters), [jobPool, filters])
   const filterOptions = useMemo(() => buildFilterOptions(jobPool), [jobPool])
   const nextActions = generateNextActions(jobPool, selectedJob, cvTextState, todayRecords)
+  const currentJobPack = useMemo(
+    () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
+    [jobPacks, selectedJob],
+  )
 
   function commitState(updater: (current: StoredMvpState) => StoredMvpState) {
     setState((current) => ({ ...updater(current), lastSavedAt: new Date().toISOString() }))
@@ -257,6 +280,7 @@ function App() {
   }, [selectedJob])
   useEffect(() => { localStorage.setItem(CV_TEXT_KEY, JSON.stringify(cvTextState)) }, [cvTextState])
   useEffect(() => { localStorage.setItem(SCRIPT_TEMPLATES_KEY, JSON.stringify(scriptTemplates)) }, [scriptTemplates])
+  useEffect(() => { localStorage.setItem(JOB_PACKS_KEY, JSON.stringify(jobPacks)) }, [jobPacks])
 
   useEffect(() => {
     let disposed = false
@@ -500,6 +524,7 @@ function App() {
       cvText: cvTextState,
       scriptTemplates,
       trainingRecords: state.history,
+      jobPacks,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -518,6 +543,7 @@ function App() {
       setSelectedJob(parsed.selectedJob)
       setCvTextState(parsed.cvText)
       setScriptTemplates(parsed.scriptTemplates)
+      setJobPacks(normalizeJobPacks(parsed.jobPacks))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -543,7 +569,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -552,9 +578,65 @@ function App() {
     setSelectedJob(null)
     setCvTextState({ text: '', source: 'upload' })
     setScriptTemplates({})
+    setJobPacks([])
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
+  }
+
+  async function generateJobPack() {
+    if (!selectedJob) {
+      setJobPackMessage('请先在“资料与岗位”中选择目标岗位。')
+      return
+    }
+    setJobPackLoading(true)
+    setJobPackMessage('')
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 30_000)
+    try {
+      const response = await fetch('/api/generate-job-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          taskType: 'generate_job_pack',
+          selectedJob,
+          cvText: cvTextState.text.slice(0, 8000),
+          trainingRecords: state.history.slice(0, 20),
+          aiFeedbackRecords: state.history.map((record) => record.aiFeedback).filter(Boolean),
+          scriptTemplates,
+        }),
+      })
+      const result = await response.json() as GenerateJobPackResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '岗位准备包生成失败。' : result.error)
+      const pack: StoredJobPack = {
+        id: `${selectedJob.id || selectedJob.companyName}-${Date.now()}`,
+        selectedJobId: selectedJob.id,
+        selectedJob,
+        provider: result.provider,
+        model: result.model,
+        generatedAt: result.generatedAt,
+        jobPack: result.jobPack,
+        rawProviderNote: result.rawProviderNote,
+      }
+      setJobPacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== selectedJob.id)].slice(0, 20))
+      setJobPackMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟岗位准备包。' : '岗位准备包已生成。')
+    } catch (error) {
+      setJobPackMessage(error instanceof Error && error.name === 'AbortError' ? '请求超时，未覆盖已有准备包。' : error instanceof Error ? error.message : '岗位准备包生成失败。')
+    } finally {
+      clearTimeout(timeout)
+      setJobPackLoading(false)
+    }
+  }
+
+  function deleteJobPack(packId: string) {
+    setJobPacks((current) => current.filter((pack) => pack.id !== packId))
+    setJobPackMessage('已删除岗位准备包。')
+  }
+
+  function exportJobPack(pack: StoredJobPack) {
+    downloadJson(pack, `interview-os-job-pack-${formatDateForFileName(new Date())}.json`)
+    setJobPackMessage('已导出岗位准备包。')
   }
 
   const sharedRecordProps = {
@@ -721,6 +803,40 @@ function App() {
           </Page>
         )}
 
+        {activeView === 'jobPack' && (
+          <Page title="岗位准备包" subtitle="根据岗位表、CV 文本和训练记录生成，不需要手填。">
+            {!selectedJob ? (
+              <section className="primary-flow">
+                <div>
+                  <span className="eyebrow">尚未选择岗位</span>
+                  <h2>先选择目标岗位</h2>
+                  <p>岗位准备包只能基于 job.xlsx 中的岗位生成。</p>
+                </div>
+                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><Upload size={17} />去选择岗位</button>
+              </section>
+            ) : (
+              <>
+                <section className="primary-flow">
+                  <div>
+                    <span className="eyebrow">当前岗位</span>
+                    <h2>{selectedJob.jobTitle}</h2>
+                    <p>{selectedJob.companyName} · {selectedJob.city || '城市未写'} · {selectedJob.mainTrack || selectedJob.companyBusiness || '方向未写'}</p>
+                  </div>
+                  <button className="primary-button" type="button" onClick={() => void generateJobPack()} disabled={jobPackLoading}>
+                    <Sparkles size={17} />{jobPackLoading ? '生成中…' : currentJobPack ? '重新生成准备包' : '生成岗位准备包'}
+                  </button>
+                </section>
+                {jobPackMessage && <p className={jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? 'error-line' : 'success-line'}>{jobPackMessage}</p>}
+                {currentJobPack ? (
+                  <JobPackReport pack={currentJobPack} onDelete={() => deleteJobPack(currentJobPack.id)} onExport={() => exportJobPack(currentJobPack)} />
+                ) : (
+                  <p className="empty-state">还没有岗位准备包。生成后会保存到本地，刷新后不会丢。</p>
+                )}
+              </>
+            )}
+          </Page>
+        )}
+
         {activeView === 'backup' && (
           <Page title="数据备份" subtitle="备份包含资料 metadata、岗位、转写状态和 AI 反馈；不包含音频 Blob。">
             <section className="backup-actions">
@@ -855,15 +971,27 @@ function RecordRow({
     setMessage('')
     onUpdate((current) => ({ ...current, transcriptStatus: 'transcribing' }))
     try {
+      const payload = {
+        trainingRecordId: record.id,
+        trainingType: record.trainingType,
+        audioMetadata: record.audioMetadata,
+        selectedJob: job,
+      }
+      const blob = record.recordingId ? await readRecordingBlob(record.recordingId) : null
+      const requestInit: RequestInit = blob
+        ? (() => {
+          const form = new FormData()
+          form.append('payload', JSON.stringify(payload))
+          form.append('audio', blob, record.recordingName || record.audioMetadata.recordingName || 'answer.webm')
+          return { method: 'POST', body: form }
+        })()
+        : {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
       const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trainingRecordId: record.id,
-          trainingType: record.trainingType,
-          audioMetadata: record.audioMetadata,
-          selectedJob: job,
-        }),
+        ...requestInit,
       })
       const result = await response.json() as TranscribeResponse
       if (!response.ok || !result.success) throw new Error(result.success ? '转写失败。' : result.error)
@@ -1007,10 +1135,17 @@ function StatusPill({ icon, label, tone }: { icon: ReactNode; label: string; ton
 
 function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
   const isMock = feedback.provider === 'mock' || feedback.provider === 'mock_fallback'
+  const providerLabel = feedback.provider === 'deepseek'
+    ? '由 DeepSeek 生成'
+    : feedback.provider === 'mock_fallback'
+      ? '真实模型调用失败，已自动使用模拟反馈。'
+      : feedback.provider === 'mock'
+        ? '当前为模拟反馈，仅用于测试流程。'
+        : `${feedback.provider} · ${feedback.model}`
   return (
     <div className="ai-report">
-      <header><div><span>总分</span><strong>{feedback.score}</strong></div><p>{feedback.summary}</p><em>{feedback.provider} · {feedback.model}</em></header>
-      {isMock && <p className="mock-notice">当前为模拟反馈，仅用于测试流程。接入真实模型后会生成真实分析。</p>}
+      <header><div><span>总分</span><strong>{feedback.score}</strong></div><p>{feedback.summary}</p><em>{providerLabel} · {feedback.model} · {formatDateTime(feedback.generatedAt)}</em></header>
+      {isMock && <p className="mock-notice">{providerLabel}</p>}
       {feedback.rawProviderNote && <p className="provider-note">{feedback.rawProviderNote}</p>}
       <div className="feedback-columns"><FeedbackList title="做得好的地方" items={feedback.strengths} /><FeedbackList title="主要问题" items={feedback.problems} /></div>
       <dl className="feedback-detail-list">
@@ -1026,6 +1161,60 @@ function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
       <details><summary>90 秒优化版</summary><p>{feedback.improvedLongVersion}</p></details>
       <FeedbackList title="下一步任务" items={feedback.nextTasks} />
     </div>
+  )
+}
+
+function JobPackReport({ pack, onDelete, onExport }: { pack: StoredJobPack; onDelete: () => void; onExport: () => void }) {
+  const isMock = pack.provider === 'mock' || pack.provider === 'mock_fallback'
+  const providerLabel = pack.provider === 'deepseek'
+    ? '由 DeepSeek 生成'
+    : pack.provider === 'mock_fallback'
+      ? '真实模型调用失败，已自动使用模拟准备包。'
+      : pack.provider === 'mock'
+        ? '当前为模拟准备包，仅用于测试流程。'
+        : `${pack.provider} · ${pack.model}`
+  return (
+    <article className="job-pack-report">
+      <header>
+        <div><span className="eyebrow">岗位准备包</span><h2>{pack.selectedJob.companyName} · {pack.selectedJob.jobTitle}</h2><p>{providerLabel} · {pack.model} · {formatDateTime(pack.generatedAt)}</p></div>
+        <div className="inline-actions"><button type="button" onClick={onExport}><Download size={15} />导出准备包</button><button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button></div>
+      </header>
+      {isMock && <p className="mock-notice">{providerLabel}</p>}
+      {pack.rawProviderNote && <p className="provider-note">{pack.rawProviderNote}</p>}
+      <section className="brief-section"><h3>公司业务总结</h3><p>{pack.jobPack.companySummary}</p></section>
+      <section className="brief-section"><h3>产品与业务方向</h3><p>{pack.jobPack.productAndBusiness}</p></section>
+      <div className="brief-grid">
+        <FeedbackList title="岗位要求拆解" items={pack.jobPack.jobRequirementBreakdown} />
+        <FeedbackList title="日常工作预测" items={pack.jobPack.workContentPrediction} />
+        <FeedbackList title="候选人匹配点" items={pack.jobPack.candidateFit} />
+        <FeedbackList title="风险点" items={pack.jobPack.riskPoints} />
+      </div>
+      <section className="brief-section"><h3>自我介绍策略</h3><p>{pack.jobPack.selfIntroductionStrategy}</p></section>
+      <section className="brief-section"><h3>Miro 项目讲法</h3><p>{pack.jobPack.miroProjectStrategy}</p></section>
+      <section className="question-list">
+        <h3>高频面试问题</h3>
+        {pack.jobPack.likelyQuestions.map((question) => (
+          <details key={question.question}>
+            <summary>{question.question}</summary>
+            <p><strong>考察：</strong>{question.whyItMatters}</p>
+            <p><strong>框架：</strong>{question.framework}</p>
+          </details>
+        ))}
+      </section>
+      <section className="question-list">
+        <h3>满分回答框架</h3>
+        {pack.jobPack.fullScoreAnswerFrameworks.map((framework) => (
+          <details key={`${framework.question}-${framework.frameworkName}`}>
+            <summary>{framework.question}</summary>
+            <p><strong>{framework.frameworkName}</strong></p>
+            <FeedbackList title="回答结构" items={framework.answerStructure} />
+            <FeedbackList title="可调用经历" items={framework.candidateEvidence} />
+            <FeedbackList title="雷区" items={framework.pitfalls} />
+          </details>
+        ))}
+      </section>
+      <FeedbackList title="面试前准备任务" items={pack.jobPack.preparationTasks} />
+    </article>
   )
 }
 
@@ -1052,6 +1241,7 @@ function readJobPool() { return readArray<JobRecord>(JOB_POOL_KEY) }
 function readSelectedJob() { try { const raw = localStorage.getItem(SELECTED_JOB_KEY); return raw ? JSON.parse(raw) as JobRecord : null } catch { return null } }
 function readCvTextState(): CvTextState { try { const raw = localStorage.getItem(CV_TEXT_KEY); return raw ? { text: '', source: 'upload', ...JSON.parse(raw) } : { text: '', source: 'upload' } } catch { return { text: '', source: 'upload' } } }
 function readScriptTemplates(): ScriptTemplates { try { const raw = localStorage.getItem(SCRIPT_TEMPLATES_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} } }
+function readJobPacks() { return normalizeJobPacks(readArray<StoredJobPack>(JOB_PACKS_KEY)) }
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
 
@@ -1095,6 +1285,16 @@ function normalizeTrainingRecords(records?: Array<Partial<TrainingRecord> & { re
 }
 
 function normalizeFiles(files?: UploadedFileMeta[]) { return (Array.isArray(files) ? files : []).map((file, index) => ({ ...file, category: file.category ?? (index === 0 ? 'cv' : 'project') })) }
+function normalizeJobPacks(packs?: StoredJobPack[]) {
+  return (Array.isArray(packs) ? packs : []).filter((pack) => pack?.selectedJob && pack?.jobPack).map((pack) => ({
+    ...pack,
+    id: pack.id || `${pack.selectedJob.id || pack.selectedJob.companyName}-${pack.generatedAt || Date.now()}`,
+    selectedJobId: pack.selectedJobId || pack.selectedJob.id,
+    provider: pack.provider || 'mock',
+    model: pack.model || 'unknown',
+    generatedAt: pack.generatedAt || new Date().toISOString(),
+  }))
+}
 function getFileByCategory(files: UploadedFileMeta[], category: UploadCategory) { return files.find((file) => file.category === category) }
 function getDefaultTask(id: TaskId) { return defaultTasks.find((task) => task.id === id) || defaultTasks[0] }
 function isTaskId(value: unknown): value is TaskId { return value === 'cn-intro' || value === 'en-intro' || value === 'miro-project' }

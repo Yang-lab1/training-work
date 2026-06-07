@@ -43,6 +43,67 @@ export interface AnalyzeAnswerRequest {
   scriptText?: string
 }
 
+export interface JobPackQuestion {
+  question: string
+  whyItMatters: string
+  framework: string
+}
+
+export interface JobPackAnswerFramework {
+  question: string
+  frameworkName: string
+  answerStructure: string[]
+  candidateEvidence: string[]
+  pitfalls: string[]
+}
+
+export interface JobPackContent {
+  companySummary: string
+  productAndBusiness: string
+  jobRequirementBreakdown: string[]
+  workContentPrediction: string[]
+  candidateFit: string[]
+  riskPoints: string[]
+  selfIntroductionStrategy: string
+  miroProjectStrategy: string
+  likelyQuestions: JobPackQuestion[]
+  fullScoreAnswerFrameworks: JobPackAnswerFramework[]
+  preparationTasks: string[]
+}
+
+export interface GenerateJobPackRequest {
+  taskType?: 'generate_job_pack'
+  selectedJob: AnalyzeJobContext
+  cvText?: string
+  trainingRecords?: Array<{
+    trainingType?: TrainingType
+    title?: string
+    durationSeconds?: number
+    transcript?: { text?: string }
+    aiFeedback?: Partial<StoredAIFeedback>
+  }>
+  aiFeedbackRecords?: Partial<StoredAIFeedback>[]
+  scriptTemplates?: Record<string, string | undefined>
+}
+
+export interface GenerateJobPackSuccess {
+  success: true
+  provider: AIProviderName
+  model: string
+  generatedAt: string
+  jobPack: JobPackContent
+  rawProviderNote?: string
+}
+
+export interface GenerateJobPackFailure {
+  success: false
+  error: string
+  provider: AIProviderName
+  fallbackAvailable: true
+}
+
+export type GenerateJobPackResponse = GenerateJobPackSuccess | GenerateJobPackFailure
+
 export interface AnalyzeAnswerSuccess {
   success: true
   provider: AIProviderName

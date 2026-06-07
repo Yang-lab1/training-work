@@ -62,6 +62,55 @@ test.beforeEach(async ({ page }) => {
       }),
     })
   })
+
+  await page.route('**/api/generate-job-pack', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-job-pack-v1',
+        generatedAt: new Date().toISOString(),
+        jobPack: {
+          companySummary: '测试科技公司主要做企业 AI 办公产品，候选人需要讲清业务场景和 AI 落地价值。',
+          productAndBusiness: '核心业务是企业 AI 办公产品，岗位重点是需求拆解、用户体验和 MVP 验证。',
+          jobRequirementBreakdown: ['理解 AI 办公场景', '能拆解产品需求', '能用项目证据说明岗位匹配'],
+          workContentPrediction: ['梳理用户场景', '输出需求文档或原型', '协同研发和设计验证 MVP'],
+          candidateFit: ['AI 学习经历', 'Miro 项目', '产品体验与设计背景'],
+          riskPoints: ['不要只讲概念', '需要补充具体结果', '避免背准备包原文'],
+          selfIntroductionStrategy: '开头直接说明申请测试科技公司的 AI产品实习生，中段讲 AI 学习和 Miro 项目，结尾回到企业 AI 办公产品。',
+          miroProjectStrategy: 'Miro 项目要讲用户协作场景、AI 作用、MVP 取舍和验证结果。',
+          likelyQuestions: [
+            { question: '为什么选择测试科技公司？', whyItMatters: '考察公司理解。', framework: '公司业务-个人证据-岗位贡献' },
+            { question: '你如何理解 AI 办公产品？', whyItMatters: '考察业务理解。', framework: '用户-场景-价值' },
+            { question: '请讲 Miro 项目。', whyItMatters: '考察项目表达。', framework: '项目七步法' },
+            { question: '你如何验证 AI 产品方案？', whyItMatters: '考察指标意识。', framework: '假设-指标-MVP' },
+            { question: '你如何协作研发？', whyItMatters: '考察沟通能力。', framework: '目标-分工-产出' },
+            { question: '你的短板是什么？', whyItMatters: '考察风险认知。', framework: '承认-迁移-补齐' },
+            { question: '入职第一个月怎么做？', whyItMatters: '考察岗位日常。', framework: '了解-对齐-交付' },
+            { question: '你和普通转型候选人有什么不同？', whyItMatters: '考察复合优势。', framework: '定位-证据-价值' },
+          ],
+          fullScoreAnswerFrameworks: [
+            {
+              question: '为什么选择测试科技公司？',
+              frameworkName: '宝洁八大问',
+              answerStructure: ['动机', '公司业务', '项目证据', '岗位贡献'],
+              candidateEvidence: ['AI 学习', 'Miro 项目'],
+              pitfalls: ['不要泛泛说喜欢 AI'],
+            },
+            {
+              question: '请讲 Miro 项目。',
+              frameworkName: '项目七步法',
+              answerStructure: ['用户', '问题', '行动', 'MVP', '结果', '岗位关系'],
+              candidateEvidence: ['Miro 项目', '产品体验'],
+              pitfalls: ['不要讲成作品介绍'],
+            },
+          ],
+          preparationTasks: ['重练自我介绍', '重讲 Miro 项目', '准备 3 个追问'],
+        },
+      }),
+    })
+  })
 })
 
 test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page }, testInfo) => {
@@ -69,7 +118,7 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   await writeJobFixture(fixturePath)
 
   await page.goto('/')
-  await expect(page.locator('.top-nav nav button')).toHaveCount(6)
+  await expect(page.locator('.top-nav nav button')).toHaveCount(7)
   await expect(page.getByText('今日训练')).toBeVisible()
 
   await page.getByRole('button', { name: /资料与岗位/ }).click()
@@ -112,6 +161,20 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   await page.getByRole('button', { name: 'AI 反馈', exact: true }).click()
   await expect(page.getByText(/AI 82 分/)).toBeVisible()
 
+  await page.getByRole('button', { name: /岗位准备包/ }).click()
+  await page.getByRole('button', { name: /生成岗位准备包/ }).click()
+  await expect(page.getByText(/公司业务总结/)).toBeVisible()
+  await expect(page.getByText(/岗位要求拆解/)).toBeVisible()
+  await expect(page.getByText(/为什么选择测试科技公司/)).toHaveCount(2)
+  await expect(page.getByText(/项目七步法/)).toHaveCount(2)
+
+  const packState = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_job_packs') || '[]'))
+  expect(packState[0].jobPack.companySummary).toContain('测试科技公司')
+
+  await page.reload()
+  await page.getByRole('button', { name: /岗位准备包/ }).click()
+  await expect(page.getByText(/测试科技公司主要做企业 AI 办公产品/)).toBeVisible()
+
   await page.getByRole('button', { name: /数据备份/ }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /导出 JSON/ }).click()
@@ -122,6 +185,7 @@ test('dogfood: 上传岗位表到 AI 反馈和备份导出闭环', async ({ page
   expect(backup.selectedJob.jobTitle).toBe('AI产品实习生')
   expect(backup.trainingRecords[0].transcript.text).toContain('测试科技公司')
   expect(backup.trainingRecords[0].aiFeedback.score).toBe(82)
+  expect(backup.jobPacks[0].jobPack.companySummary).toContain('测试科技公司')
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(hasHorizontalOverflow).toBe(false)

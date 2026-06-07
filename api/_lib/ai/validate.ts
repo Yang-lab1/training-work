@@ -1,6 +1,7 @@
 import type {
   AnalyzeAnswerRequest,
   AnalyzeJobContext,
+  GenerateJobPackRequest,
   TrainingType,
 } from '../../../src/lib/ai/types.js'
 
@@ -33,6 +34,12 @@ function safeJob(value: unknown): AnalyzeJobContext | null {
   }
 }
 
+function requiredJob(value: unknown): AnalyzeJobContext {
+  const job = safeJob(value)
+  if (!job?.companyName || !job.jobTitle) throw new Error('请先选择有效岗位。')
+  return job
+}
+
 export function validateAnalyzeAnswerRequest(value: unknown): AnalyzeAnswerRequest {
   if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
   const input = value as Record<string, unknown>
@@ -54,5 +61,42 @@ export function validateAnalyzeAnswerRequest(value: unknown): AnalyzeAnswerReque
     targetSeconds: safeNumber(input.targetSeconds, 3600),
     cvText: safeText(input.cvText, 6000),
     scriptText: safeText(input.scriptText, 8000),
+  }
+}
+
+export function validateGenerateJobPackRequest(value: unknown): GenerateJobPackRequest {
+  if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
+  const input = value as Record<string, unknown>
+  const trainingRecords = Array.isArray(input.trainingRecords)
+    ? input.trainingRecords.slice(0, 20).map((record) => {
+      const item = record && typeof record === 'object' ? record as Record<string, unknown> : {}
+      const transcript = item.transcript && typeof item.transcript === 'object' ? item.transcript as Record<string, unknown> : {}
+      const aiFeedback = item.aiFeedback && typeof item.aiFeedback === 'object' ? item.aiFeedback as Record<string, unknown> : {}
+      return {
+        trainingType: safeText(item.trainingType, 40) as TrainingType,
+        title: safeText(item.title, 120),
+        durationSeconds: safeNumber(item.durationSeconds, 3600),
+        transcript: { text: safeText(transcript.text, 3000) },
+        aiFeedback: {
+          score: safeNumber(aiFeedback.score, 100),
+          summary: safeText(aiFeedback.summary, 800),
+          problems: Array.isArray(aiFeedback.problems) ? aiFeedback.problems.map((problem) => safeText(problem, 300)).filter(Boolean).slice(0, 8) : [],
+          nextTasks: Array.isArray(aiFeedback.nextTasks) ? aiFeedback.nextTasks.map((task) => safeText(task, 300)).filter(Boolean).slice(0, 8) : [],
+        },
+      }
+    })
+    : []
+  const aiFeedbackRecords = trainingRecords.map((record) => record.aiFeedback).filter(Boolean)
+  const scriptTemplates = input.scriptTemplates && typeof input.scriptTemplates === 'object'
+    ? Object.fromEntries(Object.entries(input.scriptTemplates as Record<string, unknown>).map(([key, val]) => [key, safeText(val, 4000)]))
+    : {}
+
+  return {
+    taskType: 'generate_job_pack',
+    selectedJob: requiredJob(input.selectedJob),
+    cvText: safeText(input.cvText, 8000),
+    trainingRecords,
+    aiFeedbackRecords,
+    scriptTemplates,
   }
 }

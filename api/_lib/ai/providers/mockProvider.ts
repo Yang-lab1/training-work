@@ -2,8 +2,10 @@ import type {
   AIProviderName,
   AnalyzeAnswerRequest,
   AnalyzeAnswerSuccess,
+  GenerateJobPackRequest,
+  GenerateJobPackSuccess,
 } from '../../../../src/lib/ai/types.js'
-import { normalizeModelFeedback } from '../response.js'
+import { normalizeJobPack, normalizeModelFeedback } from '../response.js'
 
 function shortVersion(input: AnalyzeAnswerRequest) {
   const company = input.selectedJob?.companyName || '目标公司'
@@ -117,4 +119,82 @@ export function analyzeWithMock(
     improvedLongVersion: longVersion(input),
     nextTasks: tasks,
   }, provider, 'mock-v2', note)
+}
+
+export function generateJobPackWithMock(
+  input: GenerateJobPackRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): GenerateJobPackSuccess {
+  const job = input.selectedJob
+  const company = job.companyName || '目标公司'
+  const role = job.jobTitle || '目标岗位'
+  const business = job.companyBusiness || job.mainTrack || job.businessDirection || '相关业务'
+  const requirements = job.jobRequirements || '岗位要求未在表格中详细填写'
+  const content = job.jobContent || '岗位日常未在表格中详细填写'
+  const feedbackTasks = (input.aiFeedbackRecords || [])
+    .flatMap((feedback) => feedback.nextTasks || [])
+    .slice(0, 3)
+
+  return normalizeJobPack({
+    companySummary: `${company}在本次岗位表中体现的业务重点是${business}。准备时要先讲清公司做什么，再说明你的 AI、产品和项目经验如何服务这个方向。`,
+    productAndBusiness: `核心准备方向：${business}。如果面试官追问业务理解，应结合岗位内容说明用户、场景、产品价值和可能的商业目标。`,
+    jobRequirementBreakdown: [
+      `岗位名称：${role}，优先拆成业务理解、产品判断、跨团队沟通和结果表达。`,
+      `岗位内容：${content}`,
+      `岗位要求：${requirements}`,
+      '回答时要把经历连接到岗位要求，不要只讲个人背景。',
+    ],
+    workContentPrediction: [
+      '整理用户场景和业务问题，形成需求或方案判断。',
+      '与产品、研发、设计或业务团队沟通，推动 MVP 或功能验证。',
+      '输出 PRD、原型说明、竞品/用户分析或项目复盘材料。',
+    ],
+    candidateFit: [
+      'AI 学习经历可以证明你理解 AI 能力边界和落地方式。',
+      'Miro 项目适合证明需求拆解、协作流程和 MVP 取舍。',
+      '工业设计或体验背景适合转化为用户洞察、原型表达和场景敏感度。',
+      ...(feedbackTasks.length ? [`已有训练反馈提示：${feedbackTasks.join('；')}`] : []),
+    ],
+    riskPoints: [
+      '如果岗位偏技术，需要避免只讲概念，应说明你如何和研发/算法协作。',
+      '如果岗位偏业务，需要避免只讲工具，应说明业务目标和用户价值。',
+      '不要让回答像背稿，要用公司和岗位关键词自然收尾。',
+    ],
+    selfIntroductionStrategy: `自我介绍开头直接说正在申请${company}的${role}，中段用 AI 学习、Miro 项目和产品体验证明匹配，结尾回到${business}。`,
+    miroProjectStrategy: `Miro 项目要贴合${role}讲：先讲协作或用户场景，再讲你如何拆问题、做 MVP 取舍、验证结果，最后说明这和${company}的${business}有关。`,
+    likelyQuestions: [
+      { question: `为什么选择${company}的${role}？`, whyItMatters: '考察动机、公司理解和岗位匹配。', framework: '结论-公司业务-个人证据-岗位贡献' },
+      { question: `你如何理解${business}？`, whyItMatters: '考察业务理解是否真实。', framework: '用户-场景-产品价值-商业/效率目标' },
+      { question: '请讲一个最能证明你产品能力的项目。', whyItMatters: '考察项目表达和结果意识。', framework: '项目七步法' },
+      { question: 'Miro 项目里你做了什么关键决策？', whyItMatters: '考察个人贡献而不是团队流水账。', framework: '背景-冲突-取舍-结果' },
+      { question: '如果入职第一个月，你会怎么上手？', whyItMatters: '考察岗位日常理解。', framework: '了解业务-梳理用户-对齐团队-交付小结果' },
+      { question: '你没有完全相关经验怎么办？', whyItMatters: '考察迁移能力和风险认知。', framework: '承认差距-迁移证据-补齐计划' },
+      { question: '你如何和研发、设计或业务协作？', whyItMatters: '考察跨团队推进。', framework: '目标-角色-沟通机制-产出' },
+      { question: '你如何验证一个 AI 产品方案有效？', whyItMatters: '考察 AI 落地和指标意识。', framework: '假设-指标-MVP-反馈迭代' },
+    ],
+    fullScoreAnswerFrameworks: [
+      {
+        question: `为什么选择${company}的${role}？`,
+        frameworkName: '宝洁八大问：动机 + 匹配',
+        answerStructure: ['一句话动机', '公司业务理解', '个人项目证据', '能贡献什么', '结尾回到岗位'],
+        candidateEvidence: ['AI 学习', 'Miro 项目', '产品体验/设计背景'],
+        pitfalls: ['只说喜欢 AI', '不提公司业务', '不提岗位产出'],
+      },
+      {
+        question: '请讲一个最能证明你产品能力的项目。',
+        frameworkName: '项目七步法',
+        answerStructure: ['用户是谁', '问题是什么', '目标是什么', '你做了什么', 'MVP 取舍', '结果证据', '岗位关系'],
+        candidateEvidence: ['Miro 项目', '小米/硬件项目', '环保科技项目'],
+        pitfalls: ['讲成作品介绍', '没有你的个人决策', '没有结果'],
+      },
+    ],
+    preparationTasks: [
+      `准备 90 秒版本：为什么是${company}的${role}。`,
+      '用项目七步法重讲 Miro 项目。',
+      `整理 3 个和${business}相关的岗位关键词。`,
+      '准备一个承认短板但能迁移的回答。',
+      '把自我介绍最后 20 秒改成岗位匹配总结。',
+    ],
+  }, provider, 'mock-job-pack-v1', note)
 }

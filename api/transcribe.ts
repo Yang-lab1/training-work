@@ -27,6 +27,24 @@ export default {
       const origin = request.headers.get('origin')
       const host = request.headers.get('host')
       if (origin && host && new URL(origin).host !== host) throw new Error('不允许跨站调用此接口。')
+      const contentLength = Number(request.headers.get('content-length') || 0)
+      if (contentLength > 30_000_000) throw new Error('音频请求不能超过 30 MB。')
+      const contentType = request.headers.get('content-type') || ''
+      if (contentType.includes('multipart/form-data')) {
+        const form = await request.formData()
+        const payloadText = String(form.get('payload') || '{}')
+        const payload = JSON.parse(payloadText) as Record<string, unknown>
+        const audio = form.get('audio')
+        if (audio instanceof File) {
+          payload.audioMetadata = {
+            ...(payload.audioMetadata && typeof payload.audioMetadata === 'object' ? payload.audioMetadata : {}),
+            recordingName: audio.name,
+            mimeType: audio.type,
+            size: audio.size,
+          }
+        }
+        return json(await transcribeWithProvider(validateTranscribeRequest(payload)))
+      }
       return json(await transcribeWithProvider(validateTranscribeRequest(await request.json())))
     } catch (error) {
       return json({
