@@ -139,7 +139,7 @@ export function evaluatePracticeAnswer(
   userId: string,
   practiceType: string,
   answerText: string,
-  selfScore: number,
+  answerQualitySeed = 0,
   durationSeconds = 90,
 ): PracticeSession {
   const prompt = practicePrompts.find((item) => item.type === practiceType) ?? practicePrompts[0]
@@ -150,7 +150,7 @@ export function evaluatePracticeAnswer(
   )
   const hasApplication = /role|job|target|company|AI|RAG|product|岗位|职位|目标|公司|项目|应用|产品/i.test(answerText)
   const passiveLearning = /read|watched|looked|看过|浏览|了解|读过/.test(answerText)
-  let score = 52 + Math.min(22, Math.floor(wordLikeCount / 8)) + Math.round(selfScore * 0.16)
+  let score = 52 + Math.min(22, Math.floor(wordLikeCount / 8)) + Math.round(answerQualitySeed * 0.16)
   if (hasEvidence) score += 8
   if (hasApplication) score += 6
   if (passiveLearning && !hasEvidence) score -= 8
@@ -159,7 +159,7 @@ export function evaluatePracticeAnswer(
   const content = Math.max(45, Math.min(96, score + (hasEvidence ? 2 : -4)))
   const expression = Math.max(
     42,
-    Math.min(95, 70 + Math.round(selfScore * 0.12) - (durationSeconds > prompt.time_limit_seconds ? 8 : 0)),
+    Math.min(95, 70 + Math.round(answerQualitySeed * 0.12) - (durationSeconds > prompt.time_limit_seconds ? 8 : 0)),
   )
   const language = Math.max(45, Math.min(94, practiceType.includes('英文') ? expression - 4 : expression + 2))
 

@@ -34,17 +34,17 @@ const preferredSheets = [
 const aliases = {
   companyName: ['公司名称', '公司', '公司名', '企业', '企业名称', '单位名称'],
   jobTitle: ['岗位名称', '岗位', '职位', '职位名称', '岗位名'],
-  city: ['工作城市', '城市', '地点', '工作地点', '办公地点'],
-  salary: ['薪资区间', '薪资', '薪酬', '月薪', '待遇', '薪资范围'],
+  city: ['城市', '工作城市', '地点', '工作地点', '办公地点'],
+  salary: ['薪资', '薪酬', '月薪', '待遇', '薪资范围', '薪资区间'],
   matchLevel: ['匹配度', '岗位匹配度', '匹配'],
   mainTrack: ['主线分类', '主线', '方向', '岗位方向', '赛道'],
-  priority: ['ABC投递档位', '申请优先级', '优先级', '投递优先级', '推荐等级', 'A/B/C'],
+  priority: ['优先级', '申请优先级', '投递优先级', '推荐等级', 'A/B/C', 'ABC投递档位'],
   jobType: ['岗位类型', '类型', '正式/实习', '校招/社招'],
-  companyBusiness: ['公司是做什么的', '公司业务', '主营业务', '业务介绍', '公司介绍'],
-  jobContent: ['岗位是做什么的', '岗位内容', '职位内容', '工作内容', '岗位职责', '职位职责'],
+  companyBusiness: ['公司业务', '公司是做什么的', '主营业务', '业务介绍', '公司介绍'],
+  jobContent: ['岗位内容', '岗位是做什么的', '职位内容', '工作内容', '岗位职责', '职位职责'],
   jobRequirements: ['岗位要求', '职位要求', '任职要求', '要求', '实习要求', '经验要求'],
   source: ['来源', '岗位来源', '招聘来源'],
-  link: ['招聘链接', '投递链接', '职位链接', '链接', 'URL'],
+  link: ['链接', '招聘链接', '投递链接', 'URL', '职位链接'],
   difficulty: ['可投难度', '投递难度', '难度'],
   roleFitReason: ['档位理由', '匹配理由', '岗位匹配理由', '排序理由', '面试建议'],
 } satisfies Record<string, string[]>
@@ -75,31 +75,29 @@ export async function parseJobWorkbook(file: File): Promise<JobRecord[]> {
         ? XLSX.utils.encode_cell({ r: index + 1, c: linkColumnIndex })
         : ''
       const hyperlink = cellAddress ? sheet[cellAddress]?.l?.Target ?? '' : ''
-      const sourceSheet = sheetName
       const mainTrack = getValue(row, aliases.mainTrack)
       const companyBusiness = getValue(row, aliases.companyBusiness)
-      const jobContent = getValue(row, aliases.jobContent)
 
       jobs.push({
-        id: createJobId(companyName, jobTitle, getValue(row, aliases.city), sourceSheet),
+        id: createJobId(companyName, jobTitle, getValue(row, aliases.city), sheetName),
         companyName,
         jobTitle,
         city: getValue(row, aliases.city),
-        jobType: getValue(row, aliases.jobType) || inferJobType(sourceSheet, jobTitle),
+        jobType: getValue(row, aliases.jobType) || inferJobType(sheetName, jobTitle),
         priority: getValue(row, aliases.priority),
         mainTrack,
         salary: getValue(row, aliases.salary),
-        sourceSheet,
+        sourceSheet: sheetName,
         source: getValue(row, aliases.source),
         link: hyperlink || getValue(row, aliases.link),
         companyBusiness,
-        jobContent,
+        jobContent: getValue(row, aliases.jobContent),
         jobRequirements: getValue(row, aliases.jobRequirements),
         businessDirection: companyBusiness || mainTrack,
         roleFitReason: getValue(row, aliases.roleFitReason),
         matchLevel: getValue(row, aliases.matchLevel),
         difficulty: getValue(row, aliases.difficulty),
-        isTodayNew: sourceSheet.includes('今日新增'),
+        isTodayNew: sheetName.includes('今日新增'),
       })
     })
   }
@@ -132,7 +130,8 @@ function findHeader(headers: string[], candidates: string[]) {
 function normalize(value: string) {
   return value
     .toLowerCase()
-    .replace(/[\s_\-/（）()【】[\]：:]/g, '')
+    .replace(/[\s_/（）()【】:?？：-]/g, '')
+    .replace(/\[|\]/g, '')
 }
 
 function createJobId(company: string, title: string, city: string, sheet: string) {

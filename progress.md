@@ -93,6 +93,18 @@
 - Production 已部署：`dpl_BPj81mk2oFPZy3zwoSFPffsvUYcZ`，公开地址 `https://interview-os-pi.vercel.app`。
 - 线上 `/api/transcribe`、`/api/analyze-answer`、六导航和移动端检查通过。
 
+## 2026-06-07 V0.3B + V0.3C 严格验收交付版
+
+- 补齐 job.xlsx 真实解析：读取所有 sheet，优先正式岗、实习岗、今日新增、面试顺序表、次选 sheet，并修正中文字段模糊匹配与稳定岗位 id。
+- 新增前端 Provider 结构描述文件：AI router / Mock / DeepSeek / 豆包 / OpenAI / Gemini，以及 ASR router / Mock / OpenAI / 豆包 / 讯飞 / 阿里云 / 腾讯云预留。
+- DeepSeek 服务端 Provider 支持 `DEEPSEEK_BASE_URL`，模型 JSON 解析增加 code fence 清理和 JSON 子串修复。
+- 新增 `playwright.config.ts` 和 `tests/interview-os.e2e.spec.ts`，覆盖上传岗位表、选岗、刷新持久化、训练稿替换、录音保存、模拟转写、Mock AI 反馈、导出 JSON。
+- 删除旧 `logic.ts` 中对人工 `selfScore` 的依赖；主流程仍只保留旧 review 兼容折叠展示。
+- 验证通过：`npm run lint`、`npm run build`、`npm run test:ai`、`npx playwright test`。
+- Production 已部署：`dpl_HjynARyDvhZCYoSUiqWKF839Fy3c`，公开地址 `https://interview-os-pi.vercel.app`。
+- 生产 assets：JS `/assets/index-BnQD6uWH.js`，CSS `/assets/index-Bx1Yxbkl.css`，Last-Modified `Sun, 07 Jun 2026 13:55:23 GMT`。
+- 生产 smoke 通过：`/api/transcribe`、`/api/analyze-answer`、六项顶部导航、桌面/移动端无横向溢出。
+
 ## 2026-06-06 Interview OS V0.1.6 + V0.2A
 
 - 新增 `POST /api/analyze-answer` Vercel Function。

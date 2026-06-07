@@ -90,3 +90,16 @@ npm run test:ai
 - 音频 Blob 保存在 IndexedDB `interview-os-recordings`。
 - JSON 备份不包含音频 Blob。
 - 当前没有账号、云数据库、真实 ASR、RAG、公司准备包或完整面试舱。
+
+## V0.3B + V0.3C 严格验收
+
+本轮交付新增 Playwright 端到端 dogfood：
+
+```bash
+npm run lint
+npm run build
+npm run test:ai
+npx playwright test
+```
+
+`tests/interview-os.e2e.spec.ts` 会自动生成 `job.xlsx` fixture，验证上传岗位表、解析岗位、选择岗位、刷新持久化、训练稿岗位替换、录音保存、模拟转写、Mock AI 反馈、刷新后反馈保留，以及导出 JSON 包含 `selectedJob`、`trainingRecords`、`transcript` 和 `aiFeedback`。

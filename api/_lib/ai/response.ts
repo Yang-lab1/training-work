@@ -60,5 +60,14 @@ export function parseModelJson(content: string) {
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
-  return JSON.parse(cleaned) as ModelFeedback
+  try {
+    return JSON.parse(cleaned) as ModelFeedback
+  } catch {
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      return JSON.parse(cleaned.slice(start, end + 1)) as ModelFeedback
+    }
+    throw new Error('Model output is not valid JSON')
+  }
 }
