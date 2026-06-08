@@ -18,6 +18,7 @@ export type AITaskType =
   | 'generate_follow_up'
   | 'generate_interview_report'
   | 'review_real_interview'
+  | 'generate_company_knowledge_pack'
 
 export type TrainingType = 'chineseIntro' | 'englishIntro' | 'miroProject'
 
@@ -78,6 +79,7 @@ export interface JobPackContent {
 export interface GenerateJobPackRequest {
   taskType?: 'generate_job_pack'
   selectedJob: AnalyzeJobContext
+  companyKnowledgePack?: Partial<CompanyKnowledgePackContent>
   cvText?: string
   trainingRecords?: Array<{
     trainingType?: TrainingType
@@ -190,6 +192,9 @@ export interface GenerateMockInterviewRequest {
   taskType?: 'generate_mock_interview'
   selectedJob: AnalyzeJobContext
   jobPack?: Partial<JobPackContent>
+  companyKnowledgePack?: Partial<CompanyKnowledgePackContent>
+  questionBank?: QuestionBankUpdate[]
+  realInterviewReviews?: Partial<RealInterviewReviewReport>[]
   cvText?: string
   trainingRecords?: Array<{
     trainingType?: TrainingType
@@ -292,3 +297,162 @@ export interface GenerateInterviewReportFailure {
 }
 
 export type GenerateInterviewReportResponse = GenerateInterviewReportSuccess | GenerateInterviewReportFailure
+
+export type RealInterviewQuestionCategory =
+  | 'self_intro'
+  | 'project'
+  | 'role_fit'
+  | 'technical_basic'
+  | 'pressure'
+  | 'english'
+  | 'behavior'
+  | 'unknown'
+
+export interface ExtractedRealInterviewQuestion {
+  id: string
+  question: string
+  category: RealInterviewQuestionCategory
+  confidence: number
+  sourceSpan: string
+}
+
+export interface ExtractedRealInterviewAnswer {
+  questionId: string
+  answerText: string
+  durationEstimate: number
+  qualityNote: string
+}
+
+export interface RealInterviewComparison {
+  predictedByMockInterview: string[]
+  predictedByJobPack: string[]
+  missedQuestions: string[]
+  newQuestionPatterns: string[]
+  weakAreas: string[]
+}
+
+export interface QuestionBankUpdate {
+  question: string
+  category: RealInterviewQuestionCategory
+  source: 'real_interview'
+  selectedJobId?: string
+  priority: 'high' | 'medium' | 'low'
+  suggestedPracticeType: TrainingType | 'mockInterview'
+}
+
+export interface RealInterviewReviewReport {
+  overallSummary: string
+  interviewerFocus: string[]
+  strongestAnswer: string
+  weakestAnswer: string
+  missedPreparation: string[]
+  unexpectedQuestions: string[]
+  answerQuality: string
+  roleFitAssessment: string
+  nextTrainingTasks: string[]
+  questionBankUpdates: QuestionBankUpdate[]
+}
+
+export interface ReviewRealInterviewRequest {
+  taskType?: 'review_real_interview'
+  selectedJob: AnalyzeJobContext
+  transcript: string
+  jobPack?: Partial<JobPackContent>
+  mockInterview?: {
+    questions?: MockInterviewQuestion[]
+    finalReport?: unknown
+  }
+  trainingRecords?: Array<{
+    trainingType?: TrainingType
+    transcript?: { text?: string }
+    aiFeedback?: Partial<StoredAIFeedback>
+  }>
+  cvText?: string
+}
+
+export interface ReviewRealInterviewSuccess {
+  success: true
+  provider: AIProviderName
+  model: string
+  generatedAt: string
+  extractedQuestions: ExtractedRealInterviewQuestion[]
+  extractedAnswers: ExtractedRealInterviewAnswer[]
+  comparison: RealInterviewComparison
+  reviewReport: RealInterviewReviewReport
+  rawProviderNote?: string
+}
+
+export interface ReviewRealInterviewFailure {
+  success: false
+  error: string
+  provider: AIProviderName
+  fallbackAvailable: true
+}
+
+export type ReviewRealInterviewResponse = ReviewRealInterviewSuccess | ReviewRealInterviewFailure
+
+export type CompanySourceType =
+  | 'company_official'
+  | 'job_description'
+  | 'article'
+  | 'portfolio'
+  | 'other'
+
+export interface CompanySourceInput {
+  id: string
+  selectedJobId?: string
+  type: CompanySourceType
+  title: string
+  sourceName: string
+  sourceUrl?: string
+  text: string
+  wordCount: number
+  uploadedAt: string
+}
+
+export interface EvidenceMapItem {
+  claim: string
+  sourceId: string
+  sourceName: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface CompanyKnowledgePackContent {
+  sourceSummary: string
+  companyCoreBusiness: string
+  productLines: string[]
+  recentSignals: string[]
+  roleContext: string
+  interviewFocusPrediction: string[]
+  risksAndUnknowns: string[]
+  evidenceMap: EvidenceMapItem[]
+  recommendedQuestions: string[]
+  howToUseInInterview: string[]
+}
+
+export interface GenerateCompanyKnowledgePackRequest {
+  taskType?: 'generate_company_knowledge_pack'
+  selectedJob: AnalyzeJobContext
+  jobPack?: Partial<JobPackContent>
+  companySources: CompanySourceInput[]
+  cvText?: string
+  realInterviewReviews?: Partial<RealInterviewReviewReport>[]
+}
+
+export interface GenerateCompanyKnowledgePackSuccess {
+  success: true
+  provider: AIProviderName
+  model: string
+  generatedAt: string
+  companyKnowledgePack: CompanyKnowledgePackContent
+  rawProviderNote?: string
+}
+
+export interface GenerateCompanyKnowledgePackFailure {
+  success: false
+  error: string
+  provider: AIProviderName
+  fallbackAvailable: true
+}
+
+export type GenerateCompanyKnowledgePackResponse = GenerateCompanyKnowledgePackSuccess | GenerateCompanyKnowledgePackFailure

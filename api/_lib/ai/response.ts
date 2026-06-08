@@ -2,13 +2,22 @@ import type {
   AIProviderName,
   AnalyzeAnswerSuccess,
   GenerateFollowUpSuccess,
+  GenerateCompanyKnowledgePackSuccess,
   GenerateInterviewReportSuccess,
   GenerateJobPackSuccess,
   GenerateMockInterviewSuccess,
+  CompanyKnowledgePackContent,
+  EvidenceMapItem,
+  ExtractedRealInterviewAnswer,
+  ExtractedRealInterviewQuestion,
   InterviewFinalReport,
   JobPackAnswerFramework,
   JobPackQuestion,
   MockInterviewQuestion,
+  QuestionBankUpdate,
+  RealInterviewComparison,
+  RealInterviewReviewReport,
+  ReviewRealInterviewSuccess,
 } from '../../../src/lib/ai/types.js'
 
 type ModelFeedback = Omit<
@@ -33,7 +42,7 @@ function list(value: unknown, fallback: string[]) {
 function objectList<T>(
   value: unknown,
   fallback: T[],
-  normalizer: (item: Record<string, unknown>) => T,
+  normalizer: (item: Record<string, unknown>, index: number) => T,
 ) {
   if (!Array.isArray(value)) return fallback
   const items = value
@@ -244,6 +253,160 @@ export function normalizeInterviewReport(
     model,
     generatedAt: new Date().toISOString(),
     finalReport,
+    rawProviderNote,
+  }
+}
+
+function confidence(value: unknown): EvidenceMapItem['confidence'] {
+  return value === 'high' || value === 'medium' || value === 'low' ? value : 'medium'
+}
+
+function questionCategory(value: unknown): ExtractedRealInterviewQuestion['category'] {
+  return ['self_intro', 'project', 'role_fit', 'technical_basic', 'pressure', 'english', 'behavior', 'unknown'].includes(String(value))
+    ? value as ExtractedRealInterviewQuestion['category']
+    : 'unknown'
+}
+
+function normalizeExtractedQuestion(item: Record<string, unknown>, index: number): ExtractedRealInterviewQuestion {
+  const rawConfidence = typeof item.confidence === 'number' ? item.confidence : Number(item.confidence)
+  return {
+    id: text(item.id, `real-q-${index + 1}`),
+    question: text(item.question, '请先做一下自我介绍。'),
+    category: questionCategory(item.category),
+    confidence: Number.isFinite(rawConfidence) ? Math.max(0, Math.min(1, rawConfidence)) : 0.72,
+    sourceSpan: text(item.sourceSpan, text(item.question, '面试官问题片段')),
+  }
+}
+
+function normalizeExtractedAnswer(item: Record<string, unknown>, index: number): ExtractedRealInterviewAnswer {
+  return {
+    questionId: text(item.questionId, `real-q-${index + 1}`),
+    answerText: text(item.answerText, '候选人回答片段尚未识别完整。'),
+    durationEstimate: Math.max(0, Math.round(Number(item.durationEstimate) || 0)),
+    qualityNote: text(item.qualityNote, '回答需要继续补充岗位匹配证据。'),
+  }
+}
+
+function normalizeQuestionBankUpdate(item: Record<string, unknown>, index: number): QuestionBankUpdate {
+  const practice = text(item.suggestedPracticeType, 'mockInterview') as QuestionBankUpdate['suggestedPracticeType']
+  const priority = text(item.priority, index === 0 ? 'high' : 'medium') as QuestionBankUpdate['priority']
+  return {
+    question: text(item.question, '请先做一下自我介绍。'),
+    category: questionCategory(item.category),
+    source: 'real_interview',
+    selectedJobId: text(item.selectedJobId, ''),
+    priority: ['high', 'medium', 'low'].includes(priority) ? priority : 'medium',
+    suggestedPracticeType: ['chineseIntro', 'englishIntro', 'miroProject', 'mockInterview'].includes(practice) ? practice : 'mockInterview',
+  }
+}
+
+export function normalizeRealInterviewReview(
+  value: unknown,
+  provider: AIProviderName,
+  model: string,
+  rawProviderNote?: string,
+): ReviewRealInterviewSuccess {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const fallbackQuestions = [
+    { id: 'real-q-1', question: '请先做一下自我介绍。', category: 'self_intro', confidence: 0.86, sourceSpan: '面试官：请先做一下自我介绍。' },
+    { id: 'real-q-2', question: '你为什么从设计转向 AI 产品？', category: 'role_fit', confidence: 0.78, sourceSpan: '面试官：你为什么从设计转向 AI 产品？' },
+    { id: 'real-q-3', question: '你能讲一下 Miro 项目吗？', category: 'project', confidence: 0.82, sourceSpan: '面试官：你能讲一下 Miro 项目吗？' },
+  ]
+  const extractedQuestions = objectList(input.extractedQuestions, fallbackQuestions.map((item, index) => normalizeExtractedQuestion(item, index)), normalizeExtractedQuestion)
+  const fallbackAnswers = extractedQuestions.map((question) => ({
+    questionId: question.id,
+    answerText: '候选人已回答，但仍需要把项目动作、结果和岗位关系讲得更具体。',
+    durationEstimate: 60,
+    qualityNote: '回答可复盘，下一轮要补充更直接的岗位证据。',
+  }))
+  const extractedAnswers = objectList(input.extractedAnswers, fallbackAnswers, normalizeExtractedAnswer)
+
+  const comparisonInput = input.comparison && typeof input.comparison === 'object' ? input.comparison as Record<string, unknown> : {}
+  const comparison: RealInterviewComparison = {
+    predictedByMockInterview: list(comparisonInput.predictedByMockInterview, ['自我介绍', 'Miro 项目讲解']).slice(0, 8),
+    predictedByJobPack: list(comparisonInput.predictedByJobPack, ['为什么选择该公司和岗位']).slice(0, 8),
+    missedQuestions: list(comparisonInput.missedQuestions, ['真实面试中出现了更具体的转型动机追问']).slice(0, 8),
+    newQuestionPatterns: list(comparisonInput.newQuestionPatterns, ['围绕转型动机和项目落地细节追问']).slice(0, 8),
+    weakAreas: list(comparisonInput.weakAreas, ['岗位匹配证据', '项目结果量化']).slice(0, 8),
+  }
+
+  const reportInput = input.reviewReport && typeof input.reviewReport === 'object' ? input.reviewReport as Record<string, unknown> : {}
+  const questionBankUpdates = objectList(
+    reportInput.questionBankUpdates,
+    extractedQuestions.map((question, index) => normalizeQuestionBankUpdate({ ...question, selectedJobId: '', priority: index === 0 ? 'high' : 'medium' }, index)),
+    normalizeQuestionBankUpdate,
+  ).slice(0, 12)
+  const reviewReport: RealInterviewReviewReport = {
+    overallSummary: text(reportInput.overallSummary, '本场真实面试围绕自我介绍、转型动机和项目经历展开，下一轮训练要更贴近岗位证据。'),
+    interviewerFocus: list(reportInput.interviewerFocus, ['岗位动机', '项目深度', 'AI 产品理解']).slice(0, 8),
+    strongestAnswer: text(reportInput.strongestAnswer, '自我介绍能够说明背景转向。'),
+    weakestAnswer: text(reportInput.weakestAnswer, 'Miro 项目回答需要更具体的用户、场景、结果。'),
+    missedPreparation: list(reportInput.missedPreparation, ['准备包中对转型动机的反问准备不足']).slice(0, 8),
+    unexpectedQuestions: list(reportInput.unexpectedQuestions, comparison.newQuestionPatterns).slice(0, 8),
+    answerQuality: text(reportInput.answerQuality, '回答能覆盖问题，但证据密度和结果表达还不够。'),
+    roleFitAssessment: text(reportInput.roleFitAssessment, '岗位匹配要在开头和结尾直接讲清楚公司业务、岗位要求和个人项目证据。'),
+    nextTrainingTasks: list(reportInput.nextTrainingTasks, ['把真实面试问题加入下一轮模拟面试', '重练 Miro 项目 2 分钟版本', '准备转型动机 60 秒版本']).slice(0, 6),
+    questionBankUpdates,
+  }
+
+  return {
+    success: true,
+    provider,
+    model,
+    generatedAt: new Date().toISOString(),
+    extractedQuestions,
+    extractedAnswers,
+    comparison,
+    reviewReport,
+    rawProviderNote,
+  }
+}
+
+function normalizeEvidence(item: Record<string, unknown>, index: number): EvidenceMapItem {
+  return {
+    claim: text(item.claim, '公司业务与岗位要求来自上传资料和岗位表。'),
+    sourceId: text(item.sourceId, `source-${index + 1}`),
+    sourceName: text(item.sourceName, '岗位表 / 上传资料'),
+    confidence: confidence(item.confidence),
+  }
+}
+
+export function normalizeCompanyKnowledgePack(
+  value: unknown,
+  provider: AIProviderName,
+  model: string,
+  rawProviderNote?: string,
+): GenerateCompanyKnowledgePackSuccess {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const fallbackPack: CompanyKnowledgePackContent = {
+    sourceSummary: '已根据岗位表和上传公司资料整理公司知识包。',
+    companyCoreBusiness: '公司核心业务需要结合岗位表和用户上传资料继续核验。',
+    productLines: ['企业 AI 应用', '知识库 / 工作流', '智能客服或业务自动化'],
+    recentSignals: ['上传资料中出现 AI Agent、RAG 或流程自动化方向'],
+    roleContext: '目标岗位需要把公司业务理解转化成面试回答中的岗位匹配证据。',
+    interviewFocusPrediction: ['为什么选择公司', '岗位日常理解', 'AI 项目如何落地', 'Miro 项目与业务关系'],
+    risksAndUnknowns: ['公开资料有限，部分业务判断需要面试前二次核验'],
+    evidenceMap: [{ claim: '公司资料来自用户上传文本和岗位表字段。', sourceId: 'selected-job', sourceName: '岗位表', confidence: 'medium' }],
+    recommendedQuestions: ['你了解我们公司的核心业务吗？', '你的项目和我们的岗位有什么关系？', '如果入职第一个月你会怎么上手？'],
+    howToUseInInterview: ['自我介绍开头点出公司业务', '项目回答结尾回到岗位需求', '遇到追问时引用资料来源而不是背答案'],
+  }
+  return {
+    success: true,
+    provider,
+    model,
+    generatedAt: new Date().toISOString(),
+    companyKnowledgePack: {
+      sourceSummary: text(input.sourceSummary, fallbackPack.sourceSummary),
+      companyCoreBusiness: text(input.companyCoreBusiness, fallbackPack.companyCoreBusiness),
+      productLines: list(input.productLines, fallbackPack.productLines).slice(0, 8),
+      recentSignals: list(input.recentSignals, fallbackPack.recentSignals).slice(0, 8),
+      roleContext: text(input.roleContext, fallbackPack.roleContext),
+      interviewFocusPrediction: list(input.interviewFocusPrediction, fallbackPack.interviewFocusPrediction).slice(0, 8),
+      risksAndUnknowns: list(input.risksAndUnknowns, fallbackPack.risksAndUnknowns).slice(0, 8),
+      evidenceMap: objectList(input.evidenceMap, fallbackPack.evidenceMap, normalizeEvidence).slice(0, 12),
+      recommendedQuestions: list(input.recommendedQuestions, fallbackPack.recommendedQuestions).slice(0, 10),
+      howToUseInInterview: list(input.howToUseInInterview, fallbackPack.howToUseInInterview).slice(0, 8),
+    },
     rawProviderNote,
   }
 }

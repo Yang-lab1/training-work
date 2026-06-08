@@ -1,6 +1,7 @@
 import type { ASRProviderName, TranscribeRequest, TranscribeSuccess } from '../../../src/lib/asr/types.js'
 import { serverEnv } from '../ai/env.js'
 import { transcribeWithMock } from './providers/mockAsrProvider.js'
+import { transcribeWithOpenAI } from './providers/openaiAsrProvider.js'
 
 const supported = new Set<ASRProviderName>([
   'mock', 'openai', 'doubao', 'volcengine', 'xfyun', 'aliyun', 'tencent',
@@ -27,5 +28,13 @@ export async function transcribeWithProvider(input: TranscribeRequest): Promise<
   if (!keyFor(provider)?.trim()) {
     return transcribeWithMock(input, 'mock_fallback', `未配置 ${provider} ASR Key，已自动使用模拟转写。`)
   }
-  return transcribeWithMock(input, 'mock_fallback', `${provider} ASR Provider 已预留但尚未启用真实音频上传。`)
+  try {
+    if (provider === 'openai') return await transcribeWithOpenAI(input)
+    return transcribeWithMock(input, 'mock_fallback', `${provider} ASR Provider 已预留但尚未启用真实音频上传。`)
+  } catch (error) {
+    const note = error instanceof Error && error.name === 'AbortError'
+      ? `${provider} ASR 请求超时，已自动使用模拟转写。`
+      : `${provider} ASR 调用失败，已自动使用模拟转写。`
+    return transcribeWithMock(input, 'mock_fallback', note)
+  }
 }

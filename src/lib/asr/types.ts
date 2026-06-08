@@ -22,14 +22,18 @@ export interface TranscribeRequest {
   trainingRecordId: string
   trainingType: TrainingType
   audioMetadata?: AudioMetadata
+  sourceType?: 'training' | 'mock_interview' | 'real_interview'
   selectedJob: AnalyzeJobContext | null
+  audioFile?: File
 }
 
 export interface TranscribeSuccess {
   success: true
   provider: ASRProviderName
+  model?: string
   transcript: string
   language: 'zh' | 'en' | 'mixed'
+  durationSeconds?: number
   generatedAt: string
   rawProviderNote?: string
 }

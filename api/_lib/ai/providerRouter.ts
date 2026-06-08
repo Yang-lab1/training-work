@@ -2,6 +2,8 @@ import type {
   AnalyzeAnswerRequest,
   AnalyzeAnswerSuccess,
   ConfiguredAIProvider,
+  GenerateCompanyKnowledgePackRequest,
+  GenerateCompanyKnowledgePackSuccess,
   GenerateFollowUpRequest,
   GenerateFollowUpSuccess,
   GenerateInterviewReportRequest,
@@ -10,13 +12,15 @@ import type {
   GenerateJobPackSuccess,
   GenerateMockInterviewRequest,
   GenerateMockInterviewSuccess,
+  ReviewRealInterviewRequest,
+  ReviewRealInterviewSuccess,
 } from '../../../src/lib/ai/types.js'
 import { serverEnv } from './env.js'
 import { createDeepSeekProvider } from './providers/deepseekProvider.js'
 import { getDoubaoProviderStatus } from './providers/doubaoProvider.js'
 import { getGeminiProviderStatus } from './providers/geminiProvider.js'
 import { getAgnesProviderStatus } from './providers/agnesProvider.js'
-import { analyzeWithMock, generateFollowUpWithMock, generateInterviewReportWithMock, generateJobPackWithMock, generateMockInterviewWithMock } from './providers/mockProvider.js'
+import { analyzeWithMock, generateCompanyKnowledgePackWithMock, generateFollowUpWithMock, generateInterviewReportWithMock, generateJobPackWithMock, generateMockInterviewWithMock, reviewRealInterviewWithMock } from './providers/mockProvider.js'
 import { getOpenAIProviderStatus } from './providers/openaiProvider.js'
 
 function configuredProvider(): ConfiguredAIProvider {
@@ -156,5 +160,65 @@ export async function generateInterviewReportWithProvider(
     return generateInterviewReportWithMock(input, 'mock_fallback', `${provider} Provider 尚未启用。`)
   } catch {
     return generateInterviewReportWithMock(input, 'mock_fallback', `${provider} 整场复盘调用失败，已自动使用模拟复盘。`)
+  }
+}
+
+export async function reviewRealInterviewWithProvider(
+  input: ReviewRealInterviewRequest,
+): Promise<ReviewRealInterviewSuccess> {
+  const provider = configuredProvider()
+  if (provider === 'mock') return reviewRealInterviewWithMock(input)
+
+  try {
+    if (provider === 'deepseek') {
+      const apiKey = serverEnv.DEEPSEEK_API_KEY?.trim()
+      if (!apiKey) return reviewRealInterviewWithMock(input, 'mock_fallback', '未配置 DEEPSEEK_API_KEY，已自动使用模拟真实面试复盘。')
+      const deepseek = createDeepSeekProvider(apiKey)
+      if (!deepseek.reviewRealInterview) throw new Error('DeepSeek real interview review is unavailable')
+      return await deepseek.reviewRealInterview(input)
+    }
+    const status = provider === 'doubao'
+      ? getDoubaoProviderStatus()
+      : provider === 'openai'
+        ? getOpenAIProviderStatus()
+        : provider === 'gemini'
+          ? getGeminiProviderStatus()
+          : getAgnesProviderStatus()
+    return reviewRealInterviewWithMock(input, 'mock_fallback', `${provider} Provider 尚未启用。${status.note}`)
+  } catch (error) {
+    const reason = error instanceof Error && error.name === 'AbortError'
+      ? `${provider} 真实面试复盘请求超时，已自动使用模拟复盘。`
+      : `${provider} 真实面试复盘调用失败，已自动使用模拟复盘。`
+    return reviewRealInterviewWithMock(input, 'mock_fallback', reason)
+  }
+}
+
+export async function generateCompanyKnowledgePackWithProvider(
+  input: GenerateCompanyKnowledgePackRequest,
+): Promise<GenerateCompanyKnowledgePackSuccess> {
+  const provider = configuredProvider()
+  if (provider === 'mock') return generateCompanyKnowledgePackWithMock(input)
+
+  try {
+    if (provider === 'deepseek') {
+      const apiKey = serverEnv.DEEPSEEK_API_KEY?.trim()
+      if (!apiKey) return generateCompanyKnowledgePackWithMock(input, 'mock_fallback', '未配置 DEEPSEEK_API_KEY，已自动使用模拟公司知识包。')
+      const deepseek = createDeepSeekProvider(apiKey)
+      if (!deepseek.generateCompanyKnowledgePack) throw new Error('DeepSeek company knowledge pack generator is unavailable')
+      return await deepseek.generateCompanyKnowledgePack(input)
+    }
+    const status = provider === 'doubao'
+      ? getDoubaoProviderStatus()
+      : provider === 'openai'
+        ? getOpenAIProviderStatus()
+        : provider === 'gemini'
+          ? getGeminiProviderStatus()
+          : getAgnesProviderStatus()
+    return generateCompanyKnowledgePackWithMock(input, 'mock_fallback', `${provider} Provider 尚未启用。${status.note}`)
+  } catch (error) {
+    const reason = error instanceof Error && error.name === 'AbortError'
+      ? `${provider} 公司知识包请求超时，已自动使用模拟结果。`
+      : `${provider} 公司知识包调用失败，已自动使用模拟结果。`
+    return generateCompanyKnowledgePackWithMock(input, 'mock_fallback', reason)
   }
 }

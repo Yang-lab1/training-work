@@ -10,6 +10,10 @@ import type {
   GenerateInterviewReportSuccess,
   GenerateMockInterviewRequest,
   GenerateMockInterviewSuccess,
+  GenerateCompanyKnowledgePackRequest,
+  GenerateCompanyKnowledgePackSuccess,
+  ReviewRealInterviewRequest,
+  ReviewRealInterviewSuccess,
 } from '../../../src/lib/ai/types.js'
 
 export interface AnalyzeAnswerProvider {
@@ -20,4 +24,6 @@ export interface AnalyzeAnswerProvider {
   generateMockInterview?(input: GenerateMockInterviewRequest): Promise<GenerateMockInterviewSuccess>
   generateFollowUp?(input: GenerateFollowUpRequest): Promise<GenerateFollowUpSuccess>
   generateInterviewReport?(input: GenerateInterviewReportRequest): Promise<GenerateInterviewReportSuccess>
+  reviewRealInterview?(input: ReviewRealInterviewRequest): Promise<ReviewRealInterviewSuccess>
+  generateCompanyKnowledgePack?(input: GenerateCompanyKnowledgePackRequest): Promise<GenerateCompanyKnowledgePackSuccess>
 }

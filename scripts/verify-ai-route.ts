@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import analyzeAnswerRoute from '../api/analyze-answer.ts'
 import generateFollowUpRoute from '../api/generate-follow-up.ts'
+import generateCompanyKnowledgePackRoute from '../api/generate-company-knowledge-pack.ts'
 import generateInterviewReportRoute from '../api/generate-interview-report.ts'
 import generateJobPackRoute from '../api/generate-job-pack.ts'
 import generateMockInterviewRoute from '../api/generate-mock-interview.ts'
+import reviewRealInterviewRoute from '../api/review-real-interview.ts'
 import transcribeRoute from '../api/transcribe.ts'
 
 function request(path: string, body: unknown) {
@@ -25,11 +27,64 @@ async function withFakeDeepSeekServer<T>(handler: (baseUrl: string) => Promise<T
     let body = ''
     req.on('data', (chunk) => { body += chunk })
     req.on('end', () => {
+      const isCompanyKnowledge = body.includes('companyKnowledgePack') || body.includes('evidenceMap') || body.includes('generate_company_knowledge_pack')
+      const isRealInterviewReview = body.includes('extractedQuestions') || body.includes('questionBankUpdates') || body.includes('review_real_interview')
       const isMockInterview = body.includes('questions') && body.includes('followUpPolicy')
       const isFollowUp = body.includes('followUpQuestion')
       const isInterviewReport = body.includes('overallScore')
       const isJobPack = body.includes('companySummary')
-      const content = isMockInterview ? {
+      const content = isCompanyKnowledge ? {
+        sourceSummary: ['fixture company source and selected job were combined'],
+        companyCoreBusiness: 'Test company builds enterprise AI workflow products.',
+        productLines: ['AI workflow', 'RAG knowledge base', 'smart customer service'],
+        recentSignals: ['AI Agent and process automation are priority themes'],
+        roleContext: 'The role needs AI product requirement analysis and delivery collaboration.',
+        interviewFocusPrediction: ['AI product thinking', 'user scenario analysis', 'MVP tradeoff'],
+        risksAndUnknowns: ['Need more concrete business metrics'],
+        evidenceMap: [{
+          claim: 'The company focuses on enterprise AI applications.',
+          sourceId: 'source-1',
+          sourceName: 'company-source.txt',
+          confidence: 'high',
+        }],
+        recommendedQuestions: ['How would you evaluate an AI workflow MVP?'],
+        howToUseInInterview: ['Use the company source to anchor why-company and role-fit answers.'],
+      } : isRealInterviewReview ? {
+        extractedQuestions: [
+          { id: 'rq-1', question: 'Please introduce yourself.', category: 'self_intro', confidence: 0.92, sourceSpan: 'interviewer intro' },
+          { id: 'rq-2', question: 'Why move from design to AI product?', category: 'role_fit', confidence: 0.88, sourceSpan: 'career transition' },
+        ],
+        extractedAnswers: [
+          { questionId: 'rq-1', answerText: 'I combine design, AI learning, and product work.', durationEstimate: 55, qualityNote: 'Clear but needs metrics.' },
+          { questionId: 'rq-2', answerText: 'I want to connect user scenarios with AI delivery.', durationEstimate: 46, qualityNote: 'Good role logic.' },
+        ],
+        comparison: {
+          predictedByMockInterview: ['Please introduce yourself.'],
+          predictedByJobPack: ['Why move from design to AI product?'],
+          missedQuestions: ['Miro project depth was not predicted enough.'],
+          newQuestionPatterns: ['Career transition'],
+          weakAreas: ['Project evidence'],
+        },
+        reviewReport: {
+          overallSummary: 'The real interview focused on self-intro, role fit, and project depth.',
+          interviewerFocus: ['role motivation', 'project evidence'],
+          strongestAnswer: 'Role transition answer',
+          weakestAnswer: 'Project metrics',
+          missedPreparation: ['Prepare Miro project data points'],
+          unexpectedQuestions: ['Career transition follow-up'],
+          answerQuality: 'Generally clear, but needs sharper evidence.',
+          roleFitAssessment: 'Role fit is credible for AI product intern.',
+          nextTrainingTasks: ['Rehearse Miro project with user, scene, AI role, and MVP tradeoff.'],
+          questionBankUpdates: [{
+            question: 'Why did you move from design to AI product?',
+            category: 'role_fit',
+            source: 'real_interview',
+            selectedJobId: 'job-1',
+            priority: 'high',
+            suggestedPracticeType: 'chineseIntro',
+          }],
+        },
+      } : isMockInterview ? {
         questions: Array.from({ length: 6 }, (_, index) => ({
           id: `deep-q-${index + 1}`,
           type: index === 0 ? 'self_intro' : index === 2 ? 'project' : 'role_fit',
@@ -158,6 +213,36 @@ await withFakeDeepSeekServer(async (baseUrl) => {
   assert.equal(realJobPackPayload.success, true)
   assert.equal(realJobPackPayload.provider, 'deepseek')
   assert.match(realJobPackPayload.jobPack.companySummary, /示例科技/)
+
+  const realReviewResponse = await reviewRealInterviewRoute.fetch(request('/api/review-real-interview', {
+    selectedJob: baseInput.selectedJob,
+    transcript: 'Interviewer: Please introduce yourself.\nCandidate: I combine AI learning and product work.\nInterviewer: Why move from design to AI product?\nCandidate: I want to connect user scenarios with AI delivery.',
+    jobPack: realJobPackPayload.jobPack,
+    cvText: baseInput.cvText,
+  }))
+  const realReviewPayload = await realReviewResponse.json()
+  assert.equal(realReviewPayload.success, true)
+  assert.equal(realReviewPayload.provider, 'deepseek')
+  assert.ok(realReviewPayload.extractedQuestions.length >= 2)
+
+  const realKnowledgeResponse = await generateCompanyKnowledgePackRoute.fetch(request('/api/generate-company-knowledge-pack', {
+    selectedJob: baseInput.selectedJob,
+    jobPack: realJobPackPayload.jobPack,
+    companySources: [{
+      id: 'source-1',
+      type: 'company_official',
+      title: 'fixture',
+      sourceName: 'company-source.txt',
+      text: 'Enterprise AI workflow products.',
+      wordCount: 4,
+      uploadedAt: new Date().toISOString(),
+    }],
+    realInterviewReviews: [realReviewPayload.reviewReport],
+  }))
+  const realKnowledgePayload = await realKnowledgeResponse.json()
+  assert.equal(realKnowledgePayload.success, true)
+  assert.equal(realKnowledgePayload.provider, 'deepseek')
+  assert.ok(realKnowledgePayload.companyKnowledgePack.evidenceMap.length >= 1)
 })
 
 process.env.AI_PROVIDER = 'deepseek'
@@ -245,6 +330,42 @@ assert.equal(jobPackPayload.provider, 'mock')
 assert.match(jobPackPayload.jobPack.companySummary, /示例科技/)
 assert.ok(jobPackPayload.jobPack.likelyQuestions.length >= 8)
 assert.ok(jobPackPayload.jobPack.fullScoreAnswerFrameworks.length >= 2)
+
+const realInterviewResponse = await reviewRealInterviewRoute.fetch(request('/api/review-real-interview', {
+  selectedJob: baseInput.selectedJob,
+  transcript: 'Interviewer: Please introduce yourself.\nCandidate: I combine AI learning and product work.\nInterviewer: Why move from design to AI product?\nCandidate: I want to connect user scenarios with AI delivery.',
+  jobPack: jobPackPayload.jobPack,
+  trainingRecords: [{ title: 'Chinese intro', transcript: { text: baseInput.transcript } }],
+  cvText: baseInput.cvText,
+}))
+const realInterviewPayload = await realInterviewResponse.json()
+assert.equal(realInterviewPayload.success, true)
+assert.equal(realInterviewPayload.provider, 'mock')
+assert.ok(realInterviewPayload.extractedQuestions.length >= 2)
+assert.ok(realInterviewPayload.extractedAnswers.length >= 1)
+assert.ok(realInterviewPayload.reviewReport.questionBankUpdates.length >= 1)
+
+const companyKnowledgeResponse = await generateCompanyKnowledgePackRoute.fetch(request('/api/generate-company-knowledge-pack', {
+  selectedJob: baseInput.selectedJob,
+  jobPack: jobPackPayload.jobPack,
+  companySources: [{
+    id: 'source-1',
+    selectedJobId: 'job-1',
+    type: 'company_official',
+    title: 'company-source.txt',
+    sourceName: 'company-source.txt',
+    text: 'Test Technology is an enterprise AI application platform focused on AI Agent, RAG knowledge base, and workflow automation.',
+    wordCount: 19,
+    uploadedAt: new Date().toISOString(),
+  }],
+  cvText: baseInput.cvText,
+  realInterviewReviews: [realInterviewPayload.reviewReport],
+}))
+const companyKnowledgePayload = await companyKnowledgeResponse.json()
+assert.equal(companyKnowledgePayload.success, true)
+assert.equal(companyKnowledgePayload.provider, 'mock')
+assert.ok(companyKnowledgePayload.companyKnowledgePack.evidenceMap.length >= 1)
+assert.ok(companyKnowledgePayload.companyKnowledgePack.recommendedQuestions.length >= 1)
 
 process.env.AI_PROVIDER = 'deepseek'
 delete process.env.DEEPSEEK_API_KEY

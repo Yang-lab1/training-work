@@ -1,6 +1,8 @@
 import type {
   AnalyzeAnswerRequest,
   AnalyzeAnswerSuccess,
+  GenerateCompanyKnowledgePackRequest,
+  GenerateCompanyKnowledgePackSuccess,
   GenerateFollowUpRequest,
   GenerateFollowUpSuccess,
   GenerateInterviewReportRequest,
@@ -9,10 +11,12 @@ import type {
   GenerateJobPackSuccess,
   GenerateMockInterviewRequest,
   GenerateMockInterviewSuccess,
+  ReviewRealInterviewRequest,
+  ReviewRealInterviewSuccess,
 } from '../../../../src/lib/ai/types.js'
 import { serverEnv } from '../env.js'
 import type { AnalyzeAnswerProvider } from '../provider.js'
-import { normalizeFollowUp, normalizeInterviewReport, normalizeJobPack, normalizeMockInterviewQuestions, normalizeModelFeedback, parseModelJson } from '../response.js'
+import { normalizeCompanyKnowledgePack, normalizeFollowUp, normalizeInterviewReport, normalizeJobPack, normalizeMockInterviewQuestions, normalizeModelFeedback, normalizeRealInterviewReview, parseModelJson } from '../response.js'
 
 const SYSTEM_PROMPT = `你是一名严格的中文面试教练。请分析候选人的一次训练回答，并只输出合法 JSON。
 必须具体结合训练类型、目标公司、目标岗位、回答文本和时长。
@@ -48,6 +52,10 @@ JSON 字段必须为 followUpQuestion, expectedFocus, followUpPolicy。
 const INTERVIEW_REPORT_PROMPT = `你是一名严格的 AI 面试复盘教练。请基于整场模拟面试的问题、回答转写和单题反馈生成整场复盘，并只输出合法 JSON。
 JSON 字段必须为 overallScore, summary, strongestAnswer, weakestAnswer, recurringProblems, roleFitAssessment, communicationAssessment, projectDepthAssessment, englishAssessment, nextTrainingPlan。
 recurringProblems 和 nextTrainingPlan 为字符串数组。必须给出可执行的下一轮训练计划。`
+
+const REAL_INTERVIEW_REVIEW_PROMPT = `你是严格的中文真实面试复盘教练。请根据真实面试转写、目标岗位、岗位准备包和训练记录，提取面试官问题、候选人回答、准备命中情况、遗漏问题、弱项和下一轮训练任务。只输出合法 JSON。JSON 必须包含 extractedQuestions, extractedAnswers, comparison, reviewReport。extractedQuestions 每项包含 id, question, category, confidence, sourceSpan。category 只能是 self_intro, project, role_fit, technical_basic, pressure, english, behavior, unknown。extractedAnswers 每项包含 questionId, answerText, durationEstimate, qualityNote。comparison 包含 predictedByMockInterview, predictedByJobPack, missedQuestions, newQuestionPatterns, weakAreas。reviewReport 包含 overallSummary, interviewerFocus, strongestAnswer, weakestAnswer, missedPreparation, unexpectedQuestions, answerQuality, roleFitAssessment, nextTrainingTasks, questionBankUpdates。questionBankUpdates 每项包含 question, category, source, selectedJobId, priority, suggestedPracticeType。必须把真实问题反补到题库和下一轮训练。`
+
+const COMPANY_KNOWLEDGE_PROMPT = `你是公司与岗位研究简报生成器。请根据 selectedJob、岗位准备包、用户上传的公司资料、CV 文本和真实面试复盘，生成可追溯的 companyKnowledgePack。只输出合法 JSON。JSON 必须包含 sourceSummary, companyCoreBusiness, productLines, recentSignals, roleContext, interviewFocusPrediction, risksAndUnknowns, evidenceMap, recommendedQuestions, howToUseInInterview。evidenceMap 每项包含 claim, sourceId, sourceName, confidence。不要编造无法从资料或岗位表支持的事实；不确定时写入 risksAndUnknowns。`
 
 export function createDeepSeekProvider(apiKey: string): AnalyzeAnswerProvider {
   const model = serverEnv.DEEPSEEK_MODEL?.trim() || 'deepseek-chat'
@@ -130,6 +138,12 @@ export function createDeepSeekProvider(apiKey: string): AnalyzeAnswerProvider {
     },
     async generateInterviewReport(input: GenerateInterviewReportRequest): Promise<GenerateInterviewReportSuccess> {
       return normalizeInterviewReport(await completeJson(INTERVIEW_REPORT_PROMPT, input, 2600), 'deepseek', model)
+    },
+    async reviewRealInterview(input: ReviewRealInterviewRequest): Promise<ReviewRealInterviewSuccess> {
+      return normalizeRealInterviewReview(await completeJson(REAL_INTERVIEW_REVIEW_PROMPT, input, 3200), 'deepseek', model)
+    },
+    async generateCompanyKnowledgePack(input: GenerateCompanyKnowledgePackRequest): Promise<GenerateCompanyKnowledgePackSuccess> {
+      return normalizeCompanyKnowledgePack(await completeJson(COMPANY_KNOWLEDGE_PROMPT, input, 3200), 'deepseek', model)
     },
   }
 }

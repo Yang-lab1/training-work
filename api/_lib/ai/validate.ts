@@ -2,11 +2,14 @@ import type {
   AnalyzeAnswerRequest,
   AnalyzeJobContext,
   GenerateFollowUpRequest,
+  GenerateCompanyKnowledgePackRequest,
   GenerateInterviewReportRequest,
   GenerateJobPackRequest,
   GenerateMockInterviewRequest,
   MockInterviewQuestion,
   MockInterviewType,
+  QuestionBankUpdate,
+  ReviewRealInterviewRequest,
   TrainingType,
 } from '../../../src/lib/ai/types.js'
 
@@ -99,6 +102,7 @@ export function validateGenerateJobPackRequest(value: unknown): GenerateJobPackR
   return {
     taskType: 'generate_job_pack',
     selectedJob: requiredJob(input.selectedJob),
+    companyKnowledgePack: input.companyKnowledgePack && typeof input.companyKnowledgePack === 'object' ? input.companyKnowledgePack as GenerateJobPackRequest['companyKnowledgePack'] : undefined,
     cvText: safeText(input.cvText, 8000),
     trainingRecords,
     aiFeedbackRecords,
@@ -135,6 +139,34 @@ function safeJobPack(value: unknown) {
   }
 }
 
+function safeCompanySources(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 12).map((source, index) => {
+    const item = source && typeof source === 'object' ? source as Record<string, unknown> : {}
+    const type = safeText(item.type, 40)
+    return {
+      id: safeText(item.id, 160) || `source-${index + 1}`,
+      selectedJobId: safeText(item.selectedJobId, 160),
+      type: ['company_official', 'job_description', 'article', 'portfolio', 'other'].includes(type) ? type as GenerateCompanyKnowledgePackRequest['companySources'][number]['type'] : 'other',
+      title: safeText(item.title, 200) || safeText(item.sourceName, 200) || `资料 ${index + 1}`,
+      sourceName: safeText(item.sourceName, 200) || safeText(item.title, 200) || `资料 ${index + 1}`,
+      sourceUrl: safeText(item.sourceUrl, 600),
+      text: safeText(item.text, 10_000),
+      wordCount: safeNumber(item.wordCount, 100_000),
+      uploadedAt: safeText(item.uploadedAt, 80) || new Date().toISOString(),
+    }
+  }).filter((source) => source.text || source.sourceName)
+}
+
+function safeMockInterviewContext(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined
+  const input = value as Record<string, unknown>
+  return {
+    questions: Array.isArray(input.questions) ? input.questions.slice(0, 12).map(safeQuestion) : [],
+    finalReport: input.finalReport,
+  }
+}
+
 export function validateGenerateMockInterviewRequest(value: unknown): GenerateMockInterviewRequest {
   if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
   const input = value as Record<string, unknown>
@@ -143,6 +175,28 @@ export function validateGenerateMockInterviewRequest(value: unknown): GenerateMo
     taskType: 'generate_mock_interview',
     selectedJob: requiredJob(input.selectedJob),
     jobPack: safeJobPack(input.jobPack),
+    companyKnowledgePack: input.companyKnowledgePack && typeof input.companyKnowledgePack === 'object' ? input.companyKnowledgePack as GenerateMockInterviewRequest['companyKnowledgePack'] : undefined,
+    questionBank: Array.isArray(input.questionBank) ? input.questionBank.slice(0, 20).map((item) => {
+      const question = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      const category = safeText(question.category, 40)
+      const priority = safeText(question.priority, 40)
+      const practice = safeText(question.suggestedPracticeType, 40)
+      return {
+        question: safeText(question.question, 1000),
+        category: ['self_intro', 'project', 'role_fit', 'technical_basic', 'pressure', 'english', 'behavior', 'unknown'].includes(category) ? category as QuestionBankUpdate['category'] : 'unknown',
+        source: 'real_interview' as const,
+        selectedJobId: safeText(question.selectedJobId, 160),
+        priority: ['high', 'medium', 'low'].includes(priority) ? priority as QuestionBankUpdate['priority'] : 'medium',
+        suggestedPracticeType: ['chineseIntro', 'englishIntro', 'miroProject', 'mockInterview'].includes(practice) ? practice as QuestionBankUpdate['suggestedPracticeType'] : 'mockInterview',
+      }
+    }).filter((item) => item.question) : [],
+    realInterviewReviews: Array.isArray(input.realInterviewReviews) ? input.realInterviewReviews.slice(0, 8).map((item) => {
+      const review = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      return {
+        overallSummary: safeText(review.overallSummary, 800),
+        nextTrainingTasks: Array.isArray(review.nextTrainingTasks) ? review.nextTrainingTasks.map((task) => safeText(task, 240)).filter(Boolean).slice(0, 8) : [],
+      }
+    }) : [],
     cvText: safeText(input.cvText, 6000),
     trainingRecords: Array.isArray(input.trainingRecords) ? input.trainingRecords.slice(0, 20).map((record) => {
       const item = record && typeof record === 'object' ? record as Record<string, unknown> : {}
@@ -198,6 +252,56 @@ export function validateGenerateInterviewReportRequest(value: unknown): Generate
           nextTasks: Array.isArray(aiFeedback.nextTasks) ? aiFeedback.nextTasks.map((item) => safeText(item, 300)).filter(Boolean).slice(0, 8) : [],
         },
         durationSeconds: safeNumber(item.durationSeconds, 3600),
+      }
+    }) : [],
+  }
+}
+
+export function validateReviewRealInterviewRequest(value: unknown): ReviewRealInterviewRequest {
+  if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
+  const input = value as Record<string, unknown>
+  const transcript = safeText(input.transcript, 40_000)
+  if (!transcript) throw new Error('请先生成真实面试转写。')
+  return {
+    taskType: 'review_real_interview',
+    selectedJob: requiredJob(input.selectedJob),
+    transcript,
+    jobPack: safeJobPack(input.jobPack),
+    mockInterview: safeMockInterviewContext(input.mockInterview),
+    trainingRecords: Array.isArray(input.trainingRecords) ? input.trainingRecords.slice(0, 20).map((record) => {
+      const item = record && typeof record === 'object' ? record as Record<string, unknown> : {}
+      const transcriptValue = item.transcript && typeof item.transcript === 'object' ? item.transcript as Record<string, unknown> : {}
+      const aiFeedback = item.aiFeedback && typeof item.aiFeedback === 'object' ? item.aiFeedback as Record<string, unknown> : {}
+      return {
+        trainingType: safeText(item.trainingType, 40) as TrainingType,
+        transcript: { text: safeText(transcriptValue.text, 2000) },
+        aiFeedback: {
+          score: safeNumber(aiFeedback.score, 100),
+          summary: safeText(aiFeedback.summary, 800),
+          problems: Array.isArray(aiFeedback.problems) ? aiFeedback.problems.map((problem) => safeText(problem, 300)).filter(Boolean).slice(0, 8) : [],
+          nextTasks: Array.isArray(aiFeedback.nextTasks) ? aiFeedback.nextTasks.map((task) => safeText(task, 300)).filter(Boolean).slice(0, 8) : [],
+        },
+      }
+    }) : [],
+    cvText: safeText(input.cvText, 8000),
+  }
+}
+
+export function validateGenerateCompanyKnowledgePackRequest(value: unknown): GenerateCompanyKnowledgePackRequest {
+  if (!value || typeof value !== 'object') throw new Error('请求内容格式不正确。')
+  const input = value as Record<string, unknown>
+  return {
+    taskType: 'generate_company_knowledge_pack',
+    selectedJob: requiredJob(input.selectedJob),
+    jobPack: safeJobPack(input.jobPack),
+    companySources: safeCompanySources(input.companySources),
+    cvText: safeText(input.cvText, 8000),
+    realInterviewReviews: Array.isArray(input.realInterviewReviews) ? input.realInterviewReviews.slice(0, 8).map((item) => {
+      const review = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+      return {
+        overallSummary: safeText(review.overallSummary, 800),
+        interviewerFocus: Array.isArray(review.interviewerFocus) ? review.interviewerFocus.map((focus) => safeText(focus, 160)).filter(Boolean).slice(0, 8) : [],
+        nextTrainingTasks: Array.isArray(review.nextTrainingTasks) ? review.nextTrainingTasks.map((task) => safeText(task, 240)).filter(Boolean).slice(0, 8) : [],
       }
     }) : [],
   }

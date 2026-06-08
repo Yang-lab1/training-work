@@ -29,8 +29,17 @@ import type {
   GenerateInterviewReportResponse,
   GenerateJobPackResponse,
   GenerateMockInterviewResponse,
+  GenerateCompanyKnowledgePackResponse,
   InterviewFinalReport,
   JobPackContent,
+  CompanyKnowledgePackContent,
+  CompanySourceInput,
+  QuestionBankUpdate,
+  RealInterviewReviewReport,
+  ReviewRealInterviewResponse,
+  ExtractedRealInterviewQuestion,
+  ExtractedRealInterviewAnswer,
+  RealInterviewComparison,
   MockInterviewQuestion,
   MockInterviewType,
   StoredAIFeedback,
@@ -41,7 +50,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '0.6A'
+const APP_VERSION = '0.8'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -52,10 +61,14 @@ const SCRIPT_TEMPLATES_KEY = 'interview_os_script_templates'
 const TRAINING_RECORDS_KEY = 'interview_os_training_records'
 const JOB_PACKS_KEY = 'interview_os_job_packs'
 const MOCK_INTERVIEWS_KEY = 'interview_os_mock_interviews'
+const REAL_INTERVIEWS_KEY = 'interview_os_real_interviews'
+const QUESTION_BANK_KEY = 'interview_os_question_bank'
+const COMPANY_SOURCES_KEY = 'interview_os_company_sources'
+const COMPANY_KNOWLEDGE_PACKS_KEY = 'interview_os_company_knowledge_packs'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'backup'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup'
 type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -162,6 +175,10 @@ interface BackupPayload {
   trainingRecords: TrainingRecord[]
   jobPacks: StoredJobPack[]
   mockInterviews: MockInterviewSession[]
+  realInterviews: StoredRealInterview[]
+  questionBank: QuestionBankUpdate[]
+  companySources: CompanySourceInput[]
+  companyKnowledgePacks: StoredCompanyKnowledgePack[]
 }
 
 interface StoredJobPack {
@@ -207,6 +224,39 @@ interface MockInterviewSession {
     report: InterviewFinalReport
     rawProviderNote?: string
   }
+}
+
+interface StoredRealInterview {
+  id: string
+  selectedJob: JobRecord
+  relatedMockInterviewId?: string
+  recordingId?: string
+  recordingName?: string
+  audioMetadata?: TrainingRecord['audioMetadata']
+  transcript?: TranscriptData
+  transcriptStatus: TranscriptStatus
+  extractedQuestions: ExtractedRealInterviewQuestion[]
+  extractedAnswers: ExtractedRealInterviewAnswer[]
+  comparison?: RealInterviewComparison
+  reviewReport?: RealInterviewReviewReport
+  provider?: string
+  model?: string
+  generatedAt?: string
+  rawProviderNote?: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface StoredCompanyKnowledgePack {
+  id: string
+  selectedJobId: string
+  selectedJob: JobRecord
+  provider: string
+  model: string
+  generatedAt: string
+  companyKnowledgePack: CompanyKnowledgePackContent
+  sourceIds: string[]
+  rawProviderNote?: string
 }
 
 const defaultTasks: TrainingTask[] = [
@@ -255,6 +305,8 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
   { id: 'feedback', label: 'AI 反馈', icon: <BrainCircuit size={17} /> },
   { id: 'jobPack', label: '岗位准备包', icon: <Sparkles size={17} /> },
   { id: 'mockInterview', label: '模拟面试', icon: <MessagesSquare size={17} /> },
+  { id: 'realInterview', label: '真实面试复盘', icon: <FileAudio size={17} /> },
+  { id: 'companyKnowledge', label: '公司资料增强', icon: <FileText size={17} /> },
   { id: 'backup', label: '数据备份', icon: <Archive size={17} /> },
 ]
 
@@ -267,6 +319,10 @@ function App() {
   const [scriptTemplates, setScriptTemplates] = useState<ScriptTemplates>(readScriptTemplates)
   const [jobPacks, setJobPacks] = useState<StoredJobPack[]>(readJobPacks)
   const [mockInterviews, setMockInterviews] = useState<MockInterviewSession[]>(readMockInterviews)
+  const [realInterviews, setRealInterviews] = useState<StoredRealInterview[]>(readRealInterviews)
+  const [questionBank, setQuestionBank] = useState<QuestionBankUpdate[]>(readQuestionBank)
+  const [companySources, setCompanySources] = useState<CompanySourceInput[]>(readCompanySources)
+  const [companyKnowledgePacks, setCompanyKnowledgePacks] = useState<StoredCompanyKnowledgePack[]>(readCompanyKnowledgePacks)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
@@ -284,8 +340,13 @@ function App() {
   const [jobPackLoading, setJobPackLoading] = useState(false)
   const [mockInterviewMessage, setMockInterviewMessage] = useState('')
   const [mockInterviewLoading, setMockInterviewLoading] = useState('')
+  const [realInterviewMessage, setRealInterviewMessage] = useState('')
+  const [realInterviewLoading, setRealInterviewLoading] = useState('')
+  const [companyKnowledgeMessage, setCompanyKnowledgeMessage] = useState('')
+  const [companyKnowledgeLoading, setCompanyKnowledgeLoading] = useState(false)
   const [recordingInterviewQuestionId, setRecordingInterviewQuestionId] = useState<string | null>(null)
   const [interviewAudioPreviews, setInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
+  const [realInterviewAudioPreviews, setRealInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
@@ -304,6 +365,14 @@ function App() {
   const currentJobPack = useMemo(
     () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
     [jobPacks, selectedJob],
+  )
+  const currentKnowledgePack = useMemo(
+    () => selectedJob ? companyKnowledgePacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
+    [companyKnowledgePacks, selectedJob],
+  )
+  const currentCompanySources = useMemo(
+    () => selectedJob ? companySources.filter((source) => !source.selectedJobId || source.selectedJobId === selectedJob.id) : companySources,
+    [companySources, selectedJob],
   )
   const activeMockInterview = useMemo(
     () => mockInterviews.find((session) => session.status === 'in_progress') || mockInterviews[0],
@@ -335,6 +404,10 @@ function App() {
   useEffect(() => { localStorage.setItem(SCRIPT_TEMPLATES_KEY, JSON.stringify(scriptTemplates)) }, [scriptTemplates])
   useEffect(() => { localStorage.setItem(JOB_PACKS_KEY, JSON.stringify(jobPacks)) }, [jobPacks])
   useEffect(() => { localStorage.setItem(MOCK_INTERVIEWS_KEY, JSON.stringify(mockInterviews)) }, [mockInterviews])
+  useEffect(() => { localStorage.setItem(REAL_INTERVIEWS_KEY, JSON.stringify(realInterviews)) }, [realInterviews])
+  useEffect(() => { localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(questionBank)) }, [questionBank])
+  useEffect(() => { localStorage.setItem(COMPANY_SOURCES_KEY, JSON.stringify(companySources)) }, [companySources])
+  useEffect(() => { localStorage.setItem(COMPANY_KNOWLEDGE_PACKS_KEY, JSON.stringify(companyKnowledgePacks)) }, [companyKnowledgePacks])
 
   useEffect(() => {
     let disposed = false
@@ -367,6 +440,21 @@ function App() {
     void loadInterviewAudio()
     return () => { disposed = true }
   }, [mockInterviews])
+
+  useEffect(() => {
+    let disposed = false
+    async function loadRealInterviewAudio() {
+      const previews: Record<string, AudioPreview> = {}
+      for (const interview of realInterviews) {
+        if (!interview.recordingId) continue
+        const blob = await readRecordingBlob(interview.recordingId)
+        if (blob && !disposed) previews[interview.id] = createPreview(blob)
+      }
+      if (!disposed) setRealInterviewAudioPreviews(previews)
+    }
+    void loadRealInterviewAudio()
+    return () => { disposed = true }
+  }, [realInterviews])
 
   useEffect(() => {
     if (!recordingTaskId && !recordingInterviewQuestionId) return undefined
@@ -604,6 +692,9 @@ function App() {
           taskType: 'generate_mock_interview',
           selectedJob,
           jobPack: currentJobPack?.jobPack,
+          companyKnowledgePack: currentKnowledgePack?.companyKnowledgePack,
+          questionBank,
+          realInterviewReviews: realInterviews.map((interview) => interview.reviewReport).filter(Boolean).slice(0, 8),
           cvText: cvTextState.text.slice(0, 6000),
           trainingRecords: state.history.slice(0, 20),
           interviewType,
@@ -831,6 +922,206 @@ function App() {
     setMockInterviews((current) => current.filter((session) => session.id !== sessionId))
   }
 
+  async function handleRealInterviewAudioUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selectedJob) {
+      if (!selectedJob) setRealInterviewMessage('请先选择目标岗位。')
+      return
+    }
+    const recordingId = `real-interview-${Date.now()}`
+    await saveRecordingBlob(recordingId, file)
+    const now = new Date().toISOString()
+    const interview: StoredRealInterview = {
+      id: `real-${Date.now()}`,
+      selectedJob,
+      relatedMockInterviewId: activeMockInterview?.id,
+      recordingId,
+      recordingName: file.name,
+      audioMetadata: { recordingId, recordingName: file.name, durationSeconds: 0, mimeType: file.type },
+      transcriptStatus: 'not_started',
+      extractedQuestions: [],
+      extractedAnswers: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    setRealInterviewAudioPreviews((current) => ({ ...current, [interview.id]: createPreview(file) }))
+    setRealInterviews((current) => [interview, ...current].slice(0, 20))
+    setRealInterviewMessage('真实面试录音已保存到本地。下一步生成转写。')
+  }
+
+  async function generateRealInterviewTranscript(interviewId: string) {
+    const interview = realInterviews.find((item) => item.id === interviewId)
+    if (!interview) return
+    setRealInterviewLoading(`transcript-${interviewId}`)
+    setRealInterviewMessage('')
+    setRealInterviews((current) => current.map((item) => item.id === interviewId ? { ...item, transcriptStatus: 'transcribing', updatedAt: new Date().toISOString() } : item))
+    try {
+      const payload = {
+        trainingRecordId: interview.id,
+        trainingType: 'chineseIntro',
+        audioMetadata: interview.audioMetadata,
+        selectedJob: interview.selectedJob,
+        sourceType: 'real_interview',
+      }
+      const blob = interview.recordingId ? await readRecordingBlob(interview.recordingId) : null
+      if (!blob) throw new Error('该记录没有可用音频文件，请重新上传录音，或使用模拟转写测试流程。')
+      const form = new FormData()
+      form.append('payload', JSON.stringify(payload))
+      form.append('audio', blob, interview.recordingName || 'real-interview.webm')
+      const response = await fetch('/api/transcribe', { method: 'POST', body: form })
+      const result = await response.json() as TranscribeResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '转写失败。' : result.error)
+      const transcript: TranscriptData = {
+        text: result.transcript,
+        source: result.provider === 'mock' || result.provider === 'mock_fallback' ? 'mock' : 'asr',
+        updatedAt: result.generatedAt,
+        generatedAt: result.generatedAt,
+        provider: result.provider,
+        language: result.language,
+      }
+      setRealInterviews((current) => current.map((item) => item.id === interviewId ? {
+        ...item,
+        transcript,
+        transcriptStatus: transcript.source === 'mock' ? 'mock_ready' : 'completed',
+        updatedAt: new Date().toISOString(),
+      } : item))
+      setRealInterviewMessage(transcript.source === 'mock' ? '已生成模拟真实面试转写。' : '真实面试转写完成。')
+    } catch (error) {
+      setRealInterviews((current) => current.map((item) => item.id === interviewId ? { ...item, transcriptStatus: 'failed', updatedAt: new Date().toISOString() } : item))
+      setRealInterviewMessage(error instanceof Error ? error.message : '真实面试转写失败。')
+    } finally {
+      setRealInterviewLoading('')
+    }
+  }
+
+  async function reviewRealInterview(interviewId: string) {
+    const interview = realInterviews.find((item) => item.id === interviewId)
+    if (!interview?.transcript?.text) {
+      setRealInterviewMessage('请先生成真实面试转写。')
+      return
+    }
+    setRealInterviewLoading(`review-${interviewId}`)
+    setRealInterviewMessage('')
+    try {
+      const response = await fetch('/api/review-real-interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'review_real_interview',
+          selectedJob: interview.selectedJob,
+          transcript: interview.transcript.text,
+          jobPack: currentJobPack?.jobPack,
+          mockInterview: activeMockInterview,
+          trainingRecords: state.history.slice(0, 20),
+          cvText: cvTextState.text.slice(0, 8000),
+        }),
+      })
+      const result = await response.json() as ReviewRealInterviewResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '真实面试复盘失败。' : result.error)
+      setRealInterviews((current) => current.map((item) => item.id === interviewId ? {
+        ...item,
+        extractedQuestions: result.extractedQuestions,
+        extractedAnswers: result.extractedAnswers,
+        comparison: result.comparison,
+        reviewReport: result.reviewReport,
+        provider: result.provider,
+        model: result.model,
+        generatedAt: result.generatedAt,
+        rawProviderNote: result.rawProviderNote,
+        updatedAt: new Date().toISOString(),
+      } : item))
+      setQuestionBank((current) => mergeQuestionBank(current, result.reviewReport.questionBankUpdates, interview.selectedJob.id))
+      setRealInterviewMessage('真实面试复盘已生成，并已反补题库。')
+    } catch (error) {
+      setRealInterviewMessage(error instanceof Error ? error.message : '真实面试复盘失败。')
+    } finally {
+      setRealInterviewLoading('')
+    }
+  }
+
+  function deleteRealInterview(interviewId: string) {
+    setRealInterviews((current) => current.filter((interview) => interview.id !== interviewId))
+  }
+
+  async function handleCompanySourceUpload(type: CompanySourceInput['type'], event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selectedJob) {
+      if (!selectedJob) setCompanyKnowledgeMessage('请先选择目标岗位。')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setCompanyKnowledgeMessage('公司资料文本不能超过 2 MB。')
+      return
+    }
+    const text = await readSourceFileText(file)
+    const now = new Date().toISOString()
+    const source: CompanySourceInput = {
+      id: `company-source-${Date.now()}`,
+      selectedJobId: selectedJob.id,
+      type,
+      title: file.name,
+      sourceName: file.name,
+      text,
+      wordCount: countTextUnits(text),
+      uploadedAt: now,
+    }
+    setCompanySources((current) => [source, ...current].slice(0, 40))
+    setCompanyKnowledgeMessage('公司资料已读取。下一步生成公司知识包。')
+  }
+
+  async function generateCompanyKnowledgePack() {
+    if (!selectedJob) {
+      setCompanyKnowledgeMessage('请先选择目标岗位。')
+      setActiveView('materials')
+      return
+    }
+    setCompanyKnowledgeLoading(true)
+    setCompanyKnowledgeMessage('')
+    try {
+      const response = await fetch('/api/generate-company-knowledge-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'generate_company_knowledge_pack',
+          selectedJob,
+          jobPack: currentJobPack?.jobPack,
+          companySources: currentCompanySources,
+          cvText: cvTextState.text.slice(0, 8000),
+          realInterviewReviews: realInterviews.map((interview) => interview.reviewReport).filter(Boolean).slice(0, 8),
+        }),
+      })
+      const result = await response.json() as GenerateCompanyKnowledgePackResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '公司知识包生成失败。' : result.error)
+      const pack: StoredCompanyKnowledgePack = {
+        id: `${selectedJob.id || selectedJob.companyName}-knowledge-${Date.now()}`,
+        selectedJobId: selectedJob.id,
+        selectedJob,
+        provider: result.provider,
+        model: result.model,
+        generatedAt: result.generatedAt,
+        companyKnowledgePack: result.companyKnowledgePack,
+        sourceIds: currentCompanySources.map((source) => source.id),
+        rawProviderNote: result.rawProviderNote,
+      }
+      setCompanyKnowledgePacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== selectedJob.id)].slice(0, 20))
+      setCompanyKnowledgeMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟公司知识包。' : '公司知识包已生成。')
+    } catch (error) {
+      setCompanyKnowledgeMessage(error instanceof Error ? error.message : '公司知识包生成失败。')
+    } finally {
+      setCompanyKnowledgeLoading(false)
+    }
+  }
+
+  function deleteCompanySource(sourceId: string) {
+    setCompanySources((current) => current.filter((source) => source.id !== sourceId))
+  }
+
+  function deleteCompanyKnowledgePack(packId: string) {
+    setCompanyKnowledgePacks((current) => current.filter((pack) => pack.id !== packId))
+  }
+
   async function resetTask(taskId: TaskId) {
     const task = state.tasks.find((item) => item.id === taskId)
     if (task?.recordingId) await deleteRecordingBlob(task.recordingId)
@@ -880,6 +1171,10 @@ function App() {
       trainingRecords: state.history,
       jobPacks,
       mockInterviews,
+      realInterviews,
+      questionBank,
+      companySources,
+      companyKnowledgePacks,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -900,6 +1195,10 @@ function App() {
       setScriptTemplates(parsed.scriptTemplates)
       setJobPacks(normalizeJobPacks(parsed.jobPacks))
       setMockInterviews(normalizeMockInterviews(parsed.mockInterviews))
+      setRealInterviews(normalizeRealInterviews(parsed.realInterviews))
+      setQuestionBank(normalizeQuestionBank(parsed.questionBank))
+      setCompanySources(normalizeCompanySources(parsed.companySources))
+      setCompanyKnowledgePacks(normalizeCompanyKnowledgePacks(parsed.companyKnowledgePacks))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -925,7 +1224,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -936,6 +1235,10 @@ function App() {
     setScriptTemplates({})
     setJobPacks([])
     setMockInterviews([])
+    setRealInterviews([])
+    setQuestionBank([])
+    setCompanySources([])
+    setCompanyKnowledgePacks([])
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
@@ -958,6 +1261,7 @@ function App() {
         body: JSON.stringify({
           taskType: 'generate_job_pack',
           selectedJob,
+          companyKnowledgePack: currentKnowledgePack?.companyKnowledgePack,
           cvText: cvTextState.text.slice(0, 8000),
           trainingRecords: state.history.slice(0, 20),
           aiFeedbackRecords: state.history.map((record) => record.aiFeedback).filter(Boolean),
@@ -1244,6 +1548,95 @@ function App() {
           </Page>
         )}
 
+        {activeView === 'realInterview' && (
+          <Page title="真实面试复盘" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先选择目标岗位，再上传真实面试录音'}>
+            {!selectedJob ? (
+              <section className="primary-flow">
+                <div>
+                  <span className="eyebrow">需要目标岗位</span>
+                  <h2>先在岗位库选择岗位</h2>
+                  <p>真实面试复盘会把问题反补到该岗位的题库和下一轮训练。</p>
+                </div>
+                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
+              </section>
+            ) : (
+              <>
+                <section className="primary-flow">
+                  <div>
+                    <span className="eyebrow">真实录音复盘</span>
+                    <h2>上传真实面试录音</h2>
+                    <p>系统会转写、提取面试官问题，生成复盘并反补题库。</p>
+                  </div>
+                  <label className="small-upload-button">
+                    <input type="file" accept="audio/*,.webm,.wav,.mp3,.m4a,.aac,.ogg,.mp4" onChange={(event) => void handleRealInterviewAudioUpload(event)} />
+                    <Upload size={16} />上传真实面试录音
+                  </label>
+                </section>
+                {realInterviewMessage && <p className={realInterviewMessage.includes('失败') || realInterviewMessage.includes('没有') || realInterviewMessage.includes('请先') ? 'error-line' : 'success-line'}>{realInterviewMessage}</p>}
+                <div className="record-list">
+                  {realInterviews.length ? realInterviews.map((interview) => (
+                    <RealInterviewCard
+                      key={interview.id}
+                      interview={interview}
+                      preview={realInterviewAudioPreviews[interview.id]}
+                      loading={realInterviewLoading}
+                      onTranscript={() => void generateRealInterviewTranscript(interview.id)}
+                      onReview={() => void reviewRealInterview(interview.id)}
+                      onDelete={() => deleteRealInterview(interview.id)}
+                    />
+                  )) : <p className="empty-state">还没有真实面试录音。上传后会保存到本地浏览器。</p>}
+                </div>
+              </>
+            )}
+          </Page>
+        )}
+
+        {activeView === 'companyKnowledge' && (
+          <Page title="公司资料增强" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先选择目标岗位，再上传公司资料'}>
+            {!selectedJob ? (
+              <section className="primary-flow">
+                <div>
+                  <span className="eyebrow">需要目标岗位</span>
+                  <h2>先选择目标岗位</h2>
+                  <p>公司知识包会绑定当前岗位，不需要手填岗位信息。</p>
+                </div>
+                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
+              </section>
+            ) : (
+              <>
+                <section className="primary-flow">
+                  <div>
+                    <span className="eyebrow">资料来源</span>
+                    <h2>上传公司资料文本</h2>
+                    <p>支持 TXT / Markdown / HTML 文本。PDF / DOCX 暂只建议另存为文本后上传。</p>
+                  </div>
+                  <div className="inline-actions">
+                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('company_official', event)} /><Upload size={15} />公司资料</label>
+                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('job_description', event)} /><Upload size={15} />岗位 JD</label>
+                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('article', event)} /><Upload size={15} />文章文本</label>
+                    <label className="small-upload-button"><input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCompanySourceUpload('portfolio', event)} /><Upload size={15} />作品集文本</label>
+                  </div>
+                </section>
+                <section className="primary-flow">
+                  <div>
+                    <span className="eyebrow">{currentCompanySources.length} 个来源</span>
+                    <h2>生成公司知识包</h2>
+                    <p>{currentJobPack ? '会结合岗位准备包和真实面试复盘。' : '建议先生成岗位准备包，但也可以直接生成。'}</p>
+                  </div>
+                  <button className="primary-button" type="button" onClick={() => void generateCompanyKnowledgePack()} disabled={companyKnowledgeLoading}>
+                    <Sparkles size={16} />{companyKnowledgeLoading ? '生成中…' : currentKnowledgePack ? '重新生成知识包' : '生成公司知识包'}
+                  </button>
+                </section>
+                {companyKnowledgeMessage && <p className={companyKnowledgeMessage.includes('失败') || companyKnowledgeMessage.includes('请先') ? 'error-line' : 'success-line'}>{companyKnowledgeMessage}</p>}
+                <CompanySourcesList sources={currentCompanySources} onDelete={deleteCompanySource} />
+                {currentKnowledgePack ? (
+                  <CompanyKnowledgeReport pack={currentKnowledgePack} onDelete={() => deleteCompanyKnowledgePack(currentKnowledgePack.id)} />
+                ) : <p className="empty-state">还没有公司知识包。生成后会保存到本地，并可被岗位准备包和模拟面试引用。</p>}
+              </>
+            )}
+          </Page>
+        )}
+
         {activeView === 'backup' && (
           <Page title="数据备份" subtitle="备份包含资料 metadata、岗位、转写状态和 AI 反馈；不包含音频 Blob。">
             <section className="backup-actions">
@@ -1380,6 +1773,117 @@ function InterviewFinalReportView({ finalReport }: { finalReport: NonNullable<Mo
       </dl>
       <FeedbackList title="反复出现的问题" items={finalReport.report.recurringProblems} />
       <FeedbackList title="下一轮训练计划" items={finalReport.report.nextTrainingPlan} />
+    </article>
+  )
+}
+
+function RealInterviewCard({
+  interview,
+  preview,
+  loading,
+  onTranscript,
+  onReview,
+  onDelete,
+}: {
+  interview: StoredRealInterview
+  preview?: AudioPreview
+  loading: string
+  onTranscript: () => void
+  onReview: () => void
+  onDelete: () => void
+}) {
+  const isMock = interview.provider === 'mock' || interview.provider === 'mock_fallback'
+  return (
+    <article className="record-card">
+      <header>
+        <div>
+          <h3>{interview.recordingName || '真实面试录音'}</h3>
+          <p>{interview.selectedJob.companyName} · {interview.selectedJob.jobTitle} · {formatDateTime(interview.createdAt)}</p>
+        </div>
+        <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
+      </header>
+      {preview && <div className="audio-result"><audio controls src={preview.url} /><span>{formatFileSize(preview.size)}</span></div>}
+      <div className="status-row">
+        <span>转写：{transcriptStatusLabel(interview.transcriptStatus)}</span>
+        <span>复盘：{interview.reviewReport ? '已生成' : '待生成'}</span>
+      </div>
+      <div className="inline-actions">
+        <button type="button" onClick={onTranscript} disabled={loading === `transcript-${interview.id}`}><FileText size={15} />{loading === `transcript-${interview.id}` ? '转写中…' : '生成转写'}</button>
+        <button className="primary-button" type="button" onClick={onReview} disabled={!interview.transcript || loading === `review-${interview.id}`}><BrainCircuit size={15} />{loading === `review-${interview.id}` ? '复盘中…' : '生成真实复盘'}</button>
+      </div>
+      {interview.transcript && <div className="transcript-preview"><span>{interview.transcript.provider || interview.transcript.source}</span><p>{interview.transcript.text}</p></div>}
+      {interview.reviewReport && (
+        <article className="ai-report">
+          <header>
+            <div><span>真实面试复盘</span><strong>{interview.extractedQuestions.length}</strong></div>
+            <p>{interview.reviewReport.overallSummary}</p>
+            <em>{interview.provider} · {interview.model} · {interview.generatedAt ? formatDateTime(interview.generatedAt) : ''}</em>
+          </header>
+          {isMock && <p className="mock-notice">当前为模拟真实面试复盘，仅用于测试流程。</p>}
+          {interview.rawProviderNote && <p className="provider-note">{interview.rawProviderNote}</p>}
+          <FeedbackList title="面试官实际问题" items={interview.extractedQuestions.map((question) => question.question)} />
+          <FeedbackList title="反补训练任务" items={interview.reviewReport.nextTrainingTasks} />
+          <FeedbackList title="题库更新" items={interview.reviewReport.questionBankUpdates.map((item) => item.question)} />
+          <dl className="feedback-detail-list">
+            <div><dt>面试官重点</dt><dd>{interview.reviewReport.interviewerFocus.join('、')}</dd></div>
+            <div><dt>最强回答</dt><dd>{interview.reviewReport.strongestAnswer}</dd></div>
+            <div><dt>最弱回答</dt><dd>{interview.reviewReport.weakestAnswer}</dd></div>
+            <div><dt>岗位匹配</dt><dd>{interview.reviewReport.roleFitAssessment}</dd></div>
+          </dl>
+        </article>
+      )}
+    </article>
+  )
+}
+
+function CompanySourcesList({ sources, onDelete }: { sources: CompanySourceInput[]; onDelete: (sourceId: string) => void }) {
+  if (!sources.length) return <p className="empty-state">还没有上传公司资料。可以先用 job.xlsx 生成，也可以补充公司官网、JD、公众号文章导出文本。</p>
+  return (
+    <section className="material-list">
+      {sources.map((source) => (
+        <div className="material-row" key={source.id}>
+          <div><strong>{source.title}</strong><span>{source.type} · {source.wordCount} 字 · {formatDateTime(source.uploadedAt)}</span></div>
+          <button className="danger-text" type="button" onClick={() => onDelete(source.id)}><Trash2 size={15} />删除</button>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function CompanyKnowledgeReport({ pack, onDelete }: { pack: StoredCompanyKnowledgePack; onDelete: () => void }) {
+  const isMock = pack.provider === 'mock' || pack.provider === 'mock_fallback'
+  return (
+    <article className="job-pack-report">
+      <header>
+        <div>
+          <span className="eyebrow">公司知识包</span>
+          <h2>{pack.selectedJob.companyName}</h2>
+          <p>{pack.provider} · {pack.model} · {formatDateTime(pack.generatedAt)}</p>
+        </div>
+        <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
+      </header>
+      {isMock && <p className="mock-notice">当前为模拟公司知识包，仅用于测试流程。</p>}
+      {pack.rawProviderNote && <p className="provider-note">{pack.rawProviderNote}</p>}
+      <section className="brief-section"><h3>来源摘要</h3><p>{pack.companyKnowledgePack.sourceSummary}</p></section>
+      <section className="brief-section"><h3>核心业务</h3><p>{pack.companyKnowledgePack.companyCoreBusiness}</p></section>
+      <div className="brief-grid">
+        <FeedbackList title="产品线" items={pack.companyKnowledgePack.productLines} />
+        <FeedbackList title="近期信号" items={pack.companyKnowledgePack.recentSignals} />
+        <FeedbackList title="面试重点预测" items={pack.companyKnowledgePack.interviewFocusPrediction} />
+        <FeedbackList title="风险与未知" items={pack.companyKnowledgePack.risksAndUnknowns} />
+      </div>
+      <section className="brief-section"><h3>岗位上下文</h3><p>{pack.companyKnowledgePack.roleContext}</p></section>
+      <FeedbackList title="推荐追问" items={pack.companyKnowledgePack.recommendedQuestions} />
+      <FeedbackList title="面试中怎么用" items={pack.companyKnowledgePack.howToUseInInterview} />
+      <section className="question-list">
+        <h3>证据地图</h3>
+        {pack.companyKnowledgePack.evidenceMap.map((item) => (
+          <details key={`${item.sourceId}-${item.claim}`}>
+            <summary>{item.claim}</summary>
+            <p>{item.sourceName} · {item.confidence}</p>
+          </details>
+        ))}
+      </section>
     </article>
   )
 }
@@ -1757,6 +2261,10 @@ function readCvTextState(): CvTextState { try { const raw = localStorage.getItem
 function readScriptTemplates(): ScriptTemplates { try { const raw = localStorage.getItem(SCRIPT_TEMPLATES_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} } }
 function readJobPacks() { return normalizeJobPacks(readArray<StoredJobPack>(JOB_PACKS_KEY)) }
 function readMockInterviews() { return normalizeMockInterviews(readArray<MockInterviewSession>(MOCK_INTERVIEWS_KEY)) }
+function readRealInterviews() { return normalizeRealInterviews(readArray<StoredRealInterview>(REAL_INTERVIEWS_KEY)) }
+function readQuestionBank() { return normalizeQuestionBank(readArray<QuestionBankUpdate>(QUESTION_BANK_KEY)) }
+function readCompanySources() { return normalizeCompanySources(readArray<CompanySourceInput>(COMPANY_SOURCES_KEY)) }
+function readCompanyKnowledgePacks() { return normalizeCompanyKnowledgePacks(readArray<StoredCompanyKnowledgePack>(COMPANY_KNOWLEDGE_PACKS_KEY)) }
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
 
@@ -1827,6 +2335,50 @@ function normalizeMockInterviews(sessions?: MockInterviewSession[]) {
       createdAt: answer.createdAt || new Date().toISOString(),
     })) : [],
   })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+function normalizeRealInterviews(interviews?: StoredRealInterview[]) {
+  return (Array.isArray(interviews) ? interviews : []).filter((interview) => interview?.selectedJob).map((interview) => ({
+    ...interview,
+    id: interview.id || `real-${Date.now()}`,
+    transcriptStatus: interview.transcriptStatus || (interview.transcript ? interview.transcript.source === 'mock' ? 'mock_ready' : 'completed' : 'not_started'),
+    extractedQuestions: Array.isArray(interview.extractedQuestions) ? interview.extractedQuestions : [],
+    extractedAnswers: Array.isArray(interview.extractedAnswers) ? interview.extractedAnswers : [],
+    createdAt: interview.createdAt || new Date().toISOString(),
+    updatedAt: interview.updatedAt || interview.createdAt || new Date().toISOString(),
+  })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+function normalizeQuestionBank(items?: QuestionBankUpdate[]) {
+  return (Array.isArray(items) ? items : []).filter((item) => item?.question).map((item) => ({
+    ...item,
+    source: 'real_interview' as const,
+    priority: item.priority || 'medium',
+    suggestedPracticeType: item.suggestedPracticeType || 'mockInterview',
+  }))
+}
+
+function normalizeCompanySources(sources?: CompanySourceInput[]) {
+  return (Array.isArray(sources) ? sources : []).filter((source) => source?.sourceName && typeof source.text === 'string').map((source) => ({
+    ...source,
+    id: source.id || `company-source-${Date.now()}`,
+    type: source.type || 'other',
+    title: source.title || source.sourceName,
+    wordCount: source.wordCount || countTextUnits(source.text),
+    uploadedAt: source.uploadedAt || new Date().toISOString(),
+  }))
+}
+
+function normalizeCompanyKnowledgePacks(packs?: StoredCompanyKnowledgePack[]) {
+  return (Array.isArray(packs) ? packs : []).filter((pack) => pack?.selectedJob && pack?.companyKnowledgePack).map((pack) => ({
+    ...pack,
+    id: pack.id || `${pack.selectedJob.id || pack.selectedJob.companyName}-knowledge-${Date.now()}`,
+    selectedJobId: pack.selectedJobId || pack.selectedJob.id,
+    provider: pack.provider || 'mock',
+    model: pack.model || 'unknown',
+    generatedAt: pack.generatedAt || new Date().toISOString(),
+    sourceIds: Array.isArray(pack.sourceIds) ? pack.sourceIds : [],
+  }))
 }
 
 function updateMockAnswer(
@@ -1922,6 +2474,29 @@ function formatFileSize(bytes: number) { return bytes < 1024 * 1024 ? `${Math.ma
 function formatDateForFile(date: Date) { return date.toISOString().replace(/[:.]/g, '-').slice(0, 19) }
 function formatDateForFileName(date: Date) { return date.toISOString().slice(0, 10) }
 function downloadJson(payload: unknown, name: string) { const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); URL.revokeObjectURL(url) }
+async function readSourceFileText(file: File) {
+  const raw = await file.text()
+  if (file.name.toLowerCase().endsWith('.html') || file.type === 'text/html') {
+    return raw
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 40_000)
+  }
+  return raw.slice(0, 40_000)
+}
+function countTextUnits(text: string) { return text.trim().replace(/\s+/g, '').length }
+function mergeQuestionBank(current: QuestionBankUpdate[], updates: QuestionBankUpdate[], selectedJobId?: string) {
+  const map = new Map<string, QuestionBankUpdate>()
+  for (const item of current) map.set(`${item.selectedJobId || ''}::${item.question}`, item)
+  for (const item of updates) {
+    const next = { ...item, selectedJobId: item.selectedJobId || selectedJobId }
+    map.set(`${next.selectedJobId || ''}::${next.question}`, next)
+  }
+  return [...map.values()].slice(0, 120)
+}
 
 function openRecordingDb(): Promise<IDBDatabase> { return new Promise((resolve, reject) => { const request = indexedDB.open(RECORDING_DB_NAME, 1); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains(RECORDING_STORE)) request.result.createObjectStore(RECORDING_STORE) }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) }) }
 async function saveRecordingBlob(id: string, blob: Blob) { const db = await openRecordingDb(); await new Promise<void>((resolve, reject) => { const tx = db.transaction(RECORDING_STORE, 'readwrite'); tx.objectStore(RECORDING_STORE).put(blob, id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error) }); db.close() }

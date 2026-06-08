@@ -4,14 +4,18 @@ import type {
   AnalyzeAnswerSuccess,
   GenerateFollowUpRequest,
   GenerateFollowUpSuccess,
+  GenerateCompanyKnowledgePackRequest,
+  GenerateCompanyKnowledgePackSuccess,
   GenerateInterviewReportRequest,
   GenerateInterviewReportSuccess,
   GenerateJobPackRequest,
   GenerateJobPackSuccess,
   GenerateMockInterviewRequest,
   GenerateMockInterviewSuccess,
+  ReviewRealInterviewRequest,
+  ReviewRealInterviewSuccess,
 } from '../../../../src/lib/ai/types.js'
-import { normalizeFollowUp, normalizeInterviewReport, normalizeJobPack, normalizeMockInterviewQuestions, normalizeModelFeedback } from '../response.js'
+import { normalizeCompanyKnowledgePack, normalizeFollowUp, normalizeInterviewReport, normalizeJobPack, normalizeMockInterviewQuestions, normalizeModelFeedback, normalizeRealInterviewReview } from '../response.js'
 
 function shortVersion(input: AnalyzeAnswerRequest) {
   const company = input.selectedJob?.companyName || '目标公司'
@@ -224,11 +228,34 @@ export function generateMockInterviewWithMock(
       expectedFocus: item?.whyItMatters || '结合准备包方向和个人经历作答。',
       followUpPolicy: item?.framework || '如果回答空泛，追问项目证据。',
     }))
+  const fromKnowledge = (input.companyKnowledgePack?.recommendedQuestions || [])
+    .slice(0, 2)
+    .map((question, index) => ({
+      id: `knowledge-${index + 1}`,
+      type: 'role_fit',
+      question,
+      source: 'selectedJob',
+      expectedFocus: input.companyKnowledgePack?.sourceSummary || '结合公司资料增强包回答。',
+      followUpPolicy: '追问资料来源、公司业务理解和个人项目证据。',
+    }))
+  const fromQuestionBank = (input.questionBank || [])
+    .filter((item) => !job.id || !item.selectedJobId || item.selectedJobId === job.id)
+    .slice(0, 2)
+    .map((item, index) => ({
+      id: `real-bank-${index + 1}`,
+      type: item.category === 'project' ? 'project' : item.category === 'english' ? 'english' : 'role_fit',
+      question: item.question,
+      source: 'mockProvider',
+      expectedFocus: '来自真实面试反补题库，需要优先重练。',
+      followUpPolicy: '如果回答空泛，追问真实面试中暴露的薄弱点。',
+    }))
   const questions = [
     { id: 'q-1', type: 'self_intro', question: `请用中文做一个 90 秒自我介绍，并说明你为什么适合${company}的${role}。`, source: 'selectedJob', expectedFocus: '背景、AI 学习、项目证据、岗位匹配。', followUpPolicy: '追问最能证明岗位匹配的一段经历。' },
     { id: 'q-2', type: 'role_fit', question: `你为什么选择${company}和${role}？`, source: 'selectedJob', expectedFocus: `公司业务 ${business}、岗位动机、个人贡献。`, followUpPolicy: '追问公司业务与项目经历的关系。' },
     { id: 'q-3', type: 'project', question: '请讲一下 Miro 项目，你负责了什么关键决策？', source: 'miroProject', expectedFocus: '用户、场景、AI 作用、MVP 取舍、结果。', followUpPolicy: '追问具体用户和验证证据。' },
     ...fromPack,
+    ...fromKnowledge,
+    ...fromQuestionBank,
     { id: 'q-4', type: 'role_fit', question: '你从设计背景转向 AI 产品，优势和短板分别是什么？', source: 'selectedJob', expectedFocus: '迁移能力、风险认知、补齐计划。', followUpPolicy: '追问短板如何在入职后补齐。' },
     { id: 'q-5', type: 'technical_basic', question: '如果要验证一个 AI 产品功能是否有效，你会看哪些指标？', source: 'selectedJob', expectedFocus: '假设、指标、MVP、反馈闭环。', followUpPolicy: '追问具体指标和实验设计。' },
     { id: 'q-6', type: input.interviewType === 'pressure_mock' ? 'pressure' : 'english', question: input.interviewType === 'pressure_mock' ? '如果面试官认为你经验不够，你会怎么回应？' : 'Please briefly explain why you are a good fit for this role.', source: 'mockProvider', expectedFocus: '承认差距、迁移证据、学习计划。', followUpPolicy: '追问最强证据。' },
@@ -273,4 +300,153 @@ export function generateInterviewReportWithMock(
     englishAssessment: '英文回答先保证短句清楚，再补充岗位关键词。',
     nextTrainingPlan: ['重练 90 秒中文自我介绍', '用项目七步法重讲 Miro 项目', '准备“为什么选择公司和岗位”', '补一版英文 60 秒回答'],
   }, provider, 'mock-interview-report-v1', note)
+}
+
+function categorizeQuestion(question: string) {
+  if (/自我介绍|介绍一下|introduce/i.test(question)) return 'self_intro'
+  if (/Miro|项目|project/i.test(question)) return 'project'
+  if (/为什么|岗位|公司|匹配|fit|role/i.test(question)) return 'role_fit'
+  if (/英文|English/i.test(question)) return 'english'
+  if (/压力|不足|缺点|挑战/i.test(question)) return 'pressure'
+  return 'unknown'
+}
+
+function extractInterviewTurns(transcript: string) {
+  const lines = transcript
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const questions: Array<{ question: string; span: string }> = []
+  const answers: string[] = []
+  for (const line of lines) {
+    const normalized = line.replace(/^\d+[.、]\s*/, '')
+    if (/^(面试官|Interviewer|Q)[:：]/i.test(normalized) || /[？?]$/.test(normalized)) {
+      questions.push({
+        question: normalized.replace(/^(面试官|Interviewer|Q)[:：]\s*/i, ''),
+        span: normalized,
+      })
+    } else if (/^(用户|候选人|Candidate|A)[:：]/i.test(normalized)) {
+      answers.push(normalized.replace(/^(用户|候选人|Candidate|A)[:：]\s*/i, ''))
+    }
+  }
+  if (!questions.length) {
+    questions.push(
+      { question: '请先做一下自我介绍。', span: '面试官：请先做一下自我介绍。' },
+      { question: '你为什么选择这个公司和岗位？', span: '面试官：你为什么选择这个公司和岗位？' },
+      { question: '你能讲一下 Miro 项目吗？', span: '面试官：你能讲一下 Miro 项目吗？' },
+    )
+  }
+  return { questions: questions.slice(0, 10), answers }
+}
+
+export function reviewRealInterviewWithMock(
+  input: ReviewRealInterviewRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): ReviewRealInterviewSuccess {
+  const job = input.selectedJob
+  const company = job.companyName || '目标公司'
+  const role = job.jobTitle || '目标岗位'
+  const turns = extractInterviewTurns(input.transcript)
+  const extractedQuestions = turns.questions.map((item, index) => ({
+    id: `real-q-${index + 1}`,
+    question: item.question,
+    category: categorizeQuestion(item.question),
+    confidence: item.span === item.question ? 0.7 : 0.86,
+    sourceSpan: item.span,
+  }))
+  const extractedAnswers = extractedQuestions.map((question, index) => ({
+    questionId: question.id,
+    answerText: turns.answers[index] || '该题回答需要从完整转写中继续核对。',
+    durationEstimate: 60,
+    qualityNote: question.category === 'project'
+      ? '项目回答要补充用户、场景、AI 作用和 MVP 取舍。'
+      : '回答需要更直接连接岗位要求和个人证据。',
+  }))
+  const packQuestions = (input.jobPack?.likelyQuestions || []).map((item) => item?.question || '').filter(Boolean)
+  const mockQuestions = (input.mockInterview?.questions || []).map((item) => item.question).filter(Boolean)
+  const predictedByJobPack = extractedQuestions
+    .filter((item) => packQuestions.some((question) => question.includes(item.question.slice(0, 6)) || item.question.includes(question.slice(0, 6))))
+    .map((item) => item.question)
+  const predictedByMockInterview = extractedQuestions
+    .filter((item) => mockQuestions.some((question) => question.includes(item.question.slice(0, 6)) || item.question.includes(question.slice(0, 6))))
+    .map((item) => item.question)
+  const questionBankUpdates = extractedQuestions.map((item, index) => ({
+    question: item.question,
+    category: item.category,
+    source: 'real_interview' as const,
+    selectedJobId: job.id,
+    priority: index < 2 ? 'high' as const : 'medium' as const,
+    suggestedPracticeType: item.category === 'project' ? 'miroProject' as const : item.category === 'english' ? 'englishIntro' as const : 'mockInterview' as const,
+  }))
+  return normalizeRealInterviewReview({
+    extractedQuestions,
+    extractedAnswers,
+    comparison: {
+      predictedByMockInterview,
+      predictedByJobPack,
+      missedQuestions: extractedQuestions.filter((item) => !predictedByJobPack.includes(item.question) && !predictedByMockInterview.includes(item.question)).map((item) => item.question),
+      newQuestionPatterns: ['真实面试更关注转型动机、岗位理解和项目细节'],
+      weakAreas: ['岗位匹配证据', '项目结果量化', '真实公司业务理解'],
+    },
+    reviewReport: {
+      overallSummary: `本场真实面试围绕 ${company} 的 ${role} 展开，下一轮要把真实问题反补到模拟面试和准备包。`,
+      interviewerFocus: ['自我介绍', '岗位动机', '项目深度', 'AI 产品理解'],
+      strongestAnswer: extractedAnswers[0]?.answerText || '自我介绍能够覆盖背景。',
+      weakestAnswer: extractedAnswers.find((answer) => answer.qualityNote.includes('项目'))?.answerText || '项目回答需要继续补充结果和证据。',
+      missedPreparation: ['真实面试中出现的问题需要加入下一轮题库'],
+      unexpectedQuestions: extractedQuestions.filter((item) => !predictedByJobPack.includes(item.question)).map((item) => item.question).slice(0, 4),
+      answerQuality: '回答可复盘，但需要提高公司业务、岗位要求和项目证据之间的连接密度。',
+      roleFitAssessment: `面向 ${company} ${role}，回答要更早说出岗位关键词，并用 Miro 或 AI 项目收尾。`,
+      nextTrainingTasks: ['把真实面试问题加入下一轮模拟面试', '重练 Miro 项目 2 分钟版本', '准备转型动机 60 秒版本'],
+      questionBankUpdates,
+    },
+  }, provider, 'mock-real-interview-v1', note)
+}
+
+export function generateCompanyKnowledgePackWithMock(
+  input: GenerateCompanyKnowledgePackRequest,
+  provider: Extract<AIProviderName, 'mock' | 'mock_fallback'> = 'mock',
+  note?: string,
+): GenerateCompanyKnowledgePackSuccess {
+  const job = input.selectedJob
+  const company = job.companyName || '目标公司'
+  const role = job.jobTitle || '目标岗位'
+  const business = job.companyBusiness || job.mainTrack || '岗位相关业务'
+  const sources = input.companySources || []
+  const sourceSummary = sources.length
+    ? `已读取 ${sources.length} 份公司/岗位资料，重点围绕 ${company}、${business} 和 ${role}。`
+    : `当前主要基于 job.xlsx 中的 ${company} ${role} 信息生成，建议继续上传公司资料。`
+  const evidenceMap = sources.length
+    ? sources.slice(0, 8).map((source) => ({
+      claim: `${source.sourceName} 支持对 ${company} 业务和岗位上下文的判断。`,
+      sourceId: source.id,
+      sourceName: source.sourceName,
+      confidence: source.text.length > 100 ? 'high' : 'medium',
+    }))
+    : [{ claim: '公司与岗位信息来自用户选择的 job.xlsx 岗位行。', sourceId: job.id || 'selected-job', sourceName: 'job.xlsx', confidence: 'medium' }]
+  const sourceText = sources.map((source) => source.text).join('\n')
+  const mentionsRag = /RAG|知识库|Agent|智能客服|工作流|自动化/i.test(sourceText + business)
+  return normalizeCompanyKnowledgePack({
+    sourceSummary,
+    companyCoreBusiness: `${company} 的面试准备应优先围绕 ${business}。如果资料中出现 AI Agent、RAG、知识库或流程自动化，要把它们和候选人的 AI 产品项目连接起来。`,
+    productLines: mentionsRag ? ['AI Agent', 'RAG 知识库', '业务流程自动化', '智能客服'] : [business, 'AI 应用产品', '企业效率工具'],
+    recentSignals: mentionsRag ? ['资料中出现 Agent/RAG/知识库方向', '岗位可能关注 AI 落地和跨团队协作'] : ['资料来源有限，需要面试前继续核验近期动态'],
+    roleContext: `${role} 很可能需要理解公司业务、拆解用户场景、推动产品方案或项目协作。`,
+    interviewFocusPrediction: [
+      `你了解 ${company} 做什么吗？`,
+      `${role} 最核心的能力是什么？`,
+      '你的 Miro 项目和这个岗位有什么关系？',
+      '如果入职第一个月你会怎么上手？',
+    ],
+    risksAndUnknowns: ['公开资料可能不完整', '岗位实际工作强度和技术深度需要面试中确认'],
+    evidenceMap,
+    recommendedQuestions: [
+      `为什么选择 ${company} 的 ${role}？`,
+      `你如何理解 ${business}？`,
+      '你的 AI 项目如何验证效果？',
+      '如果要和算法、研发、设计协作，你的价值是什么？',
+    ],
+    howToUseInInterview: ['自我介绍开头点出公司业务', '项目讲解结尾回到岗位能力', '遇到追问时引用资料来源，不背准备包原文'],
+  }, provider, 'mock-company-knowledge-v1', note)
 }

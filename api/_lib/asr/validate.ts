@@ -49,6 +49,8 @@ export function validateTranscribeRequest(value: unknown): TranscribeRequest {
     trainingRecordId,
     trainingType,
     audioMetadata: audio(input.audioMetadata),
+    sourceType: text(input.sourceType, 40) === 'real_interview' ? 'real_interview' : text(input.sourceType, 40) === 'mock_interview' ? 'mock_interview' : 'training',
     selectedJob: job(input.selectedJob),
+    audioFile: input.audioFile instanceof File ? input.audioFile : undefined,
   }
 }

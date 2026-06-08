@@ -42,6 +42,7 @@ export default {
             mimeType: audio.type,
             size: audio.size,
           }
+          payload.audioFile = audio
         }
         return json(await transcribeWithProvider(validateTranscribeRequest(payload)))
       }
