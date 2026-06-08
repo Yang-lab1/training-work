@@ -11,8 +11,10 @@ import {
   FileText,
   History,
   Home,
+  Maximize2,
   MessagesSquare,
   Mic,
+  Minimize2,
   RotateCcw,
   Save,
   Sparkles,
@@ -50,7 +52,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '0.8'
+const APP_VERSION = '1.1A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -68,7 +70,7 @@ const COMPANY_KNOWLEDGE_PACKS_KEY = 'interview_os_company_knowledge_packs'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup' | 'diagnostics'
 type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -198,6 +200,36 @@ interface BackupPayload {
   questionBank: QuestionBankUpdate[]
   companySources: CompanySourceInput[]
   companyKnowledgePacks: StoredCompanyKnowledgePack[]
+}
+
+interface ProviderAvailability {
+  configured: boolean
+  implemented: boolean
+  fallbackMode: boolean
+  model?: string
+  note: string
+}
+
+interface ProviderStatusPayload {
+  success: true
+  ai: {
+    provider: string
+    configured: boolean
+    fallbackMode: boolean
+    availableProviders: Record<string, ProviderAvailability>
+  }
+  asr: {
+    provider: string
+    configured: boolean
+    fallbackMode: boolean
+    availableProviders: Record<string, ProviderAvailability>
+  }
+  routes: Record<string, {
+    path: string
+    method: string
+    available: boolean
+    mockSafe: boolean
+  }>
 }
 
 interface StoredJobPack {
@@ -332,6 +364,7 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
   { id: 'realInterview', label: '真实面试复盘', icon: <FileAudio size={17} /> },
   { id: 'companyKnowledge', label: '公司资料增强', icon: <FileText size={17} /> },
   { id: 'backup', label: '数据备份', icon: <Archive size={17} /> },
+  { id: 'diagnostics', label: '系统诊断', icon: <BrainCircuit size={17} /> },
 ]
 
 function App() {
@@ -382,6 +415,10 @@ function App() {
   const [realInterviewLoading, setRealInterviewLoading] = useState('')
   const [companyKnowledgeMessage, setCompanyKnowledgeMessage] = useState('')
   const [companyKnowledgeLoading, setCompanyKnowledgeLoading] = useState(false)
+  const [selectedMockType, setSelectedMockType] = useState<MockInterviewType>('job_pack_mock')
+  const [providerStatus, setProviderStatus] = useState<ProviderStatusPayload | null>(null)
+  const [providerStatusLoading, setProviderStatusLoading] = useState(false)
+  const [providerStatusMessage, setProviderStatusMessage] = useState('')
   const [recordingInterviewQuestionId, setRecordingInterviewQuestionId] = useState<string | null>(null)
   const [interviewAudioPreviews, setInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const [realInterviewAudioPreviews, setRealInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
@@ -447,6 +484,10 @@ function App() {
   useEffect(() => { localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(questionBank)) }, [questionBank])
   useEffect(() => { localStorage.setItem(COMPANY_SOURCES_KEY, JSON.stringify(companySources)) }, [companySources])
   useEffect(() => { localStorage.setItem(COMPANY_KNOWLEDGE_PACKS_KEY, JSON.stringify(companyKnowledgePacks)) }, [companyKnowledgePacks])
+
+  useEffect(() => {
+    if (activeView === 'diagnostics') void refreshProviderStatus()
+  }, [activeView])
 
   useEffect(() => {
     let disposed = false
@@ -591,6 +632,22 @@ function App() {
   function selectJob(job: JobRecord) {
     setSelectedJob({ ...job, selectedAt: new Date().toISOString() })
     setActiveView('training')
+  }
+
+  async function refreshProviderStatus() {
+    setProviderStatusLoading(true)
+    setProviderStatusMessage('')
+    try {
+      const response = await fetch('/api/provider-status', { cache: 'no-store' })
+      const result = await response.json() as ProviderStatusPayload | { success: false; error?: string }
+      if (!response.ok || !result.success) throw new Error(result.success ? '诊断失败。' : result.error || '诊断失败。')
+      setProviderStatus(result)
+      setProviderStatusMessage('状态已刷新。')
+    } catch (error) {
+      setProviderStatusMessage(error instanceof Error ? error.message : '诊断失败。')
+    } finally {
+      setProviderStatusLoading(false)
+    }
   }
 
   async function startRecording(taskId: TaskId) {
@@ -1482,7 +1539,7 @@ function App() {
                   </div>
                 </>
               ) : <p className="empty-state">上传 job.xlsx 后，岗位会显示在这里。</p>}
-              {legacyRole && <div className="legacy-notice"><span>检测到旧版手填岗位数据，仅作兼容提示。</span><button type="button" onClick={() => { localStorage.removeItem(LEGACY_TARGET_ROLE_KEY); setLegacyRole(null) }}>清理旧数据</button></div>}
+              {legacyRole && <div className="legacy-notice"><span>检测到旧版岗位数据，仅作兼容提示。</span><button type="button" onClick={() => { localStorage.removeItem(LEGACY_TARGET_ROLE_KEY); setLegacyRole(null) }}>清理旧数据</button></div>}
             </section>
           </Page>
         )}
@@ -1576,31 +1633,47 @@ function App() {
         )}
 
         {activeView === 'mockInterview' && (
-          <Page title="模拟面试" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先从岗位库选择目标岗位'}>
+          <Page title="模拟面试" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '请先选择目标岗位。'}>
             {!selectedJob ? (
-              <section className="primary-flow">
-                <div>
-                  <span className="eyebrow">尚未选择岗位</span>
-                  <h2>先选择目标岗位</h2>
-                  <p>模拟面试必须基于 job.xlsx 中的岗位。</p>
-                </div>
-                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
+              <section className="primary-flow compact-empty">
+                <p className="empty-state">请先选择目标岗位。</p>
+                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />选择岗位</button>
               </section>
             ) : (
               <>
                 <section className="primary-flow interview-lobby" data-testid="interview-lobby">
                   <div>
                     <span className="eyebrow">面试大厅</span>
-                    <h2>{selectedJob.companyName} · {selectedJob.jobTitle}</h2>
-                    <p>{currentJobPack ? '已读取岗位准备包。' : '建议先生成岗位准备包，也可以直接用岗位信息开始。'}</p>
+                    <h2>{selectedJob.companyName}</h2>
+                    <p>{selectedJob.jobTitle}</p>
                   </div>
-                  <div className="interview-type-grid" aria-label="面试类型">
-                    <button type="button" onClick={() => void startMockInterview('quick_mock')} disabled={Boolean(mockInterviewLoading)}>快速摸底面试</button>
-                    <button type="button" onClick={() => void startMockInterview('quick_mock')} disabled={Boolean(mockInterviewLoading)}>HR 综合面试</button>
-                    <button className="primary-button" type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}><MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : 'AI 产品岗位面试'}</button>
-                    <button type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}>Miro 项目深挖</button>
-                    <button type="button" onClick={() => void startMockInterview('pressure_mock')} disabled={Boolean(mockInterviewLoading)}>英文压力面试</button>
-                    {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>先生成准备包</button>}
+                  <div className="interview-lobby-actions">
+                    <div className="interview-type-grid" aria-label="面试类型">
+                      {([
+                        ['job_pack_mock', 'AI 产品'],
+                        ['quick_mock', '快速'],
+                        ['pressure_mock', '压力'],
+                      ] as Array<[MockInterviewType, string]>).map(([type, label]) => (
+                        <button
+                          key={type}
+                          className={selectedMockType === type ? 'active' : ''}
+                          type="button"
+                          onClick={() => setSelectedMockType(type)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="recent-interview">
+                      <span>最近</span>
+                      <strong>{activeMockInterview ? `${activeMockInterview.selectedJob.companyName} · ${activeMockInterview.status === 'completed' ? '已复盘' : '进行中'}` : '暂无'}</strong>
+                    </div>
+                    <div className="inline-actions">
+                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading)}>
+                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '开始新面试'}
+                      </button>
+                      {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>准备包</button>}
+                    </div>
                   </div>
                 </section>
                 {recorderError && <p className="error-line">{recorderError}</p>}
@@ -1680,7 +1753,7 @@ function App() {
                 <div>
                   <span className="eyebrow">需要目标岗位</span>
                   <h2>先选择目标岗位</h2>
-                  <p>公司知识包会绑定当前岗位，不需要手填岗位信息。</p>
+                  <p>公司知识包会绑定当前岗位，无需补录岗位信息。</p>
                 </div>
                 <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
               </section>
@@ -1730,6 +1803,17 @@ function App() {
             {importError && <p className="error-line">{importError}</p>}
           </Page>
         )}
+
+        {activeView === 'diagnostics' && (
+          <Page title="系统诊断" subtitle="Provider 状态与 API 可用性。">
+            <DiagnosticsView
+              status={providerStatus}
+              loading={providerStatusLoading}
+              message={providerStatusMessage}
+              onRefresh={() => void refreshProviderStatus()}
+            />
+          </Page>
+        )}
       </main>
     </div>
   )
@@ -1745,6 +1829,86 @@ function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong></div>
+}
+
+function DiagnosticsView({
+  status,
+  loading,
+  message,
+  onRefresh,
+}: {
+  status: ProviderStatusPayload | null
+  loading: boolean
+  message: string
+  onRefresh: () => void
+}) {
+  return (
+    <section className="diagnostics-panel" data-testid="provider-diagnostics">
+      <header>
+        <div>
+          <span className="eyebrow">Provider 状态</span>
+          <h2>{status ? `${status.ai.provider} · ${status.asr.provider}` : '等待读取'}</h2>
+        </div>
+        <button className="primary-button" type="button" onClick={onRefresh} disabled={loading}>
+          <RotateCcw size={16} />{loading ? '检测中…' : '测试状态'}
+        </button>
+      </header>
+      {message && <p className={message.includes('失败') ? 'error-line' : 'success-line'}>{message}</p>}
+      {status ? (
+        <>
+          <div className="diagnostic-summary-grid">
+            <ProviderSummaryCard title="AI_PROVIDER" provider={status.ai.provider} configured={status.ai.configured} fallbackMode={status.ai.fallbackMode} />
+            <ProviderSummaryCard title="ASR_PROVIDER" provider={status.asr.provider} configured={status.asr.configured} fallbackMode={status.asr.fallbackMode} />
+          </div>
+          <ProviderMatrix title="文本 Provider" providers={status.ai.availableProviders} />
+          <ProviderMatrix title="ASR Provider" providers={status.asr.availableProviders} />
+          <section className="route-status-grid" aria-label="API route 状态">
+            <h3>API routes</h3>
+            {Object.entries(status.routes).map(([name, route]) => (
+              <div key={name}>
+                <strong>{route.path}</strong>
+                <span>{route.method} · {route.available ? '可用' : '不可用'} · {route.mockSafe ? '可 fallback' : '不可 fallback'}</span>
+              </div>
+            ))}
+          </section>
+        </>
+      ) : <p className="empty-state">尚未读取诊断状态。</p>}
+    </section>
+  )
+}
+
+function ProviderSummaryCard({ title, provider, configured, fallbackMode }: { title: string; provider: string; configured: boolean; fallbackMode: boolean }) {
+  return (
+    <article className="provider-summary-card">
+      <span>{title}</span>
+      <strong>{provider}</strong>
+      <div className="diagnostic-badges">
+        <StatusBadge label={configured ? 'configured' : 'missing'} tone={configured ? 'ready' : 'idle'} />
+        <StatusBadge label={fallbackMode ? 'fallback' : 'real'} tone={fallbackMode ? 'idle' : 'ready'} />
+      </div>
+    </article>
+  )
+}
+
+function ProviderMatrix({ title, providers }: { title: string; providers: Record<string, ProviderAvailability> }) {
+  return (
+    <section className="provider-matrix">
+      <h3>{title}</h3>
+      {Object.entries(providers).map(([name, provider]) => (
+        <div key={name}>
+          <strong>{name}</strong>
+          <span>{provider.model || '默认模型'}</span>
+          <StatusBadge label={provider.configured ? 'configured' : 'missing'} tone={provider.configured ? 'ready' : 'idle'} />
+          <StatusBadge label={provider.implemented ? 'real path' : 'reserved'} tone={provider.implemented ? 'ready' : 'idle'} />
+          <p>{provider.note}</p>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function StatusBadge({ label, tone }: { label: string; tone: 'ready' | 'idle' }) {
+  return <span className={`diagnostic-badge ${tone}`}>{label}</span>
 }
 
 function UploadRow({ title, hint, file, button, accept, onChange, onRemove }: { title: string; hint: string; file?: UploadedFileMeta; button: string; accept: string; onChange: (event: ChangeEvent<HTMLInputElement>) => void; onRemove: () => void }) {
@@ -1812,19 +1976,62 @@ function MockInterviewPanel({
   onFinish: () => void
   onDelete: () => void
 }) {
+  const roomRef = useRef<HTMLElement | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
   const canGoNext = session.currentQuestionIndex < session.questions.length - 1
   const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
   const phaseLabel: Record<InterviewPhase, string> = {
-    asking: '面试官提问',
+    asking: '提问中',
     answering: '回答中',
     transcribing: '转写中',
     analyzing: '分析中',
-    feedback_ready: '反馈已生成',
-    follow_up: '追问',
+    feedback_ready: '下一题',
+    follow_up: '可追问',
     completed: '已结束',
   }
   const displayedQuestion = session.currentPhase === 'follow_up' && session.followUps.length ? session.followUps[session.followUps.length - 1] : currentQuestion
+  const questionTimer = isRecording ? recordingSeconds : currentAnswer?.durationSeconds || 0
+  const visiblePhase = session.currentPhase === 'asking' && !currentAnswer ? '待回答' : phaseLabel[session.currentPhase]
+  const feedbackSummary = currentAnswer?.aiFeedback
+    ? truncateText(`${currentAnswer.aiFeedback.score} 分 · ${currentAnswer.aiFeedback.summary}`, 96)
+    : ''
+
+  useEffect(() => {
+    function syncFullscreenState() {
+      if (!document.fullscreenElement && isFullscreen) setIsFullscreen(false)
+    }
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsFullscreen(false)
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => setIsFullscreen(false))
+      }
+    }
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+    window.addEventListener('keydown', handleKeydown)
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState)
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }, [isFullscreen])
+
+  async function enterFullscreen() {
+    setIsFullscreen(true)
+    try {
+      await roomRef.current?.requestFullscreen?.()
+    } catch {
+      setIsFullscreen(true)
+    }
+  }
+
+  async function exitFullscreen() {
+    setIsFullscreen(false)
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+    } catch {
+      setIsFullscreen(false)
+    }
+  }
 
   if (session.uiState === 'waiting_room') {
     return (
@@ -1837,16 +2044,16 @@ function MockInterviewPanel({
         <div className="waiting-room-grid">
           <div><span>预计题数</span><strong>{session.questions.length}</strong></div>
           <div><span>预计时长</span><strong>{session.questions.length * 3} 分钟</strong></div>
-          <div><span>麦克风</span><strong>待开始</strong></div>
-          <div><span>候选人</span><strong>我的窗口</strong></div>
+          <div><span>麦克风</span><strong>待命</strong></div>
+          <div><span>模式</span><strong>{typeLabel}</strong></div>
         </div>
-        <div className="meeting-source-list">
-          <span>使用资料</span>
-          <p>selectedJob · jobPack · companyKnowledgePack · questionBank</p>
-        </div>
+        <details className="waiting-materials">
+          <summary>查看准备资料</summary>
+          <p>岗位信息、准备包、公司知识包、题库会在后台参与出题。</p>
+        </details>
         <div className="inline-actions">
-          <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />进入面试</button>
-          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+          <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />开始面试</button>
+          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
         </div>
       </section>
     )
@@ -1861,7 +2068,7 @@ function MockInterviewPanel({
             <h2>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</h2>
             <p>{session.answers.length} 个回答 · {session.finalReport ? '整场复盘已生成' : '等待生成整场复盘'}</p>
           </div>
-          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
         </header>
         {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} /> : (
           <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '生成整场复盘'}</button>
@@ -1871,28 +2078,39 @@ function MockInterviewPanel({
   }
 
   return (
-    <section className="meeting-room" data-testid="interview-room">
+    <section ref={roomRef} className={`meeting-room ${isFullscreen ? 'meeting-room--fullscreen' : ''}`} data-testid="interview-room">
       <header className="meeting-status-bar" aria-label="面试状态栏">
-        <div>
-          <strong>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</strong>
-          <span>{typeLabel}</span>
+        <div className="meeting-title">
+          <strong>{session.selectedJob.companyName}</strong>
+          <span>{session.selectedJob.jobTitle}</span>
         </div>
-        <div><span>题目</span><strong>第 {session.currentQuestionIndex + 1} / {session.questions.length} 题</strong></div>
-        <div><span>当前题</span><strong>{isRecording ? formatDuration(recordingSeconds) : currentAnswer ? formatDuration(currentAnswer.durationSeconds) : '00:00'}</strong></div>
-        <div><span>状态</span><strong>{phaseLabel[session.currentPhase]}</strong></div>
-        <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+        <div><span>题目</span><strong>第 {session.currentQuestionIndex + 1} / {session.questions.length}</strong></div>
+        <div><span>计时</span><strong>{formatDuration(questionTimer)}</strong></div>
+        <div><span>状态</span><strong>{visiblePhase}</strong></div>
+        <button type="button" onClick={() => isFullscreen ? void exitFullscreen() : void enterFullscreen()}>
+          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{isFullscreen ? '退出全屏' : '全屏面试'}
+        </button>
       </header>
+
+      <div className="meeting-room-typebar">
+        <span>{typeLabel}</span>
+        {currentAnswer?.transcript && <span>{transcriptStatusLabel(currentAnswer.transcriptStatus)}</span>}
+        {currentAnswer?.aiFeedback && <span>{currentAnswer.aiFeedback.provider === 'mock_fallback' ? 'fallback mock' : currentAnswer.aiFeedback.provider}</span>}
+      </div>
 
       <div className="meeting-stage">
         <article className="interviewer-panel" data-testid="virtual-interviewer">
           <div className="interviewer-avatar"><MessagesSquare size={34} /></div>
-          <span>{displayedQuestion?.type || 'question'} · {displayedQuestion?.source || 'selectedJob'}</span>
+          <div className="interviewer-meta">
+            <span>虚拟面试官</span>
+            {session.currentPhase === 'follow_up' && <strong>追问</strong>}
+          </div>
           <h3>{displayedQuestion?.question || '面试问题生成中…'}</h3>
-          <p>{displayedQuestion?.expectedFocus || '请围绕岗位、项目证据和表达结构回答。'}</p>
+          <p>{truncateText(displayedQuestion?.expectedFocus || '围绕岗位、项目证据和表达结构回答。', 88)}</p>
         </article>
         <aside className="candidate-window" data-testid="candidate-window">
           <span>我的窗口</span>
-          <strong>{isRecording ? '正在回答' : currentAnswer ? '已回答' : '待回答'}</strong>
+          <strong>{isRecording ? '录音中' : currentAnswer ? '已回答' : '待回答'}</strong>
           <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
           <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
         </aside>
@@ -1901,55 +2119,77 @@ function MockInterviewPanel({
       {currentQuestion && (
         <div className="meeting-control-bar" aria-label="底部控制栏">
           <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId)}>
-            <Mic size={16} />{isRecording ? `回答中 ${formatDuration(recordingSeconds)}` : '开始回答'}
+            <Mic size={16} />开始回答
           </button>
           <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />停止</button>
+          <button type="button" onClick={() => { if (preview?.url) void new Audio(preview.url).play() }} disabled={!preview}><FileAudio size={15} />回放</button>
           <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
-            <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '转写中…' : '生成转写'}
+            <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '转写中…' : '转写'}
           </button>
           <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
-            <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '分析中…' : '生成单题反馈'}
+            <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '分析中…' : '反馈'}
           </button>
           <button type="button" onClick={onNext} disabled={!canGoNext}>下一题</button>
-          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '结束面试'}</button>
+          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />结束面试</button>
         </div>
       )}
-      {preview && currentAnswer && <div className="audio-result"><audio controls src={preview.url} /><a href={preview.url} download={currentAnswer.recordingName}><Download size={15} />下载</a><span>{formatDuration(currentAnswer.durationSeconds)} · {formatFileSize(preview.size)}</span></div>}
-      {currentAnswer?.transcript && <div className="transcript-preview"><span>{transcriptStatusLabel(currentAnswer.transcriptStatus)} · {currentAnswer.transcript.provider || currentAnswer.transcript.source}</span><p>{currentAnswer.transcript.text}</p></div>}
-      {currentAnswer?.aiFeedback && (
-        <div className="single-feedback-drawer">
-          <header>
-            <span>单题反馈</span>
-            {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>生成追问</button>}
-          </header>
-          <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
-        </div>
-      )}
+
+      <div className="meeting-side-notes">
+        {currentAnswer?.transcript && (
+          <details className="meeting-detail">
+            <summary>转写</summary>
+            <p>{currentAnswer.transcript.text}</p>
+          </details>
+        )}
+        {currentAnswer?.aiFeedback && (
+          <aside className="feedback-summary-strip" data-testid="interview-feedback-summary">
+            <div>
+              <span>单题反馈</span>
+              <strong>{feedbackSummary}</strong>
+            </div>
+            {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>追问</button>}
+            <details className="meeting-detail">
+              <summary>详细反馈</summary>
+              <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
+            </details>
+          </aside>
+        )}
+      </div>
     </section>
   )
 }
 
 function InterviewFinalReportView({ finalReport }: { finalReport: NonNullable<MockInterviewSession['finalReport']> }) {
   const isMock = finalReport.provider === 'mock' || finalReport.provider === 'mock_fallback'
+  const retryItems = [
+    finalReport.report.weakestAnswer,
+    ...finalReport.report.recurringProblems,
+  ].filter(Boolean).slice(0, 3)
   return (
-    <article className="ai-report">
+    <article className="review-summary-report">
       <header>
-        <div><span>整场分数</span><strong>{finalReport.report.overallScore}</strong></div>
+        <div><span>总分</span><strong>{finalReport.report.overallScore}</strong></div>
         <p>{finalReport.report.summary}</p>
         <em>{finalReport.provider} · {finalReport.model} · {formatDateTime(finalReport.generatedAt)}</em>
       </header>
       {isMock && <p className="mock-notice">当前为模拟复盘，仅用于测试流程。</p>}
       {finalReport.rawProviderNote && <p className="provider-note">{finalReport.rawProviderNote}</p>}
-      <dl className="feedback-detail-list">
-        <div><dt>最强回答</dt><dd>{finalReport.report.strongestAnswer}</dd></div>
-        <div><dt>最弱回答</dt><dd>{finalReport.report.weakestAnswer}</dd></div>
-        <div><dt>岗位匹配</dt><dd>{finalReport.report.roleFitAssessment}</dd></div>
-        <div><dt>沟通表达</dt><dd>{finalReport.report.communicationAssessment}</dd></div>
-        <div><dt>项目深度</dt><dd>{finalReport.report.projectDepthAssessment}</dd></div>
-        <div><dt>英文</dt><dd>{finalReport.report.englishAssessment}</dd></div>
-      </dl>
-      <FeedbackList title="反复出现的问题" items={finalReport.report.recurringProblems} />
-      <FeedbackList title="下一轮训练计划" items={finalReport.report.nextTrainingPlan} />
+      <div className="review-summary-grid">
+        <FeedbackList title="三个主要问题" items={finalReport.report.recurringProblems.slice(0, 3)} />
+        <FeedbackList title="三个下一步任务" items={finalReport.report.nextTrainingPlan.slice(0, 3)} />
+        <FeedbackList title="建议重练题目" items={retryItems} />
+      </div>
+      <details className="meeting-detail review-detail">
+        <summary>展开详细复盘</summary>
+        <dl className="feedback-detail-list">
+          <div><dt>最强回答</dt><dd>{finalReport.report.strongestAnswer}</dd></div>
+          <div><dt>最弱回答</dt><dd>{finalReport.report.weakestAnswer}</dd></div>
+          <div><dt>岗位匹配</dt><dd>{finalReport.report.roleFitAssessment}</dd></div>
+          <div><dt>项目深度</dt><dd>{finalReport.report.projectDepthAssessment}</dd></div>
+          <div><dt>英文表达</dt><dd>{finalReport.report.englishAssessment}</dd></div>
+          <div><dt>面试官担心点</dt><dd>{finalReport.report.communicationAssessment}</dd></div>
+        </dl>
+      </details>
     </article>
   )
 }
@@ -2131,16 +2371,6 @@ function RecordRow({
   const [transcribing, setTranscribing] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const job = record.selectedJob || currentJob
-  const legacyReview = record.review
-  const hasLegacyReview = Boolean(legacyReview && (
-    legacyReview.selfScore
-    || legacyReview.issueTags?.length
-    || legacyReview.nextActionChoice
-    || legacyReview.biggestProblem
-    || legacyReview.nextImprovement
-    || legacyReview.legacyBiggestProblem
-    || legacyReview.legacyNextImprovement
-  ))
 
   function saveManualTranscript() {
     const text = transcriptDraft.trim()
@@ -2306,17 +2536,6 @@ function RecordRow({
             {record.aiFeedback ? <AIFeedbackReport feedback={record.aiFeedback} /> : <p className="empty-state">完成转写后即可生成反馈。</p>}
           </section>
 
-          {hasLegacyReview && (
-            <details className="legacy-review">
-              <summary>旧版自评数据</summary>
-              <p>仅为兼容旧记录展示，不参与 AI 评价。</p>
-              {legacyReview?.selfScore && <p>旧自评分：{legacyReview.selfScore}</p>}
-              {legacyReview?.issueTags?.length && <p>旧问题标签：{legacyReview.issueTags.join('、')}</p>}
-              {legacyReview?.nextActionChoice && <p>旧状态：{legacyReview.nextActionChoice}</p>}
-              {(legacyReview?.biggestProblem || legacyReview?.legacyBiggestProblem) && <p>旧最大问题：{legacyReview.biggestProblem || legacyReview.legacyBiggestProblem}</p>}
-              {(legacyReview?.nextImprovement || legacyReview?.legacyNextImprovement) && <p>旧改进：{legacyReview.nextImprovement || legacyReview.legacyNextImprovement}</p>}
-            </details>
-          )}
           {message && <p className={message.includes('失败') || message.includes('超时') ? 'error-line' : 'success-line'}>{message}</p>}
         </div>
       )}
@@ -2721,6 +2940,7 @@ function getSupportedAudioMimeType() { return ['audio/webm;codecs=opus', 'audio/
 function getFileExtension(name: string) { const index = name.lastIndexOf('.'); return index >= 0 ? name.slice(index) : '' }
 function isToday(value: string) { const date = new Date(value); const now = new Date(); return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate() }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
+function truncateText(text: string, maxLength: number) { const compact = text.replace(/\s+/g, ' ').trim(); return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact }
 function formatDuration(seconds: number) { const minutes = Math.floor(seconds / 60); const rest = seconds % 60; return `${minutes}:${String(rest).padStart(2, '0')}` }
 function formatFileSize(bytes: number) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB` }
 function formatDateForFile(date: Date) { return date.toISOString().replace(/[:.]/g, '-').slice(0, 19) }

@@ -29,6 +29,67 @@ function configuredProvider(): ConfiguredAIProvider {
   return 'mock'
 }
 
+function providerStatus(provider: ConfiguredAIProvider) {
+  if (provider === 'mock') {
+    return {
+      configured: true,
+      implemented: true,
+      model: 'mock-v2',
+      fallbackMode: true,
+      note: 'Mock 文本 Provider 始终可用。',
+    }
+  }
+  if (provider === 'deepseek') {
+    const configured = Boolean(serverEnv.DEEPSEEK_API_KEY?.trim())
+    return {
+      configured,
+      implemented: true,
+      model: serverEnv.DEEPSEEK_MODEL?.trim() || 'deepseek-chat',
+      fallbackMode: !configured,
+      note: configured ? 'DeepSeek 文本 Provider 已配置。' : '缺少 DEEPSEEK_API_KEY，会回退到 Mock。',
+    }
+  }
+  const status = provider === 'doubao'
+    ? getDoubaoProviderStatus()
+    : provider === 'openai'
+      ? getOpenAIProviderStatus()
+      : provider === 'gemini'
+        ? getGeminiProviderStatus()
+        : getAgnesProviderStatus()
+  return {
+    configured: status.configured,
+    implemented: Boolean('implemented' in status ? status.implemented : false),
+    model: provider === 'doubao'
+      ? serverEnv.DOUBAO_MODEL?.trim()
+      : provider === 'openai'
+        ? serverEnv.OPENAI_MODEL?.trim()
+        : provider === 'gemini'
+          ? serverEnv.GEMINI_MODEL?.trim()
+          : serverEnv.AGNES_MODEL?.trim(),
+    fallbackMode: true,
+    note: status.note,
+  }
+}
+
+export function getAIProviderStatus() {
+  const provider = configuredProvider()
+  const availableProviders = {
+    mock: providerStatus('mock'),
+    deepseek: providerStatus('deepseek'),
+    agnes: providerStatus('agnes'),
+    doubao: providerStatus('doubao'),
+    openai: providerStatus('openai'),
+    gemini: providerStatus('gemini'),
+  }
+  const current = availableProviders[provider]
+  return {
+    provider,
+    configured: current.configured,
+    fallbackMode: provider === 'mock' || !current.configured || !current.implemented,
+    availableProviders,
+  }
+}
+
 export async function analyzeAnswerWithProvider(
   input: AnalyzeAnswerRequest,
 ): Promise<AnalyzeAnswerSuccess> {

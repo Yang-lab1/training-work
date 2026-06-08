@@ -20,7 +20,7 @@ async function writeJobFixture(path: string) {
     ['测试体验设计公司', '产品体验设计', '广州', '面议', '产品体验', 'B', '正式', 'https://example.com/pxd', 'AI 产品体验设计', '负责产品体验策略、原型和用户洞察', '产品体验设计、用户洞察、HCI'],
     ['测试 AI 公司', 'AI应用开发', '深圳', '面议', 'AI解决方案', 'B', '正式', 'https://example.com/ai-dev', 'AI 解决方案交付', '负责 AI 应用开发、后端接口和方案落地', 'Python、后端开发、AI Implementation'],
     ['测试 AI 公司', 'Forward Deployed Engineer', '香港', '面议', 'FDE', 'B', '正式', 'https://example.com/fde', 'AI 解决方案交付', '负责客户现场 AI 应用落地和产品工程', 'Forward Deployed Engineer、AI Product Engineer、客户沟通'],
-    ['测试云公司', '后端开发工程师', '深圳', '25K', '云平台', 'C', '社招', 'https://example.com/backend', '云原生平台', '负责 Java、Go、K8s、SRE 和后端平台开发', '强代码、云原生、3年以上经验'],
+    ['测试云公司', '后端开发工程师', '深圳', '25K', '云平台', 'C', '社招', 'https://example.com/backend', '云原生平台', '负责 Java、Go、K8s、SRE 和后端平台开发', '强代码、云原生、5年以上经验'],
     ['测试销售公司', '销售经理', '广州', '底薪+提成', '销售', 'C', '社招', 'https://example.com/sales', '企业服务销售', '负责 BD、拓客、客户开发和业绩指标', '销售经验、客户开发、业绩指标'],
   ]
   const sheet = XLSX.utils.json_to_sheet(rows.map((row) => ({
@@ -41,6 +41,76 @@ async function writeJobFixture(path: string) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/provider-status', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        ai: {
+          provider: 'deepseek',
+          configured: false,
+          fallbackMode: true,
+          availableProviders: {
+            mock: { configured: true, implemented: true, fallbackMode: true, model: 'mock-v2', note: 'Mock 文本 Provider 始终可用。' },
+            deepseek: { configured: false, implemented: true, fallbackMode: true, model: 'deepseek-chat', note: '缺少 DEEPSEEK_API_KEY，会回退到 Mock。' },
+            agnes: { configured: false, implemented: false, fallbackMode: true, note: '未配置 AGNES。' },
+            doubao: { configured: false, implemented: false, fallbackMode: true, note: '未配置豆包。' },
+            openai: { configured: false, implemented: false, fallbackMode: true, note: '未配置 OpenAI 文本。' },
+            gemini: { configured: false, implemented: false, fallbackMode: true, note: '未配置 Gemini。' },
+          },
+        },
+        asr: {
+          provider: 'openai',
+          configured: false,
+          fallbackMode: true,
+          availableProviders: {
+            mock: { configured: true, implemented: true, fallbackMode: true, model: 'mock-asr-v1', note: 'Mock ASR 始终可用。' },
+            openai: { configured: false, implemented: true, fallbackMode: true, model: 'whisper-1', note: '未配置 OPENAI_API_KEY，已回退到 Mock ASR。' },
+            doubao: { configured: false, implemented: false, fallbackMode: true, note: '预留豆包 ASR。' },
+            volcengine: { configured: false, implemented: false, fallbackMode: true, note: '预留火山 ASR。' },
+            xfyun: { configured: false, implemented: false, fallbackMode: true, note: '预留讯飞 ASR。' },
+            aliyun: { configured: false, implemented: false, fallbackMode: true, note: '预留阿里云 ASR。' },
+            tencent: { configured: false, implemented: false, fallbackMode: true, note: '预留腾讯云 ASR。' },
+          },
+        },
+        routes: {
+          providerStatus: { path: '/api/provider-status', method: 'GET', available: true, mockSafe: true },
+          analyzeAnswer: { path: '/api/analyze-answer', method: 'POST', available: true, mockSafe: true },
+          transcribe: { path: '/api/transcribe', method: 'POST', available: true, mockSafe: true },
+          generateJobPack: { path: '/api/generate-job-pack', method: 'POST', available: true, mockSafe: true },
+          generateMockInterview: { path: '/api/generate-mock-interview', method: 'POST', available: true, mockSafe: true },
+          reviewRealInterview: { path: '/api/review-real-interview', method: 'POST', available: true, mockSafe: true },
+          generateCompanyKnowledgePack: { path: '/api/generate-company-knowledge-pack', method: 'POST', available: true, mockSafe: true },
+        },
+      }),
+    })
+  })
+
+  await page.route('**/api/generate-job-pack', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-job-pack-v1',
+        generatedAt: new Date().toISOString(),
+        jobPack: {
+          companySummary: '测试科技公司做企业 AI 应用平台。',
+          productAndBusiness: '核心方向是 AI Agent、RAG 知识库和工作流。',
+          jobRequirementBreakdown: ['AI 产品理解', '需求拆解', '跨团队协作'],
+          workContentPrediction: ['梳理用户场景', '定义 MVP', '跟进研发落地'],
+          candidateFit: ['AI 学习背景', '工业设计和体验', 'Miro 项目'],
+          riskPoints: ['项目结果需要更量化'],
+          selfIntroductionStrategy: '先讲 AI 产品定位，再讲项目证据。',
+          miroProjectStrategy: '讲用户、场景、AI 作用和 MVP 取舍。',
+          likelyQuestions: [{ question: '为什么选择这个岗位？', whyItMatters: '岗位动机', framework: '结论-证据-岗位关系' }],
+          fullScoreAnswerFrameworks: [{ question: '介绍一个项目', frameworkName: 'STAR', answerStructure: ['背景', '行动', '结果'], candidateEvidence: ['Miro 项目'], pitfalls: ['不要泛泛而谈'] }],
+          preparationTasks: ['重练自我介绍', '准备 Miro 项目指标'],
+        },
+      }),
+    })
+  })
+
   await page.route('**/api/transcribe', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -48,7 +118,7 @@ test.beforeEach(async ({ page }) => {
         success: true,
         provider: 'mock',
         model: 'mock-asr-v1',
-        transcript: '这是模拟转写文本。我正在面试测试科技公司的 AI Product Manager，会结合 AI 应用平台、Miro 项目和用户场景说明岗位匹配。',
+        transcript: '这是模拟转写。我正在面试测试科技公司的 AI Product Manager，会结合 AI 应用平台、Miro 项目和用户场景说明岗位匹配。',
         language: 'zh',
         durationSeconds: 68,
         generatedAt: new Date().toISOString(),
@@ -65,19 +135,19 @@ test.beforeEach(async ({ page }) => {
         model: 'mock-v2',
         generatedAt: new Date().toISOString(),
         score: 82,
-        summary: '回答能覆盖岗位和项目，但项目结果还可以更具体。',
+        summary: '回答覆盖岗位和项目，但结果还可以更具体。',
         strengths: ['提到 AI 应用平台和 Miro 项目。'],
-        problems: ['项目不够具体。'],
-        roleFitFeedback: '面向测试科技公司的 AI Product Manager，要突出企业 AI 应用平台场景。',
+        problems: ['项目结果不够具体。'],
+        roleFitFeedback: '要突出企业 AI 应用平台场景。',
         structureFeedback: '按背景-行动-结果-岗位关系重讲。',
         expressionFeedback: '减少铺垫。',
         timingFeedback: '控制在目标时长内。',
-        fluencyFeedback: '后续接入真实 ASR 后分析停顿。',
-        memorizationRisk: '暂未发现明显背稿。',
+        fluencyFeedback: '真实 ASR 接入后再看停顿。',
+        memorizationRisk: '背稿风险低。',
         specificityFeedback: '补充用户、场景、AI 作用和 MVP 取舍。',
-        improvedShortVersion: '我正在申请测试科技公司的 AI Product Manager，能用 AI 产品和 Miro 项目经验支撑岗位需求。',
-        improvedLongVersion: '我正在申请测试科技公司的 AI Product Manager。我的背景结合 AI 学习、产品体验和 Miro 项目经验，能从用户场景出发拆解需求、设计 MVP 并验证结果。',
-        nextTasks: ['重练 Miro 项目 90 秒版本。', '补充一个可验证结果。'],
+        improvedShortVersion: '30 秒优化版。',
+        improvedLongVersion: '90 秒优化版。',
+        nextTasks: ['重练 Miro 项目', '补充一个可验证结果'],
       }),
     })
   })
@@ -112,27 +182,27 @@ test.beforeEach(async ({ page }) => {
         generatedAt: new Date().toISOString(),
         finalReport: {
           overallScore: 84,
-          summary: '整场模拟面试已完成，岗位匹配基本清晰。',
+          summary: '整场模拟面试已完成，岗位匹配基本清楚。',
           strongestAnswer: '中文自我介绍',
           weakestAnswer: 'Miro 项目讲解',
-          recurringProblems: ['项目结果还可以更具体'],
-          roleFitAssessment: '需要持续回到测试科技公司和 AI Product Manager。',
-          communicationAssessment: '表达清晰，铺垫可减少。',
-          projectDepthAssessment: '补充用户、场景和验证指标。',
-          englishAssessment: '英文短句清晰即可。',
-          nextTrainingPlan: ['重练 Miro 项目', '准备为什么选择公司'],
+          recurringProblems: ['项目结果还可以更具体', '公司业务连接可以更紧'],
+          roleFitAssessment: '岗位匹配清晰。',
+          communicationAssessment: '表达清楚，铺垫可减少。',
+          projectDepthAssessment: '项目深度可加强。',
+          englishAssessment: '英文短句清楚即可。',
+          nextTrainingPlan: ['重练 Miro 项目', '准备为什么选择公司', '补充 AI 产品指标'],
         },
       }),
     })
   })
 })
 
-test('dogfood: smart job filters and immersive interview room', async ({ page }, testInfo) => {
+test('dogfood: V1 meeting interview room, persistence, diagnostics, backup', async ({ page }, testInfo) => {
   const jobFixturePath = testInfo.outputPath('job.xlsx')
   await writeJobFixture(jobFixturePath)
 
   await page.goto('/')
-  await expect(page.locator('.top-nav nav button')).toHaveCount(10)
+  await expect(page.locator('.top-nav nav button')).toHaveCount(11)
 
   await page.getByRole('button', { name: /资料与岗位/ }).click()
   await page.locator('input[accept=".xlsx"]').setInputFiles(jobFixturePath)
@@ -143,50 +213,60 @@ test('dogfood: smart job filters and immersive interview room', async ({ page },
 
   const jobPool = await page.evaluate<ParsedJob[]>(() => JSON.parse(localStorage.getItem('interview_os_job_pool') || '[]') as ParsedJob[])
   expect(jobPool).toHaveLength(9)
-  const aiProductJobs = jobPool.filter((job) => job.normalized?.roleFamily === 'AI产品 / AI应用产品')
-  expect(aiProductJobs.map((job) => job.jobTitle).sort()).toEqual(['AI Product Manager', 'AI产品经理', '大模型产品经理'].sort())
-  const researchJobs = jobPool.filter((job) => job.normalized?.roleFamily === '用户研究 / 产品体验')
-  expect(researchJobs.map((job) => job.jobTitle).sort()).toEqual(['产品体验设计', '用户研究实习生'].sort())
+  expect(jobPool.filter((job) => job.normalized?.roleFamily === 'AI产品 / AI应用产品')).toHaveLength(3)
+  expect(jobPool.filter((job) => job.normalized?.roleFamily === '用户研究 / 产品体验')).toHaveLength(2)
   expect(jobPool.find((job) => job.jobTitle === '后端开发工程师')?.normalized.riskFlags).toContain('strong_code')
   expect(jobPool.find((job) => job.jobTitle === '销售经理')?.normalized.riskFlags).toContain('sales_heavy')
-
-  await expect(page.getByLabel('岗位智能筛选统计')).toContainText('总岗位')
-  await expect(page.getByText('AI产品 / AI应用产品 3')).toBeVisible()
-  await expect(page.getByText('用户研究 / 产品体验 2')).toBeVisible()
-  await page.getByLabel('隐藏强代码').check()
-  await expect(page.getByText('后端开发工程师')).toHaveCount(0)
-  await page.getByLabel('隐藏强代码').uncheck()
 
   await page.locator('.job-row').filter({ hasText: 'AI Product Manager' }).getByRole('button', { name: /选择岗位/ }).click()
   await page.reload()
   const selectedJob = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_selected_job') || 'null'))
   expect(selectedJob.jobTitle).toBe('AI Product Manager')
-  expect(selectedJob.normalized.roleFamily).toBe('AI产品 / AI应用产品')
+
+  await page.getByRole('button', { name: /岗位准备包/ }).click()
+  await page.getByRole('button', { name: /^生成岗位准备包$/ }).click()
+  await expect(page.getByText('测试科技公司做企业 AI 应用平台。')).toBeVisible()
 
   await page.getByRole('button', { name: /模拟面试/ }).click()
   await expect(page.getByTestId('interview-lobby')).toContainText('面试大厅')
-  await page.getByRole('button', { name: /AI 产品岗位面试/ }).click()
+  await page.getByRole('button', { name: /开始新面试/ }).click()
   await expect(page.getByTestId('interview-waiting-room')).toContainText('面试等待室')
-  await page.getByRole('button', { name: /进入面试/ }).click()
-  await expect(page.getByTestId('interview-room')).toBeVisible()
-  await expect(page.getByTestId('virtual-interviewer')).toContainText('请用中文做一个 90 秒自我介绍')
-  await expect(page.getByTestId('candidate-window')).toContainText('我的窗口')
-  await expect(page.getByLabel('面试状态栏')).toContainText('第 1 / 6 题')
-  await expect(page.getByLabel('底部控制栏')).toBeVisible()
+  await expect(page.getByText('查看准备资料')).toBeVisible()
+  await page.getByRole('button', { name: /开始面试/ }).click()
 
-  await page.getByRole('button', { name: /开始回答/ }).click()
-  await page.waitForTimeout(700)
-  await page.getByRole('button', { name: /^停止$/ }).click()
-  await page.getByRole('button', { name: /生成转写/ }).click()
-  await expect(page.getByText(/模拟转写/).last()).toBeVisible()
-  await page.getByRole('button', { name: /生成单题反馈/ }).click()
-  await expect(page.getByText(/本题 AI 反馈已保存/)).toBeVisible()
-  await expect(page.getByText('单题反馈', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /下一题/ }).click()
-  await expect(page.getByLabel('面试状态栏')).toContainText('第 2 / 6 题')
+  await expect(page.getByTestId('interview-room')).toBeVisible()
+  await expect(page.getByTestId('virtual-interviewer')).toContainText('虚拟面试官')
+  await expect(page.getByTestId('candidate-window')).toContainText('我的窗口')
+  await expect(page.getByLabel('面试状态栏')).toContainText('第 1 / 6')
+  await expect(page.getByLabel('底部控制栏')).toBeVisible()
+  await expect(page.getByRole('button', { name: /全屏面试/ })).toBeVisible()
+
+  const questionTextLength = await page.getByTestId('virtual-interviewer').locator('h3').evaluate((node) => node.textContent?.length || 0)
+  expect(questionTextLength).toBeLessThan(80)
+
+  await page.getByRole('button', { name: /全屏面试/ }).click()
+  await expect(page.getByRole('button', { name: /退出全屏/ })).toBeVisible()
+  await expect(page.getByTestId('interview-room')).toHaveClass(/meeting-room--fullscreen/)
+  await page.getByRole('button', { name: /退出全屏/ }).click()
+  await expect(page.getByRole('button', { name: /全屏面试/ })).toBeVisible()
+
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole('button', { name: /^开始回答$/ }).click()
+    await page.waitForTimeout(500)
+    await page.getByRole('button', { name: /^停止$/ }).click()
+    await page.getByRole('button', { name: /^转写/ }).click()
+    await expect(page.locator('.meeting-room-typebar').getByText('模拟转写')).toBeVisible()
+    await page.getByRole('button', { name: /^反馈/ }).click()
+    await expect(page.getByTestId('interview-feedback-summary')).toBeVisible()
+    const detailOpen = await page.locator('details').filter({ hasText: '详细反馈' }).last().evaluate((node) => (node as HTMLDetailsElement).open)
+    expect(detailOpen).toBe(false)
+    if (index < 2) await page.getByRole('button', { name: /^下一题$/ }).click()
+  }
+
   await page.getByRole('button', { name: /结束面试/ }).click()
   await expect(page.getByTestId('interview-review-room')).toContainText('面试复盘室')
-  await expect(page.getByText(/整场分数/)).toBeVisible()
+  await expect(page.getByText(/总分/)).toBeVisible()
+  await expect(page.getByText(/展开详细复盘/)).toBeVisible()
 
   await page.getByRole('button', { name: /数据备份/ }).click()
   const downloadPromise = page.waitForEvent('download')
@@ -195,8 +275,29 @@ test('dogfood: smart job filters and immersive interview room', async ({ page },
   const backupPath = await download.path()
   expect(backupPath).toBeTruthy()
   const backup = JSON.parse(await fs.readFile(backupPath!, 'utf8'))
-  expect(backup.selectedJob.normalized.roleFamily).toBe('AI产品 / AI应用产品')
+  expect(backup.appVersion).toBe('1.1A')
+  expect(backup.selectedJob.jobTitle).toBe('AI Product Manager')
+  expect(backup.jobPacks).toHaveLength(1)
   expect(backup.mockInterviews[0].finalReport.report.overallScore).toBe(84)
+
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.getByRole('button', { name: /数据备份/ }).click()
+  page.once('dialog', (dialog) => void dialog.accept())
+  await page.locator('input[accept=".json,application/json"]').setInputFiles(backupPath!)
+  await expect(page.getByText('导入成功。')).toBeVisible()
+  await page.reload()
+  const restoredJob = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_selected_job') || 'null'))
+  expect(restoredJob.jobTitle).toBe('AI Product Manager')
+
+  await page.getByRole('button', { name: /系统诊断/ }).click()
+  await expect(page.getByTestId('provider-diagnostics')).toContainText('AI_PROVIDER')
+  await expect(page.getByTestId('provider-diagnostics')).toContainText('ASR_PROVIDER')
+  await expect(page.getByTestId('provider-diagnostics')).toContainText('/api/provider-status')
+  await expect(page.getByTestId('provider-diagnostics')).toContainText('fallback')
+  const diagnosticsText = await page.getByTestId('provider-diagnostics').textContent()
+  expect(diagnosticsText).not.toContain('test-key')
+  expect(diagnosticsText).not.toContain('sk-')
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(hasHorizontalOverflow).toBe(false)

@@ -6,6 +6,7 @@ import generateCompanyKnowledgePackRoute from '../api/generate-company-knowledge
 import generateInterviewReportRoute from '../api/generate-interview-report.ts'
 import generateJobPackRoute from '../api/generate-job-pack.ts'
 import generateMockInterviewRoute from '../api/generate-mock-interview.ts'
+import providerStatusRoute from '../api/provider-status.ts'
 import reviewRealInterviewRoute from '../api/review-real-interview.ts'
 import transcribeRoute from '../api/transcribe.ts'
 
@@ -422,5 +423,23 @@ const agnesFallbackResponse = await generateMockInterviewRoute.fetch(request('/a
 const agnesFallbackPayload = await agnesFallbackResponse.json()
 assert.equal(agnesFallbackPayload.success, true)
 assert.equal(agnesFallbackPayload.provider, 'mock_fallback')
+
+process.env.AI_PROVIDER = 'deepseek'
+delete process.env.DEEPSEEK_API_KEY
+process.env.ASR_PROVIDER = 'openai'
+delete process.env.OPENAI_API_KEY
+const providerStatusResponse = await providerStatusRoute.fetch(new Request('http://localhost/api/provider-status'))
+assert.equal(providerStatusResponse.status, 200)
+const providerStatusPayload = await providerStatusResponse.json()
+assert.equal(providerStatusPayload.success, true)
+assert.equal(providerStatusPayload.ai.provider, 'deepseek')
+assert.equal(providerStatusPayload.ai.configured, false)
+assert.equal(providerStatusPayload.ai.fallbackMode, true)
+assert.equal(providerStatusPayload.ai.availableProviders.deepseek.implemented, true)
+assert.equal(providerStatusPayload.asr.provider, 'openai')
+assert.equal(providerStatusPayload.asr.configured, false)
+assert.equal(providerStatusPayload.asr.availableProviders.openai.implemented, true)
+assert.equal(providerStatusPayload.routes.analyzeAnswer.path, '/api/analyze-answer')
+assert.equal(JSON.stringify(providerStatusPayload).includes('test-key'), false)
 
 console.log('AI, ASR, job pack and mock interview routes: mock, configurable provider fallback, validation passed')

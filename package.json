@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:ai": "tsx scripts/verify-ai-route.ts"
+    "test:ai": "tsx scripts/verify-ai-route.ts",
+    "test:providers": "tsx scripts/verify-provider-status.ts"
   },
   "dependencies": {
     "lucide-react": "^1.17.0",

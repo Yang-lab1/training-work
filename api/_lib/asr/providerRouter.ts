@@ -1,15 +1,22 @@
 import type { ASRProviderName, TranscribeRequest, TranscribeSuccess } from '../../../src/lib/asr/types.js'
 import { serverEnv } from '../ai/env.js'
+import { aliyunAsrStatus } from './providers/aliyunAsrProvider.js'
+import { doubaoAsrStatus } from './providers/doubaoAsrProvider.js'
 import { transcribeWithMock } from './providers/mockAsrProvider.js'
-import { transcribeWithOpenAI } from './providers/openaiAsrProvider.js'
+import { getOpenAIAsrProviderStatus, openAIAsrStatus, transcribeWithOpenAI } from './providers/openaiAsrProvider.js'
+import { tencentAsrStatus } from './providers/tencentAsrProvider.js'
+import { volcengineAsrStatus } from './providers/volcengineAsrProvider.js'
+import { xfyunAsrStatus } from './providers/xfyunAsrProvider.js'
 
-const supported = new Set<ASRProviderName>([
+type ConfigurableASRProvider = Exclude<ASRProviderName, 'mock_fallback'>
+
+const supported = new Set<ConfigurableASRProvider>([
   'mock', 'openai', 'doubao', 'volcengine', 'xfyun', 'aliyun', 'tencent',
 ])
 
-function configuredProvider(): ASRProviderName {
+function configuredProvider(): ConfigurableASRProvider {
   const value = serverEnv.ASR_PROVIDER?.trim().toLowerCase() as ASRProviderName | undefined
-  return value && supported.has(value) ? value : 'mock'
+  return value && value !== 'mock_fallback' && supported.has(value) ? value : 'mock'
 }
 
 function keyFor(provider: ASRProviderName) {
@@ -20,6 +27,65 @@ function keyFor(provider: ASRProviderName) {
   if (provider === 'aliyun') return serverEnv.ALIYUN_ASR_API_KEY
   if (provider === 'tencent') return serverEnv.TENCENT_ASR_API_KEY
   return ''
+}
+
+function statusFor(provider: Exclude<ASRProviderName, 'mock_fallback'>) {
+  if (provider === 'mock') {
+    return {
+      configured: true,
+      implemented: true,
+      model: 'mock-asr-v1',
+      fallbackMode: true,
+      note: 'Mock ASR 始终可用。',
+    }
+  }
+  if (provider === 'openai') {
+    const status = getOpenAIAsrProviderStatus()
+    return {
+      configured: status.configured,
+      implemented: openAIAsrStatus.implemented,
+      model: serverEnv.OPENAI_ASR_MODEL?.trim() || 'whisper-1',
+      fallbackMode: !status.configured,
+      note: status.note,
+    }
+  }
+  const providerStatus = provider === 'doubao'
+    ? doubaoAsrStatus
+    : provider === 'volcengine'
+      ? volcengineAsrStatus
+      : provider === 'xfyun'
+        ? xfyunAsrStatus
+        : provider === 'aliyun'
+          ? aliyunAsrStatus
+          : tencentAsrStatus
+  const configured = Boolean(keyFor(provider)?.trim())
+  return {
+    configured,
+    implemented: providerStatus.implemented,
+    model: provider === 'doubao' ? serverEnv.DOUBAO_ASR_MODEL?.trim() : undefined,
+    fallbackMode: true,
+    note: configured ? `${provider} ASR 已配置但真实调用仍预留。` : providerStatus.note,
+  }
+}
+
+export function getASRProviderStatus() {
+  const provider = configuredProvider()
+  const availableProviders = {
+    mock: statusFor('mock'),
+    openai: statusFor('openai'),
+    doubao: statusFor('doubao'),
+    volcengine: statusFor('volcengine'),
+    xfyun: statusFor('xfyun'),
+    aliyun: statusFor('aliyun'),
+    tencent: statusFor('tencent'),
+  }
+  const current = availableProviders[provider]
+  return {
+    provider,
+    configured: current.configured,
+    fallbackMode: provider === 'mock' || !current.configured || !current.implemented,
+    availableProviders,
+  }
 }
 
 export async function transcribeWithProvider(input: TranscribeRequest): Promise<TranscribeSuccess> {
