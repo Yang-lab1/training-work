@@ -20,7 +20,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { parseJobWorkbook } from './jobParser'
+import { normalizeJobRecord, parseJobWorkbook } from './jobParser'
 import type { JobRecord } from './jobParser'
 import type {
   AIFeedbackStatus,
@@ -73,6 +73,25 @@ type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
 type ScriptTemplateKey = 'chineseIntro' | 'englishIntro' | 'miroProject'
+type InterviewUiState = 'lobby' | 'waiting_room' | 'interview_room' | 'review_room'
+type InterviewPhase = 'asking' | 'answering' | 'transcribing' | 'analyzing' | 'feedback_ready' | 'follow_up' | 'completed'
+type JobSortMode = 'match' | 'priority' | 'today' | 'city' | 'family'
+
+interface JobFilters {
+  search: string
+  roleFamily: string
+  roleTrack: string
+  cityGroup: string
+  priorityBucket: string
+  hideStrongCode: boolean
+  hideAlgorithm: boolean
+  hideSales: boolean
+  hideOnsite: boolean
+  hideTravel: boolean
+  hideLowSalary: boolean
+  hideHighExperience: boolean
+  sort: JobSortMode
+}
 
 interface UploadedFileMeta {
   id: string
@@ -210,13 +229,18 @@ interface MockInterviewSession {
   id: string
   selectedJob: JobRecord
   jobPackId?: string
+  companyKnowledgePackId?: string
   status: 'not_started' | 'in_progress' | 'completed'
+  uiState: InterviewUiState
   createdAt: string
+  startedAt?: string
   completedAt?: string
   interviewType: MockInterviewType
   currentQuestionIndex: number
+  currentPhase: InterviewPhase
   questions: MockInterviewQuestion[]
   answers: MockInterviewAnswer[]
+  followUps: MockInterviewQuestion[]
   finalReport?: {
     provider: string
     model: string
@@ -335,7 +359,21 @@ function App() {
   const [recordingTaskId, setRecordingTaskId] = useState<TaskId | null>(null)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [audioPreviews, setAudioPreviews] = useState<Record<string, AudioPreview>>({})
-  const [filters, setFilters] = useState({ company: '', title: '', city: '', jobType: '', priority: '', mainTrack: '' })
+  const [filters, setFilters] = useState<JobFilters>({
+    search: '',
+    roleFamily: '',
+    roleTrack: '',
+    cityGroup: '',
+    priorityBucket: '',
+    hideStrongCode: false,
+    hideAlgorithm: false,
+    hideSales: false,
+    hideOnsite: false,
+    hideTravel: false,
+    hideLowSalary: false,
+    hideHighExperience: false,
+    sort: 'match',
+  })
   const [jobPackMessage, setJobPackMessage] = useState('')
   const [jobPackLoading, setJobPackLoading] = useState(false)
   const [mockInterviewMessage, setMockInterviewMessage] = useState('')
@@ -361,6 +399,7 @@ function App() {
   const analyzedToday = todayRecords.filter((record) => record.aiFeedbackStatus === 'completed').length
   const filteredJobs = useMemo(() => filterJobs(jobPool, filters), [jobPool, filters])
   const filterOptions = useMemo(() => buildFilterOptions(jobPool), [jobPool])
+  const jobStats = useMemo(() => buildJobStats(jobPool, filteredJobs), [jobPool, filteredJobs])
   const nextActions = generateNextActions(jobPool, selectedJob, cvTextState, todayRecords)
   const currentJobPack = useMemo(
     () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
@@ -615,6 +654,7 @@ function App() {
       mediaRecorderRef.current = recorder
       startedAtRef.current = Date.now()
       setRecordingInterviewQuestionId(questionId)
+      setMockInterviews((current) => updateMockSessionPhase(current, activeMockInterview?.id || '', 'answering'))
       setRecordingSeconds(0)
       recorder.addEventListener('dataavailable', (event) => {
         if (event.data.size) chunksRef.current.push(event.data)
@@ -706,12 +746,16 @@ function App() {
         id: `mock-interview-${Date.now()}`,
         selectedJob,
         jobPackId: currentJobPack?.id,
+        companyKnowledgePackId: currentKnowledgePack?.id,
         status: 'in_progress',
+        uiState: 'waiting_room',
         createdAt: new Date().toISOString(),
         interviewType,
         currentQuestionIndex: 0,
+        currentPhase: 'asking',
         questions: result.questions,
         answers: [],
+        followUps: [],
       }
       setMockInterviews((current) => [session, ...current].slice(0, 20))
       setMockInterviewMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟面试问题。' : '模拟面试已生成。')
@@ -743,6 +787,7 @@ function App() {
     }
     setMockInterviews((current) => current.map((item) => item.id === session.id ? {
       ...item,
+      currentPhase: 'feedback_ready',
       answers: [answer, ...item.answers.filter((existing) => existing.questionId !== questionId)],
     } : item))
     setMockInterviewMessage('已保存本题录音。下一步生成转写。')
@@ -754,7 +799,7 @@ function App() {
     if (!session || !answer) return
     setMockInterviewLoading(`transcript-${questionId}`)
     setMockInterviewMessage('')
-    setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'transcribing' })))
+    setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'transcribing' })), sessionId, 'transcribing'))
     try {
       const payload = {
         trainingRecordId: answer.id,
@@ -783,16 +828,16 @@ function App() {
         provider: result.provider,
         language: result.language,
       }
-      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({
         ...item,
         transcript,
         transcriptStatus: transcript.source === 'mock' ? 'mock_ready' : 'completed',
         aiFeedback: undefined,
         aiFeedbackStatus: 'ready_to_analyze',
-      })))
+      })), sessionId, 'feedback_ready'))
       setMockInterviewMessage(transcript.source === 'mock' ? '已生成模拟转写。' : '本题转写完成。')
     } catch (error) {
-      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'failed', aiFeedbackStatus: 'transcript_needed' })))
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, transcriptStatus: 'failed', aiFeedbackStatus: 'transcript_needed' })), sessionId, 'asking'))
       setMockInterviewMessage(error instanceof Error ? error.message : '转写失败。')
     } finally {
       setMockInterviewLoading('')
@@ -810,7 +855,7 @@ function App() {
     }
     setMockInterviewLoading(`feedback-${questionId}`)
     setMockInterviewMessage('')
-    setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'analyzing' })))
+    setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'analyzing' })), sessionId, 'analyzing'))
     try {
       const response = await fetch('/api/analyze-answer', {
         method: 'POST',
@@ -831,10 +876,10 @@ function App() {
       if (!response.ok || !result.success) throw new Error(result.success ? '反馈生成失败。' : result.error)
       const { success: _success, ...aiFeedback } = result
       void _success
-      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedback, aiFeedbackStatus: 'completed' })))
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedback, aiFeedbackStatus: 'completed' })), sessionId, 'feedback_ready'))
       setMockInterviewMessage('本题 AI 反馈已保存。')
     } catch (error) {
-      setMockInterviews((current) => updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'failed' })))
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, sessionId, questionId, (item) => ({ ...item, aiFeedbackStatus: 'failed' })), sessionId, 'feedback_ready'))
       setMockInterviewMessage(error instanceof Error ? error.message : '反馈生成失败。')
     } finally {
       setMockInterviewLoading('')
@@ -858,7 +903,7 @@ function App() {
       })
       const result = await response.json() as GenerateFollowUpResponse
       if (!response.ok || !result.success) throw new Error(result.success ? '追问生成失败。' : result.error)
-      setMockInterviews((current) => current.map((item) => item.id === sessionId ? { ...item, questions: [...item.questions, result.followUpQuestion], currentQuestionIndex: item.questions.length } : item))
+      setMockInterviews((current) => current.map((item) => item.id === sessionId ? { ...item, questions: [...item.questions, result.followUpQuestion], followUps: [...item.followUps, result.followUpQuestion], currentQuestionIndex: item.questions.length, currentPhase: 'follow_up' } : item))
       setMockInterviewMessage('已生成追问。')
     } catch (error) {
       setMockInterviewMessage(error instanceof Error ? error.message : '追问生成失败。')
@@ -868,7 +913,16 @@ function App() {
   }
 
   function nextInterviewQuestion(sessionId: string) {
-    setMockInterviews((current) => current.map((session) => session.id === sessionId ? { ...session, currentQuestionIndex: Math.min(session.currentQuestionIndex + 1, session.questions.length - 1) } : session))
+    setMockInterviews((current) => current.map((session) => session.id === sessionId ? { ...session, currentQuestionIndex: Math.min(session.currentQuestionIndex + 1, session.questions.length - 1), currentPhase: 'asking' } : session))
+  }
+
+  function enterMockInterviewRoom(sessionId: string) {
+    setMockInterviews((current) => current.map((session) => session.id === sessionId ? {
+      ...session,
+      uiState: 'interview_room',
+      startedAt: session.startedAt || new Date().toISOString(),
+      currentPhase: 'asking',
+    } : session))
   }
 
   async function finishMockInterview(sessionId: string) {
@@ -901,6 +955,8 @@ function App() {
       setMockInterviews((current) => current.map((item) => item.id === sessionId ? {
         ...item,
         status: 'completed',
+        uiState: 'review_room',
+        currentPhase: 'completed',
         completedAt: new Date().toISOString(),
         finalReport: {
           provider: result.provider,
@@ -1387,18 +1443,39 @@ function App() {
               {selectedJob && <div className="selected-job"><span>当前岗位</span><strong>{selectedJob.companyName} · {selectedJob.jobTitle}</strong><p>{selectedJob.city || '城市未写'} · {selectedJob.mainTrack || '方向未写'}</p></div>}
               {jobPool.length > 0 ? (
                 <>
-                  <div className="job-filters">
-                    <FilterSelect label="公司" value={filters.company} options={filterOptions.company} onChange={(value) => setFilters({ ...filters, company: value })} />
-                    <FilterSelect label="岗位" value={filters.title} options={filterOptions.title} onChange={(value) => setFilters({ ...filters, title: value })} />
-                    <FilterSelect label="城市" value={filters.city} options={filterOptions.city} onChange={(value) => setFilters({ ...filters, city: value })} />
-                    <FilterSelect label="类型" value={filters.jobType} options={filterOptions.jobType} onChange={(value) => setFilters({ ...filters, jobType: value })} />
-                    <FilterSelect label="优先级" value={filters.priority} options={filterOptions.priority} onChange={(value) => setFilters({ ...filters, priority: value })} />
-                    <FilterSelect label="主线" value={filters.mainTrack} options={filterOptions.mainTrack} onChange={(value) => setFilters({ ...filters, mainTrack: value })} />
+                  <JobStats stats={jobStats} />
+                  <div className="job-smart-filters">
+                    <label className="job-search"><span>搜索</span><input value={filters.search} placeholder="公司、岗位、JD、城市、主线" onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+                    <FilterSelect label="岗位族群" value={filters.roleFamily} options={filterOptions.roleFamily} onChange={(value) => setFilters({ ...filters, roleFamily: value })} />
+                    <FilterSelect label="求职主线" value={filters.roleTrack} options={filterOptions.roleTrack} onChange={(value) => setFilters({ ...filters, roleTrack: value })} />
+                    <FilterSelect label="城市组" value={filters.cityGroup} options={filterOptions.cityGroup} onChange={(value) => setFilters({ ...filters, cityGroup: value })} />
+                    <FilterSelect label="优先级" value={filters.priorityBucket} options={filterOptions.priorityBucket} onChange={(value) => setFilters({ ...filters, priorityBucket: value })} />
+                    <label><span>排序</span><select value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as JobSortMode })}><option value="match">匹配度最高</option><option value="priority">优先级最高</option><option value="today">今日新增优先</option><option value="city">城市优先</option><option value="family">岗位族群</option></select></label>
+                  </div>
+                  <div className="risk-filter-bar">
+                    <RiskToggle label="隐藏强代码" checked={filters.hideStrongCode} onChange={(checked) => setFilters({ ...filters, hideStrongCode: checked })} />
+                    <RiskToggle label="隐藏纯算法" checked={filters.hideAlgorithm} onChange={(checked) => setFilters({ ...filters, hideAlgorithm: checked })} />
+                    <RiskToggle label="隐藏强销售" checked={filters.hideSales} onChange={(checked) => setFilters({ ...filters, hideSales: checked })} />
+                    <RiskToggle label="隐藏长期驻场" checked={filters.hideOnsite} onChange={(checked) => setFilters({ ...filters, hideOnsite: checked })} />
+                    <RiskToggle label="隐藏高频出差" checked={filters.hideTravel} onChange={(checked) => setFilters({ ...filters, hideTravel: checked })} />
+                    <RiskToggle label="隐藏低薪" checked={filters.hideLowSalary} onChange={(checked) => setFilters({ ...filters, hideLowSalary: checked })} />
+                    <RiskToggle label="隐藏高年限" checked={filters.hideHighExperience} onChange={(checked) => setFilters({ ...filters, hideHighExperience: checked })} />
                   </div>
                   <div className="job-list">
                     {filteredJobs.slice(0, 30).map((job) => (
                       <article className={`job-row ${selectedJob?.id === job.id ? 'selected' : ''}`} key={job.id}>
-                        <div><strong>{job.companyName} · {job.jobTitle}</strong><span>{[job.city, job.jobType, job.priority, job.salary].filter(Boolean).join(' · ')}</span><p>{job.mainTrack || job.companyBusiness}</p></div>
+                        <div>
+                          <strong>{job.companyName} · {job.jobTitle}</strong>
+                          <span>{[job.city, job.jobType, job.salary, job.sourceSheet].filter(Boolean).join(' · ')}</span>
+                          <div className="job-tags">
+                            <em>{job.normalized.roleFamily}</em>
+                            <em>{job.normalized.roleTrack}</em>
+                            <em>{job.normalized.priorityBucket}</em>
+                            <em>{job.normalized.matchScore} 分</em>
+                            {job.normalized.riskFlags.map((flag) => <em className="risk" key={flag}>{flag}</em>)}
+                          </div>
+                          <p>{job.normalized.matchReasons.slice(0, 3).join('；')}</p>
+                        </div>
                         <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '已选择' : '选择岗位'}</button>
                       </article>
                     ))}
@@ -1511,14 +1588,18 @@ function App() {
               </section>
             ) : (
               <>
-                <section className="primary-flow">
+                <section className="primary-flow interview-lobby" data-testid="interview-lobby">
                   <div>
-                    <span className="eyebrow">岗位定向模拟</span>
+                    <span className="eyebrow">面试大厅</span>
                     <h2>{selectedJob.companyName} · {selectedJob.jobTitle}</h2>
                     <p>{currentJobPack ? '已读取岗位准备包。' : '建议先生成岗位准备包，也可以直接用岗位信息开始。'}</p>
                   </div>
-                  <div className="inline-actions">
-                    <button className="primary-button" type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}><MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '开始一轮模拟面试'}</button>
+                  <div className="interview-type-grid" aria-label="面试类型">
+                    <button type="button" onClick={() => void startMockInterview('quick_mock')} disabled={Boolean(mockInterviewLoading)}>快速摸底面试</button>
+                    <button type="button" onClick={() => void startMockInterview('quick_mock')} disabled={Boolean(mockInterviewLoading)}>HR 综合面试</button>
+                    <button className="primary-button" type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}><MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : 'AI 产品岗位面试'}</button>
+                    <button type="button" onClick={() => void startMockInterview('job_pack_mock')} disabled={Boolean(mockInterviewLoading)}>Miro 项目深挖</button>
+                    <button type="button" onClick={() => void startMockInterview('pressure_mock')} disabled={Boolean(mockInterviewLoading)}>英文压力面试</button>
                     {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>先生成准备包</button>}
                   </div>
                 </section>
@@ -1539,6 +1620,7 @@ function App() {
                     onFeedback={(questionId) => void generateInterviewAnswerFeedback(activeMockInterview.id, questionId)}
                     onFollowUp={(questionId) => void generateFollowUpQuestion(activeMockInterview.id, questionId)}
                     onNext={() => nextInterviewQuestion(activeMockInterview.id)}
+                    onEnterRoom={() => enterMockInterviewRoom(activeMockInterview.id)}
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
                   />
@@ -1673,6 +1755,28 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">全部</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
 }
 
+function RiskToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return <label className="risk-toggle"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span>{label}</span></label>
+}
+
+function JobStats({ stats }: { stats: ReturnType<typeof buildJobStats> }) {
+  return (
+    <section className="job-stats" aria-label="岗位智能筛选统计">
+      <div><span>总岗位</span><strong>{stats.total}</strong></div>
+      <div><span>当前筛选</span><strong>{stats.filtered}</strong></div>
+      <div><span>A / B / C / 排除</span><strong>{stats.prioritySummary}</strong></div>
+      <div>
+        <span>岗位族群</span>
+        <p>{stats.familySummary}</p>
+      </div>
+      <div>
+        <span>求职主线</span>
+        <p>{stats.trackSummary}</p>
+      </div>
+    </section>
+  )
+}
+
 function MockInterviewPanel({
   session,
   currentQuestion,
@@ -1687,6 +1791,7 @@ function MockInterviewPanel({
   onFeedback,
   onFollowUp,
   onNext,
+  onEnterRoom,
   onFinish,
   onDelete,
 }: {
@@ -1703,32 +1808,100 @@ function MockInterviewPanel({
   onFeedback: (questionId: string) => void
   onFollowUp: (questionId: string) => void
   onNext: () => void
+  onEnterRoom: () => void
   onFinish: () => void
   onDelete: () => void
 }) {
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
   const canGoNext = session.currentQuestionIndex < session.questions.length - 1
-  return (
-    <section className="mock-interview-panel">
-      <header>
+  const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
+  const phaseLabel: Record<InterviewPhase, string> = {
+    asking: '面试官提问',
+    answering: '回答中',
+    transcribing: '转写中',
+    analyzing: '分析中',
+    feedback_ready: '反馈已生成',
+    follow_up: '追问',
+    completed: '已结束',
+  }
+  const displayedQuestion = session.currentPhase === 'follow_up' && session.followUps.length ? session.followUps[session.followUps.length - 1] : currentQuestion
+
+  if (session.uiState === 'waiting_room') {
+    return (
+      <section className="interview-waiting-room" data-testid="interview-waiting-room">
         <div>
-          <span className="eyebrow">{session.status === 'completed' ? '已完成' : '进行中'} · {session.currentQuestionIndex + 1}/{session.questions.length}</span>
-          <h2>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</h2>
-          <p>{session.interviewType === 'pressure_mock' ? '压力追问' : session.interviewType === 'quick_mock' ? '快速模拟' : '岗位准备包模拟'}</p>
+          <span className="eyebrow">面试等待室</span>
+          <h2>{session.selectedJob.companyName}</h2>
+          <p>{session.selectedJob.jobTitle} · {typeLabel}</p>
         </div>
+        <div className="waiting-room-grid">
+          <div><span>预计题数</span><strong>{session.questions.length}</strong></div>
+          <div><span>预计时长</span><strong>{session.questions.length * 3} 分钟</strong></div>
+          <div><span>麦克风</span><strong>待开始</strong></div>
+          <div><span>候选人</span><strong>我的窗口</strong></div>
+        </div>
+        <div className="meeting-source-list">
+          <span>使用资料</span>
+          <p>selectedJob · jobPack · companyKnowledgePack · questionBank</p>
+        </div>
+        <div className="inline-actions">
+          <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />进入面试</button>
+          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+        </div>
+      </section>
+    )
+  }
+
+  if (session.uiState === 'review_room' || session.status === 'completed') {
+    return (
+      <section className="review-room" data-testid="interview-review-room">
+        <header>
+          <div>
+            <span className="eyebrow">面试复盘室</span>
+            <h2>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</h2>
+            <p>{session.answers.length} 个回答 · {session.finalReport ? '整场复盘已生成' : '等待生成整场复盘'}</p>
+          </div>
+          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
+        </header>
+        {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} /> : (
+          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '生成整场复盘'}</button>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section className="meeting-room" data-testid="interview-room">
+      <header className="meeting-status-bar" aria-label="面试状态栏">
+        <div>
+          <strong>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</strong>
+          <span>{typeLabel}</span>
+        </div>
+        <div><span>题目</span><strong>第 {session.currentQuestionIndex + 1} / {session.questions.length} 题</strong></div>
+        <div><span>当前题</span><strong>{isRecording ? formatDuration(recordingSeconds) : currentAnswer ? formatDuration(currentAnswer.durationSeconds) : '00:00'}</strong></div>
+        <div><span>状态</span><strong>{phaseLabel[session.currentPhase]}</strong></div>
         <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除 session</button>
       </header>
-      {currentQuestion && (
-        <article className="interview-question">
-          <span>{currentQuestion.type} · {currentQuestion.source}</span>
-          <h3>{currentQuestion.question}</h3>
-          <p>{currentQuestion.expectedFocus}</p>
+
+      <div className="meeting-stage">
+        <article className="interviewer-panel" data-testid="virtual-interviewer">
+          <div className="interviewer-avatar"><MessagesSquare size={34} /></div>
+          <span>{displayedQuestion?.type || 'question'} · {displayedQuestion?.source || 'selectedJob'}</span>
+          <h3>{displayedQuestion?.question || '面试问题生成中…'}</h3>
+          <p>{displayedQuestion?.expectedFocus || '请围绕岗位、项目证据和表达结构回答。'}</p>
         </article>
-      )}
+        <aside className="candidate-window" data-testid="candidate-window">
+          <span>我的窗口</span>
+          <strong>{isRecording ? '正在回答' : currentAnswer ? '已回答' : '待回答'}</strong>
+          <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
+          <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
+        </aside>
+      </div>
+
       {currentQuestion && (
-        <div className="recorder-controls">
+        <div className="meeting-control-bar" aria-label="底部控制栏">
           <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId)}>
-            <Mic size={16} />{isRecording ? `录音中 ${formatDuration(recordingSeconds)}` : '回答本题'}
+            <Mic size={16} />{isRecording ? `回答中 ${formatDuration(recordingSeconds)}` : '开始回答'}
           </button>
           <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />停止</button>
           <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
@@ -1737,17 +1910,21 @@ function MockInterviewPanel({
           <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
             <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '分析中…' : '生成单题反馈'}
           </button>
+          <button type="button" onClick={onNext} disabled={!canGoNext}>下一题</button>
+          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '结束面试'}</button>
         </div>
       )}
       {preview && currentAnswer && <div className="audio-result"><audio controls src={preview.url} /><a href={preview.url} download={currentAnswer.recordingName}><Download size={15} />下载</a><span>{formatDuration(currentAnswer.durationSeconds)} · {formatFileSize(preview.size)}</span></div>}
       {currentAnswer?.transcript && <div className="transcript-preview"><span>{transcriptStatusLabel(currentAnswer.transcriptStatus)} · {currentAnswer.transcript.provider || currentAnswer.transcript.source}</span><p>{currentAnswer.transcript.text}</p></div>}
-      {currentAnswer?.aiFeedback && <AIFeedbackReport feedback={currentAnswer.aiFeedback} />}
-      <div className="inline-actions">
-        {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={!currentAnswer?.aiFeedback || loading === `follow-${currentQuestion.id}`}>生成追问</button>}
-        <button type="button" onClick={onNext} disabled={!canGoNext}>下一题</button>
-        <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '结束并生成整场复盘'}</button>
-      </div>
-      {session.finalReport && <InterviewFinalReportView finalReport={session.finalReport} />}
+      {currentAnswer?.aiFeedback && (
+        <div className="single-feedback-drawer">
+          <header>
+            <span>单题反馈</span>
+            {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>生成追问</button>}
+          </header>
+          <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
+        </div>
+      )}
     </section>
   )
 }
@@ -2255,8 +2432,8 @@ function readStoredState(): StoredMvpState {
   }
 }
 
-function readJobPool() { return readArray<JobRecord>(JOB_POOL_KEY) }
-function readSelectedJob() { try { const raw = localStorage.getItem(SELECTED_JOB_KEY); return raw ? JSON.parse(raw) as JobRecord : null } catch { return null } }
+function readJobPool() { return readArray<JobRecord>(JOB_POOL_KEY).map(ensureNormalizedJob) }
+function readSelectedJob() { try { const raw = localStorage.getItem(SELECTED_JOB_KEY); return raw ? ensureNormalizedJob(JSON.parse(raw) as JobRecord) : null } catch { return null } }
 function readCvTextState(): CvTextState { try { const raw = localStorage.getItem(CV_TEXT_KEY); return raw ? { text: '', source: 'upload', ...JSON.parse(raw) } : { text: '', source: 'upload' } } catch { return { text: '', source: 'upload' } } }
 function readScriptTemplates(): ScriptTemplates { try { const raw = localStorage.getItem(SCRIPT_TEMPLATES_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} } }
 function readJobPacks() { return normalizeJobPacks(readArray<StoredJobPack>(JOB_PACKS_KEY)) }
@@ -2323,10 +2500,15 @@ function normalizeMockInterviews(sessions?: MockInterviewSession[]) {
     ...session,
     id: session.id || `mock-interview-${Date.now()}`,
     status: session.status || 'in_progress',
+    uiState: session.uiState || (session.status === 'completed' ? 'review_room' : 'waiting_room'),
+    currentPhase: session.currentPhase || (session.status === 'completed' ? 'completed' : 'asking'),
     createdAt: session.createdAt || new Date().toISOString(),
+    startedAt: session.startedAt,
     interviewType: session.interviewType || 'job_pack_mock',
+    companyKnowledgePackId: session.companyKnowledgePackId,
     currentQuestionIndex: Math.max(0, Math.min(session.currentQuestionIndex || 0, Math.max(0, session.questions.length - 1))),
     questions: session.questions,
+    followUps: Array.isArray(session.followUps) ? session.followUps : [],
     answers: Array.isArray(session.answers) ? session.answers.map((answer) => ({
       ...answer,
       transcriptStatus: answer.transcriptStatus || (answer.transcript ? answer.transcript.source === 'mock' ? 'mock_ready' : 'completed' : 'not_started'),
@@ -2356,6 +2538,10 @@ function normalizeQuestionBank(items?: QuestionBankUpdate[]) {
     priority: item.priority || 'medium',
     suggestedPracticeType: item.suggestedPracticeType || 'mockInterview',
   }))
+}
+
+function updateMockSessionPhase(sessions: MockInterviewSession[], sessionId: string, phase: InterviewPhase) {
+  return sessions.map((session) => session.id === sessionId ? { ...session, currentPhase: phase } : session)
 }
 
 function normalizeCompanySources(sources?: CompanySourceInput[]) {
@@ -2399,19 +2585,85 @@ function canExtractPlainText(name: string, type: string) { const ext = getFileEx
 function toCvTextMeta(cv: CvTextState): UploadedFileMeta { return { id: 'cv-text', name: cv.fileName || 'CV 文本', size: new Blob([cv.text]).size, type: 'text/plain', uploadedAt: cv.updatedAt || new Date().toISOString(), status: '已解析', category: 'cv', parseStatus: '已提取文本' } }
 function getCvStatusText(file: UploadedFileMeta | undefined, cv: CvTextState) { if (cv.text) return `已读取 CV 文本：${cv.fileName || '文本版'}。`; if (!file) return '尚未上传 CV。'; if (file.parseStatus === '需要文本版') return 'CV 已上传，但当前格式暂未解析。请补充 TXT / Markdown 文本版。'; return 'CV 已上传，但暂未解析内容。' }
 
-function filterJobs(jobs: JobRecord[], filters: Record<string, string>) {
-  return jobs.filter((job) =>
-    (!filters.company || job.companyName === filters.company)
-    && (!filters.title || job.jobTitle === filters.title)
-    && (!filters.city || job.city === filters.city)
-    && (!filters.jobType || job.jobType === filters.jobType)
-    && (!filters.priority || job.priority === filters.priority)
-    && (!filters.mainTrack || job.mainTrack === filters.mainTrack))
+function ensureNormalizedJob(job: JobRecord): JobRecord {
+  return job.normalized ? job : { ...job, normalized: normalizeJobRecord(job) }
+}
+
+function filterJobs(jobs: JobRecord[], filters: JobFilters) {
+  const normalizedJobs = jobs.map(ensureNormalizedJob)
+  const search = filters.search.trim().toLowerCase()
+  const riskChecks: Array<[boolean, string]> = [
+    [filters.hideStrongCode, 'strong_code'],
+    [filters.hideAlgorithm, 'algorithm_heavy'],
+    [filters.hideSales, 'sales_heavy'],
+    [filters.hideOnsite, 'onsite_delivery'],
+    [filters.hideTravel, 'travel_heavy'],
+    [filters.hideLowSalary, 'low_salary'],
+    [filters.hideHighExperience, 'high_experience'],
+  ]
+  const filtered = normalizedJobs.filter((job) => {
+    const normalized = job.normalized
+    return (!search || normalized.searchableText.toLowerCase().includes(search))
+      && (!filters.roleFamily || normalized.roleFamily === filters.roleFamily)
+      && (!filters.roleTrack || normalized.roleTrack === filters.roleTrack)
+      && (!filters.cityGroup || normalized.cityGroup === filters.cityGroup)
+      && (!filters.priorityBucket || normalized.priorityBucket === filters.priorityBucket)
+      && riskChecks.every(([enabled, flag]) => !enabled || !normalized.riskFlags.includes(flag))
+  })
+
+  return filtered.sort((a, b) => {
+    if (filters.sort === 'priority') return priorityRank(a.normalized.priorityBucket) - priorityRank(b.normalized.priorityBucket) || b.normalized.matchScore - a.normalized.matchScore
+    if (filters.sort === 'today') return Number(b.isTodayNew) - Number(a.isTodayNew) || b.normalized.matchScore - a.normalized.matchScore
+    if (filters.sort === 'city') return a.normalized.cityGroup.localeCompare(b.normalized.cityGroup, 'zh-CN') || b.normalized.matchScore - a.normalized.matchScore
+    if (filters.sort === 'family') return a.normalized.roleFamily.localeCompare(b.normalized.roleFamily, 'zh-CN') || b.normalized.matchScore - a.normalized.matchScore
+    return b.normalized.matchScore - a.normalized.matchScore
+  })
 }
 
 function buildFilterOptions(jobs: JobRecord[]) {
-  const values = (selector: (job: JobRecord) => string) => [...new Set(jobs.map(selector).filter(Boolean))].sort()
-  return { company: values((job) => job.companyName), title: values((job) => job.jobTitle), city: values((job) => job.city), jobType: values((job) => job.jobType), priority: values((job) => job.priority), mainTrack: values((job) => job.mainTrack) }
+  const normalizedJobs = jobs.map(ensureNormalizedJob)
+  const values = (selector: (job: JobRecord) => string) => [...new Set(normalizedJobs.map(selector).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  return {
+    roleFamily: values((job) => job.normalized.roleFamily),
+    roleTrack: values((job) => job.normalized.roleTrack),
+    cityGroup: values((job) => job.normalized.cityGroup),
+    priorityBucket: values((job) => job.normalized.priorityBucket),
+  }
+}
+
+function buildJobStats(allJobs: JobRecord[], filteredJobs: JobRecord[]) {
+  const normalizedAll = allJobs.map(ensureNormalizedJob)
+  const countBy = (items: JobRecord[], selector: (job: JobRecord) => string) => items.reduce<Record<string, number>>((acc, job) => {
+    const key = selector(job) || '未分类'
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {})
+  const priorityCounts = countBy(normalizedAll, (job) => job.normalized.priorityBucket)
+  const familyCounts = countBy(normalizedAll, (job) => job.normalized.roleFamily)
+  const trackCounts = countBy(normalizedAll, (job) => job.normalized.roleTrack)
+  return {
+    total: normalizedAll.length,
+    filtered: filteredJobs.length,
+    prioritySummary: ['A 优先', 'B 可投', 'C 次选', 'E 排除'].map((key) => `${key.replace(' ', '')} ${priorityCounts[key] || 0}`).join(' / '),
+    familySummary: summarizeCounts(familyCounts),
+    trackSummary: summarizeCounts(trackCounts),
+  }
+}
+
+function summarizeCounts(counts: Record<string, number>) {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([key, value]) => `${key} ${value}`)
+    .join('；') || '暂无'
+}
+
+function priorityRank(value: string) {
+  if (value.startsWith('A')) return 1
+  if (value.startsWith('B')) return 2
+  if (value.startsWith('C')) return 3
+  if (value.startsWith('D')) return 4
+  return 5
 }
 
 function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[]) {
