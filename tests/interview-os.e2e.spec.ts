@@ -292,9 +292,9 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /导出 JSON/ }).click()
   const download = await downloadPromise
-  const backupPath = await download.path()
-  expect(backupPath).toBeTruthy()
-  const backup = JSON.parse(await fs.readFile(backupPath!, 'utf8'))
+  const backupPath = testInfo.outputPath('interview-os-backup.json')
+  await download.saveAs(backupPath)
+  const backup = JSON.parse(await fs.readFile(backupPath, 'utf8'))
   expect(backup.appVersion).toBe('1.2A')
   expect(backup.selectedJob.jobTitle).toBe('AI Product Manager')
   expect(backup.jobUserStatus[backup.selectedJob.id]).toBe('preparing')
@@ -305,7 +305,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await page.reload()
   await page.locator('.top-nav nav button').nth(9).click()
   page.once('dialog', (dialog) => void dialog.accept())
-  await page.locator('input[accept=".json,application/json"]').setInputFiles(backupPath!)
+  await page.locator('input[accept=".json,application/json"]').setInputFiles(backupPath)
   await expect(page.getByText('导入成功。')).toBeVisible()
   await page.reload()
   const restored = await page.evaluate(() => ({
