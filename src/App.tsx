@@ -52,7 +52,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '1.2A'
+const APP_VERSION = '1.3A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -375,7 +375,7 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
 
 const JOB_USER_STATUS_OPTIONS: Array<{ value: JobUserStatus; label: string }> = [
   { value: 'not_started', label: '未处理' },
-  { value: 'shortlisted', label: '短名单' },
+  { value: 'shortlisted', label: '我想投' },
   { value: 'preparing', label: '准备中' },
   { value: 'applied', label: '已投递' },
   { value: 'interviewing', label: '面试中' },
@@ -401,6 +401,7 @@ function App() {
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
+  const [materialsMessage, setMaterialsMessage] = useState('')
   const [backupMessage, setBackupMessage] = useState('')
   const [importError, setImportError] = useState('')
   const [recorderError, setRecorderError] = useState('')
@@ -427,6 +428,7 @@ function App() {
     hideRejected: true,
     sort: 'match',
   })
+  const [showAdvancedJobFilters, setShowAdvancedJobFilters] = useState(false)
   const [jobPackMessage, setJobPackMessage] = useState('')
   const [jobPackLoading, setJobPackLoading] = useState(false)
   const [mockInterviewMessage, setMockInterviewMessage] = useState('')
@@ -446,6 +448,7 @@ function App() {
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const startedAtRef = useRef(0)
+  const jobSelectionRef = useRef<HTMLElement | null>(null)
 
   const cvFile = getFileByCategory(state.uploadedFiles, 'cv')
   const projectFile = getFileByCategory(state.uploadedFiles, 'project')
@@ -456,7 +459,6 @@ function App() {
   const analyzedToday = todayRecords.filter((record) => record.aiFeedbackStatus === 'completed').length
   const filteredJobs = useMemo(() => filterJobs(jobPool, filters, jobUserStatus), [jobPool, filters, jobUserStatus])
   const filterOptions = useMemo(() => buildFilterOptions(jobPool), [jobPool])
-  const jobStats = useMemo(() => buildJobStats(jobPool, filteredJobs), [jobPool, filteredJobs])
   const currentJobPack = useMemo(
     () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
     [jobPacks, selectedJob],
@@ -667,13 +669,23 @@ function App() {
     setSelectedJob({ ...job, selectedAt: new Date().toISOString() })
     setJobUserStatus((current) => ({
       ...current,
-      [job.id]: current[job.id] && current[job.id] !== 'not_started' ? current[job.id] : 'preparing',
+      [job.id]: 'preparing',
     }))
     setActiveView('training')
   }
 
   function updateJobUserStatus(jobId: string, status: JobUserStatus) {
     setJobUserStatus((current) => ({ ...current, [jobId]: status }))
+  }
+
+  function saveMaterialsAndContinue() {
+    const hasMaterials = Boolean(cvFile || cvTextState.text || projectFile || jobFile || jobMapFile)
+    if (!hasMaterials) {
+      setMaterialsMessage('请先上传资料。')
+      return
+    }
+    setMaterialsMessage('已保存。请选择一个今天要准备的岗位。')
+    window.setTimeout(() => jobSelectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
 
   function runDailyAction() {
@@ -904,7 +916,8 @@ function App() {
         jobPackId: currentJobPack?.id,
         companyKnowledgePackId: currentKnowledgePack?.id,
         status: 'in_progress',
-        uiState: 'waiting_room',
+        uiState: 'interview_room',
+        startedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         interviewType,
         currentQuestionIndex: 0,
@@ -1585,40 +1598,80 @@ function App() {
 
         {activeView === 'materials' && (
           <Page title="资料与岗位" subtitle="上传资料，解析岗位表，选择本次训练岗位。">
-            <section className="section-block">
+            <section className="section-block material-flow">
               <SectionHeading icon={<Upload size={20} />} title="资料" />
-              <div className="upload-list">
-                <UploadRow title="CV 文件" hint="TXT / MD 可读取；PDF / DOCX 仅保存文件状态" file={cvFile} button="上传 CV" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('cv', event)} onRemove={() => removeFile('cv')} />
-                <UploadRow title="CV 文本版" hint="上传 TXT / Markdown，不需要手动填写" file={cvTextState.fileName ? toCvTextMeta(cvTextState) : undefined} button="上传文本版" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCvTextUpload(event)} onRemove={() => setCvTextState({ text: '', source: 'upload' })} />
-                <UploadRow title="项目资料" hint="保存项目资料文件名和状态" file={projectFile} button="上传项目资料" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('project', event)} onRemove={() => removeFile('project')} />
-                <UploadRow title="交互地图 HTML" hint="当前仅保存 metadata" file={jobMapFile} button="上传 HTML" accept=".html,text/html" onChange={(event) => void handleUpload('job-map', event)} onRemove={() => removeFile('job-map')} />
+              <div className="material-modules">
+                <article className="material-module" data-testid="resume-material-module">
+                  <div>
+                    <strong>简历资料</strong>
+                    <span>上传 PDF 或文本版，用于生成自我介绍和岗位匹配。</span>
+                  </div>
+                  <div className="material-actions">
+                    <UploadRow title="简历文件" hint="PDF / DOCX / TXT / Markdown" file={cvFile} button="上传简历" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('cv', event)} onRemove={() => removeFile('cv')} />
+                    <details className="inline-details">
+                      <summary>补充可解析文本</summary>
+                      <UploadRow title="TXT / Markdown 文本版" hint="PDF / DOCX 暂未自动解析时再补充" file={cvTextState.fileName ? toCvTextMeta(cvTextState) : undefined} button="上传文本版" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCvTextUpload(event)} onRemove={() => setCvTextState({ text: '', source: 'upload' })} />
+                    </details>
+                    <p className="quiet-status">{getCvStatusText(cvFile, cvTextState)}</p>
+                  </div>
+                </article>
+                <article className="material-module" data-testid="project-material-module">
+                  <div>
+                    <strong>作品集 / 项目资料</strong>
+                    <span>上传作品集、项目 PDF、项目网页或项目说明。</span>
+                  </div>
+                  <UploadRow title="作品集 / 项目资料" hint="PDF / HTML / Markdown / TXT / URL 说明" file={projectFile} button="上传项目资料" accept=".pdf,.doc,.docx,.txt,.md,.html" onChange={(event) => void handleUpload('project', event)} onRemove={() => removeFile('project')} />
+                </article>
+                <article className="material-module" data-testid="job-material-module">
+                  <div>
+                    <strong>岗位表 / 岗位地图</strong>
+                    <span>上传已筛岗位，用于选择目标岗位。</span>
+                  </div>
+                  <div className="material-actions">
+                    <UploadRow title="job.xlsx" hint="推荐上传已筛岗位表" file={jobFile} button="上传 job.xlsx" accept=".xlsx" onChange={(event) => void handleUpload('job', event)} onRemove={() => removeFile('job')} />
+                    <details className="inline-details">
+                      <summary>补充岗位地图</summary>
+                      <UploadRow title="岗位地图 HTML" hint="当前保存 metadata，优先解析 job.xlsx" file={jobMapFile} button="上传 HTML" accept=".html,text/html" onChange={(event) => void handleUpload('job-map', event)} onRemove={() => removeFile('job-map')} />
+                    </details>
+                  </div>
+                </article>
               </div>
-              <p className="quiet-status">{getCvStatusText(cvFile, cvTextState)}</p>
+              <div className="material-continue">
+                <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvFile && !cvTextState.text && !projectFile && !jobFile && !jobMapFile}>
+                  保存并继续
+                </button>
+                <span>{materialsMessage || '上传后继续选择目标岗位。'}</span>
+              </div>
             </section>
 
-            <section className="section-block">
-              <SectionHeading icon={<BriefcaseBusiness size={20} />} title="岗位库" />
-              <div className="job-upload-line">
-                <div><strong>job.xlsx</strong><span>{jobFile ? `${jobFile.name} · ${jobPool.length} 个岗位` : '尚未上传岗位表'}</span></div>
-                <label className="small-upload-button"><input type="file" accept=".xlsx" onChange={(event) => void handleUpload('job', event)} /><Upload size={15} />{jobFile ? '重新上传' : '上传 job.xlsx'}</label>
+            <section className="section-block" ref={jobSelectionRef}>
+              <SectionHeading icon={<BriefcaseBusiness size={20} />} title="选择目标岗位" />
+              <div className="job-upload-line simple">
+                <div><strong>从已筛岗位中选一个今天准备</strong><span>{jobFile ? `${jobFile.name} · ${jobPool.length} 个岗位` : '请先在上方上传岗位表。'}</span></div>
               </div>
               {jobMessage && <p className="success-line">{jobMessage}</p>}
               {jobError && <p className="error-line">{jobError}</p>}
               {selectedJob && <div className="selected-job"><span>当前岗位</span><strong>{selectedJob.companyName} · {selectedJob.jobTitle}</strong><p>{selectedJob.city || '城市未写'} · {selectedJob.mainTrack || '方向未写'}</p></div>}
               {jobPool.length > 0 ? (
                 <>
-                  <JobStats stats={jobStats} />
-                  <div className="job-smart-filters">
+                  <div className="job-simple-filters" data-testid="job-simple-filters">
                     <label className="job-search"><span>搜索</span><input value={filters.search} placeholder="公司、岗位、JD、城市、主线" onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+                    <button type="button" className={filters.userStatus === '' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: '', sort: 'match' })}>推荐</button>
+                    <button type="button" className={filters.userStatus === 'shortlisted' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'shortlisted' })}>我想投</button>
+                    <button type="button" className={filters.userStatus === 'preparing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'preparing' })}>准备中</button>
+                    <button type="button" className={filters.userStatus === 'applied' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'applied' })}>已投递</button>
+                    <button type="button" className={filters.userStatus === 'interviewing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'interviewing' })}>面试中</button>
+                    <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
+                    <button type="button" onClick={() => setShowAdvancedJobFilters((value) => !value)}>{showAdvancedJobFilters ? '收起高级筛选' : '高级筛选'}</button>
+                  </div>
+                  {showAdvancedJobFilters && <div className="job-smart-filters" data-testid="advanced-job-filters">
                     <FilterSelect label="岗位族群" value={filters.roleFamily} options={filterOptions.roleFamily} onChange={(value) => setFilters({ ...filters, roleFamily: value })} />
                     <FilterSelect label="求职主线" value={filters.roleTrack} options={filterOptions.roleTrack} onChange={(value) => setFilters({ ...filters, roleTrack: value })} />
                     <FilterSelect label="城市组" value={filters.cityGroup} options={filterOptions.cityGroup} onChange={(value) => setFilters({ ...filters, cityGroup: value })} />
                     <FilterSelect label="优先级" value={filters.priorityBucket} options={filterOptions.priorityBucket} onChange={(value) => setFilters({ ...filters, priorityBucket: value })} />
-                    <FilterSelect label="准备状态" value={filters.userStatus} options={JOB_USER_STATUS_OPTIONS.map((item) => item.value)} getLabel={jobUserStatusLabel} onChange={(value) => setFilters({ ...filters, userStatus: value as JobFilters['userStatus'] })} />
                     <label><span>排序</span><select value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as JobSortMode })}><option value="match">匹配度最高</option><option value="priority">优先级最高</option><option value="today">今日新增优先</option><option value="city">城市优先</option><option value="family">岗位族群</option></select></label>
-                  </div>
-                  <div className="risk-filter-bar">
-                    <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
+                  </div>}
+                  {showAdvancedJobFilters && <div className="risk-filter-bar">
                     <RiskToggle label="隐藏强代码" checked={filters.hideStrongCode} onChange={(checked) => setFilters({ ...filters, hideStrongCode: checked })} />
                     <RiskToggle label="隐藏纯算法" checked={filters.hideAlgorithm} onChange={(checked) => setFilters({ ...filters, hideAlgorithm: checked })} />
                     <RiskToggle label="隐藏强销售" checked={filters.hideSales} onChange={(checked) => setFilters({ ...filters, hideSales: checked })} />
@@ -1626,7 +1679,7 @@ function App() {
                     <RiskToggle label="隐藏高频出差" checked={filters.hideTravel} onChange={(checked) => setFilters({ ...filters, hideTravel: checked })} />
                     <RiskToggle label="隐藏低薪" checked={filters.hideLowSalary} onChange={(checked) => setFilters({ ...filters, hideLowSalary: checked })} />
                     <RiskToggle label="隐藏高年限" checked={filters.hideHighExperience} onChange={(checked) => setFilters({ ...filters, hideHighExperience: checked })} />
-                  </div>
+                  </div>}
                   <div className="job-list">
                     {filteredJobs.slice(0, 30).map((job) => {
                       const status = getJobUserStatus(jobUserStatus, job.id)
@@ -1637,26 +1690,31 @@ function App() {
                           <strong>{job.companyName} · {job.jobTitle}</strong>
                           <span>{[job.city, job.jobType, job.salary, job.sourceSheet].filter(Boolean).join(' · ')}</span>
                           <div className="job-tags">
-                            <em>{job.normalized.roleFamily}</em>
-                            <em>{job.normalized.roleTrack}</em>
-                            <em>{job.normalized.priorityBucket}</em>
-                            <em>{job.normalized.matchScore} 分</em>
+                            <em>{job.normalized.matchScore} 分推荐</em>
                             <em className="status">{jobUserStatusLabel(status)}</em>
-                            {job.normalized.riskFlags.map((flag) => <em className="risk" key={flag}>{flag}</em>)}
                           </div>
-                          <p>{job.normalized.matchReasons.slice(0, 3).join('；')}</p>
+                          <p>{job.normalized.matchReasons.slice(0, 1).join('；') || job.companyBusiness || '从已筛岗位中选择一个准备。'}</p>
                           <div className="job-readiness">
                             {readiness.signals.map((signal) => <span key={signal}>{signal}</span>)}
                             <strong>{readiness.nextStep}</strong>
                           </div>
+                          <details className="job-detail-drawer">
+                            <summary>查看详情</summary>
+                            <div className="job-tags">
+                              <em>{job.normalized.roleFamily}</em>
+                              <em>{job.normalized.roleTrack}</em>
+                              <em>{job.normalized.priorityBucket}</em>
+                              {job.normalized.riskFlags.map((flag) => <em className="risk" key={flag}>{flag}</em>)}
+                            </div>
+                            <p>{job.normalized.matchReasons.join('；')}</p>
+                          </details>
                         </div>
                         <div className="job-row-actions">
                           <select aria-label={`设置 ${job.jobTitle} 状态`} value={status} onChange={(event) => updateJobUserStatus(job.id, event.target.value as JobUserStatus)}>
                             {JOB_USER_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                           </select>
-                          <button type="button" onClick={() => updateJobUserStatus(job.id, 'shortlisted')}>加入短名单</button>
-                          <button type="button" onClick={() => updateJobUserStatus(job.id, 'preparing')}>准备中</button>
-                          <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '已选择' : '选择岗位'}</button>
+                          <button type="button" onClick={() => updateJobUserStatus(job.id, 'shortlisted')}>我想投</button>
+                          <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '准备中' : '选择准备'}</button>
                         </div>
                       </article>
                     )})}
@@ -1757,7 +1815,7 @@ function App() {
         )}
 
         {activeView === 'mockInterview' && (
-          <Page title="模拟面试" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '请先选择目标岗位。'}>
+          <div className="mock-interview-screen">
             {!selectedJob ? (
               <section className="primary-flow compact-empty">
                 <p className="empty-state">请先选择目标岗位。</p>
@@ -1765,11 +1823,22 @@ function App() {
               </section>
             ) : (
               <>
-                <section className="primary-flow interview-lobby" data-testid="interview-lobby">
-                  <div>
-                    <span className="eyebrow">面试大厅</span>
-                    <h2>{selectedJob.companyName}</h2>
-                    <p>{selectedJob.jobTitle}</p>
+                {!activeMockInterview && <section className="interview-quick-start" data-testid="interview-room">
+                  <div className="quick-meeting-status">
+                    <span>{selectedJob.companyName} · {selectedJob.jobTitle}</span>
+                    <strong>{selectedMockType === 'pressure_mock' ? '英文压力面试' : selectedMockType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'}</strong>
+                  </div>
+                  <div className="quick-meeting-window">
+                    <article className="quick-interviewer" data-testid="virtual-interviewer">
+                      <div className="interviewer-avatar"><MessagesSquare size={32} /></div>
+                      <strong>面试官正在准备问题</strong>
+                      <span>点击进入面试后，直接开始一问一答。</span>
+                    </article>
+                    <aside className="candidate-window quick-candidate" data-testid="candidate-window">
+                      <span>我的窗口</span>
+                      <strong>麦克风待命</strong>
+                      <div className="wave-bars" aria-hidden="true"><i /><i /><i /><i /></div>
+                    </aside>
                   </div>
                   <div className="interview-lobby-actions">
                     <div className="interview-type-grid" aria-label="面试类型">
@@ -1788,18 +1857,14 @@ function App() {
                         </button>
                       ))}
                     </div>
-                    <div className="recent-interview">
-                      <span>最近</span>
-                      <strong>{activeMockInterview ? `${activeMockInterview.selectedJob.companyName} · ${activeMockInterview.status === 'completed' ? '已复盘' : '进行中'}` : '暂无'}</strong>
-                    </div>
                     <div className="inline-actions">
                       <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading)}>
-                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '开始新面试'}
+                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '进入面试'}
                       </button>
                       {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>准备包</button>}
                     </div>
                   </div>
-                </section>
+                </section>}
                 {recorderError && <p className="error-line">{recorderError}</p>}
                 {mockInterviewMessage && <p className={mockInterviewMessage.includes('失败') || mockInterviewMessage.includes('缺少') ? 'error-line' : 'success-line'}>{mockInterviewMessage}</p>}
                 {activeMockInterview ? (
@@ -1821,10 +1886,10 @@ function App() {
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
                   />
-                ) : <p className="empty-state">还没有模拟面试。点击上方按钮生成问题。</p>}
+                ) : null}
               </>
             )}
-          </Page>
+          </div>
         )}
 
         {activeView === 'realInterview' && (
@@ -2073,24 +2138,6 @@ function RiskToggle({ label, checked, onChange }: { label: string; checked: bool
   return <label className="risk-toggle"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span>{label}</span></label>
 }
 
-function JobStats({ stats }: { stats: ReturnType<typeof buildJobStats> }) {
-  return (
-    <section className="job-stats" aria-label="岗位智能筛选统计">
-      <div><span>总岗位</span><strong>{stats.total}</strong></div>
-      <div><span>当前筛选</span><strong>{stats.filtered}</strong></div>
-      <div><span>A / B / C / 排除</span><strong>{stats.prioritySummary}</strong></div>
-      <div>
-        <span>岗位族群</span>
-        <p>{stats.familySummary}</p>
-      </div>
-      <div>
-        <span>求职主线</span>
-        <p>{stats.trackSummary}</p>
-      </div>
-    </section>
-  )
-}
-
 function MockInterviewPanel({
   session,
   currentQuestion,
@@ -2128,6 +2175,8 @@ function MockInterviewPanel({
 }) {
   const roomRef = useRef<HTMLElement | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [sidePanelOpen, setSidePanelOpen] = useState(false)
+  const [sidePanelTab, setSidePanelTab] = useState<'dialogue' | 'feedback' | 'materials' | 'questions'>('dialogue')
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
   const canGoNext = session.currentQuestionIndex < session.questions.length - 1
   const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
@@ -2248,15 +2297,31 @@ function MockInterviewPanel({
         {currentAnswer?.aiFeedback && <span>{currentAnswer.aiFeedback.provider === 'mock_fallback' ? 'fallback mock' : currentAnswer.aiFeedback.provider}</span>}
       </div>
 
-      <div className="meeting-stage">
+      <div className={`meeting-stage ${sidePanelOpen ? 'has-side-panel' : ''}`}>
         <article className="interviewer-panel" data-testid="virtual-interviewer">
           <div className="interviewer-avatar"><MessagesSquare size={34} /></div>
           <div className="interviewer-meta">
             <span>虚拟面试官</span>
             {session.currentPhase === 'follow_up' && <strong>追问</strong>}
           </div>
-          <h3>{displayedQuestion?.question || '面试问题生成中…'}</h3>
-          <p>{truncateText(displayedQuestion?.expectedFocus || '围绕岗位、项目证据和表达结构回答。', 88)}</p>
+          <div className="dialogue-stream" data-testid="interview-dialogue">
+            <div className="dialogue-bubble interviewer">
+              <span>面试官</span>
+              <p>{displayedQuestion?.question || '面试问题生成中…'}</p>
+            </div>
+            {currentAnswer?.transcript && (
+              <div className="dialogue-bubble candidate">
+                <span>候选人</span>
+                <p>{currentAnswer.transcript.text}</p>
+              </div>
+            )}
+            {session.currentPhase === 'follow_up' && session.followUps.length > 0 && (
+              <div className="dialogue-bubble interviewer follow">
+                <span>追问</span>
+                <p>{session.followUps[session.followUps.length - 1].question}</p>
+              </div>
+            )}
+          </div>
         </article>
         <aside className="candidate-window" data-testid="candidate-window">
           <span>我的窗口</span>
@@ -2284,32 +2349,64 @@ function MockInterviewPanel({
         </div>
       )}
 
-      <div className="meeting-side-notes">
-        {currentAnswer?.transcript && (
-          <details className="meeting-detail">
-            <summary>转写</summary>
-            <p>{currentAnswer.transcript.text}</p>
-          </details>
-        )}
-        {currentAnswer?.aiFeedback && (
-          <aside className="feedback-summary-strip" data-testid="interview-feedback-summary">
-            <div>
-              <span>单题反馈</span>
-              <strong>{feedbackSummary}</strong>
+      <button className="meeting-panel-toggle" type="button" onClick={() => setSidePanelOpen((value) => !value)}>
+        {sidePanelOpen ? '收起面板' : '资料 / 反馈'}
+      </button>
+
+      {sidePanelOpen && (
+        <aside className="meeting-side-panel" data-testid="meeting-side-panel">
+          <div className="meeting-side-tabs">
+            {[
+              ['dialogue', '对话'],
+              ['feedback', '反馈'],
+              ['materials', '资料'],
+              ['questions', '题目'],
+            ].map(([id, label]) => (
+              <button key={id} className={sidePanelTab === id ? 'active' : ''} type="button" onClick={() => setSidePanelTab(id as typeof sidePanelTab)}>{label}</button>
+            ))}
+          </div>
+          {sidePanelTab === 'dialogue' && (
+            <div className="side-panel-section">
+              <strong>对话记录</strong>
+              <p>{displayedQuestion?.question}</p>
+              {currentAnswer?.transcript ? <p>{currentAnswer.transcript.text}</p> : <span>候选人回答后会显示转写。</span>}
             </div>
-            {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>追问</button>}
-            <div className="meeting-short-feedback" data-testid="meeting-short-feedback">
-              <span>最重要的问题</span>
-              <strong>{currentAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</strong>
-              <p>{currentAnswer.aiFeedback.nextTasks[0] || '进入下一题。'}</p>
+          )}
+          {sidePanelTab === 'feedback' && (
+            <div className="side-panel-section" data-testid="interview-feedback-summary">
+              {currentAnswer?.aiFeedback ? (
+                <>
+                  <strong>{feedbackSummary}</strong>
+                  <div className="meeting-short-feedback" data-testid="meeting-short-feedback">
+                    <span>最重要的问题</span>
+                    <p>{currentAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</p>
+                    <span>下一步</span>
+                    <p>{currentAnswer.aiFeedback.nextTasks[0] || '进入下一题。'}</p>
+                  </div>
+                  {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>面试官追问</button>}
+                  <details className="meeting-detail">
+                    <summary>详细反馈</summary>
+                    <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
+                  </details>
+                </>
+              ) : <span>生成反馈后会显示一句话评价和下一步动作。</span>}
             </div>
-            <details className="meeting-detail">
-              <summary>详细反馈</summary>
-              <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
-            </details>
-          </aside>
-        )}
-      </div>
+          )}
+          {sidePanelTab === 'materials' && (
+            <div className="side-panel-section">
+              <strong>准备资料</strong>
+              <p>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</p>
+              <p>{session.selectedJob.companyBusiness || session.selectedJob.mainTrack || '面试会围绕岗位 JD、项目证据和岗位匹配追问。'}</p>
+            </div>
+          )}
+          {sidePanelTab === 'questions' && (
+            <div className="side-panel-section">
+              <strong>题目</strong>
+              <ol>{session.questions.map((question, index) => <li key={question.id}>{index + 1}. {question.question}</li>)}</ol>
+            </div>
+          )}
+        </aside>
+      )}
     </section>
   )
 }
@@ -3023,33 +3120,6 @@ function buildFilterOptions(jobs: JobRecord[]) {
     cityGroup: values((job) => job.normalized.cityGroup),
     priorityBucket: values((job) => job.normalized.priorityBucket),
   }
-}
-
-function buildJobStats(allJobs: JobRecord[], filteredJobs: JobRecord[]) {
-  const normalizedAll = allJobs.map(ensureNormalizedJob)
-  const countBy = (items: JobRecord[], selector: (job: JobRecord) => string) => items.reduce<Record<string, number>>((acc, job) => {
-    const key = selector(job) || '未分类'
-    acc[key] = (acc[key] || 0) + 1
-    return acc
-  }, {})
-  const priorityCounts = countBy(normalizedAll, (job) => job.normalized.priorityBucket)
-  const familyCounts = countBy(normalizedAll, (job) => job.normalized.roleFamily)
-  const trackCounts = countBy(normalizedAll, (job) => job.normalized.roleTrack)
-  return {
-    total: normalizedAll.length,
-    filtered: filteredJobs.length,
-    prioritySummary: ['A 优先', 'B 可投', 'C 次选', 'E 排除'].map((key) => `${key.replace(' ', '')} ${priorityCounts[key] || 0}`).join(' / '),
-    familySummary: summarizeCounts(familyCounts),
-    trackSummary: summarizeCounts(trackCounts),
-  }
-}
-
-function summarizeCounts(counts: Record<string, number>) {
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([key, value]) => `${key} ${value}`)
-    .join('；') || '暂无'
 }
 
 function priorityRank(value: string) {

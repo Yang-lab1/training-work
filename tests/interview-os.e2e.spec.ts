@@ -195,7 +195,11 @@ test.beforeEach(async ({ page }) => {
 
 test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnostics, backup', async ({ page }, testInfo) => {
   const jobFixturePath = testInfo.outputPath('job.xlsx')
+  const cvFixturePath = testInfo.outputPath('cv.md')
+  const projectFixturePath = testInfo.outputPath('project.md')
   await writeJobFixture(jobFixturePath)
+  await fs.writeFile(cvFixturePath, '# CV\nAI product candidate with HCI and industrial design background.', 'utf8')
+  await fs.writeFile(projectFixturePath, '# Miro project\nCross-cultural AI communication training project.', 'utf8')
 
   await page.goto('/')
   await expect(page.locator('.top-nav nav button')).toHaveCount(11)
@@ -203,11 +207,23 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.getByTestId('daily-workbench').locator('button.primary-button')).toHaveCount(1)
 
   await page.locator('.top-nav nav button').nth(1).click()
-  await page.locator('input[accept=".xlsx"]').setInputFiles(jobFixturePath)
+  await expect(page.getByTestId('resume-material-module')).toBeVisible()
+  await expect(page.getByTestId('project-material-module')).toBeVisible()
+  await expect(page.getByTestId('job-material-module')).toBeVisible()
+  await expect(page.locator('.material-module')).toHaveCount(3)
+  await page.getByTestId('resume-material-module').locator('input[type="file"]').first().setInputFiles(cvFixturePath)
+  await page.getByTestId('project-material-module').locator('input[type="file"]').first().setInputFiles(projectFixturePath)
+  await page.getByTestId('job-material-module').locator('input[accept=".xlsx"]').setInputFiles(jobFixturePath)
+  await expect(page.getByTestId('save-materials-and-continue')).toBeEnabled()
+  await page.getByTestId('save-materials-and-continue').click()
   await page.waitForFunction(() => {
     const raw = localStorage.getItem('interview_os_job_pool')
     return raw ? JSON.parse(raw).length === 9 : false
   })
+  await expect(page.getByTestId('job-simple-filters')).toBeVisible()
+  await expect(page.getByTestId('advanced-job-filters')).toHaveCount(0)
+  await page.getByTestId('job-simple-filters').locator('button').last().click()
+  await expect(page.getByTestId('advanced-job-filters')).toBeVisible()
 
   const jobPool = await page.evaluate<TestJob[]>(() => JSON.parse(localStorage.getItem('interview_os_job_pool') || '[]') as TestJob[])
   expect(jobPool).toHaveLength(9)
@@ -218,15 +234,20 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   const aiPmRow = page.locator('.job-row').filter({ hasText: 'AI Product Manager' })
   await aiPmRow.locator('.job-row-actions button').nth(0).click()
-  await page.locator('.job-smart-filters select').nth(4).selectOption('shortlisted')
+  await page.getByTestId('job-simple-filters').locator('button').nth(1).click()
   await expect(page.locator('.job-row')).toHaveCount(1)
   await expect(aiPmRow).toBeVisible()
   await aiPmRow.locator('.job-row-actions button').nth(1).click()
-  await page.locator('.job-smart-filters select').nth(4).selectOption('preparing')
-  await expect(aiPmRow).toBeVisible()
-  await aiPmRow.locator('.job-row-actions button').nth(2).click()
-
+  await page.waitForFunction(() => {
+    const selected = JSON.parse(localStorage.getItem('interview_os_selected_job') || 'null')
+    const status = JSON.parse(localStorage.getItem('interview_os_job_user_status') || '{}')
+    return selected?.jobTitle === 'AI Product Manager' && status[selected.id] === 'preparing'
+  })
   await page.reload()
+  await page.locator('.top-nav nav button').nth(1).click()
+  await page.getByTestId('job-simple-filters').locator('button').nth(2).click()
+  await expect(page.locator('.job-row').filter({ hasText: 'AI Product Manager' })).toBeVisible()
+
   const selectedJob = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_selected_job') || 'null'))
   const userStatus = await page.evaluate(() => JSON.parse(localStorage.getItem('interview_os_job_user_status') || '{}'))
   expect(selectedJob.jobTitle).toBe('AI Product Manager')
@@ -244,13 +265,12 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.getByTestId('daily-workbench')).toContainText('开始一轮模拟面试')
 
   await page.locator('.top-nav nav button').nth(6).click()
-  await expect(page.getByTestId('interview-lobby')).toBeVisible()
-  await page.locator('.interview-lobby .primary-button').click()
-  await expect(page.getByTestId('interview-waiting-room')).toBeVisible()
-  await page.locator('.interview-waiting-room .primary-button').click()
   await expect(page.getByTestId('interview-room')).toBeVisible()
   await expect(page.getByTestId('virtual-interviewer')).toBeVisible()
   await expect(page.getByTestId('candidate-window')).toBeVisible()
+  await expect(page.locator('.interview-quick-start')).toBeVisible()
+  await page.locator('.interview-quick-start .primary-button').click()
+  await expect(page.getByTestId('interview-dialogue')).toBeVisible()
   await expect(page.locator('.meeting-control-bar')).toBeVisible()
 
   await page.locator('.meeting-status-bar button').click()
@@ -264,11 +284,16 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
     await page.locator('.meeting-control-bar button').nth(1).click()
     await page.locator('.meeting-control-bar button').nth(3).click()
     await expect(page.locator('.meeting-room-typebar')).toContainText('模拟转写')
+    await expect(page.locator('.dialogue-bubble.candidate')).toBeVisible()
     await page.locator('.meeting-control-bar button').nth(4).click()
+    await page.locator('.meeting-panel-toggle').click()
+    await page.locator('.meeting-side-tabs button').nth(1).click()
+    await expect(page.getByTestId('meeting-side-panel')).toBeVisible()
     await expect(page.getByTestId('interview-feedback-summary')).toBeVisible()
     await expect(page.getByTestId('meeting-short-feedback')).toBeVisible()
     const detailOpen = await page.locator('.ai-report-detail').last().evaluate((node) => (node as HTMLDetailsElement).open)
     expect(detailOpen).toBe(false)
+    await page.locator('.meeting-panel-toggle').click()
     if (index < 2) await page.locator('.meeting-control-bar button').nth(5).click()
   }
 
@@ -295,7 +320,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   const backupPath = testInfo.outputPath('interview-os-backup.json')
   await download.saveAs(backupPath)
   const backup = JSON.parse(await fs.readFile(backupPath, 'utf8'))
-  expect(backup.appVersion).toBe('1.2A')
+  expect(backup.appVersion).toBe('1.3A')
   expect(backup.selectedJob.jobTitle).toBe('AI Product Manager')
   expect(backup.jobUserStatus[backup.selectedJob.id]).toBe('preparing')
   expect(backup.jobPacks).toHaveLength(1)
