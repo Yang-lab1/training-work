@@ -113,7 +113,11 @@ export type GenerateJobPackResponse = GenerateJobPackSuccess | GenerateJobPackFa
 export interface AnalyzeAnswerSuccess {
   success: true
   provider: AIProviderName
+  providerUsed?: AIProviderName
   model: string
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
   generatedAt: string
   score: number
   summary: string
@@ -136,6 +140,10 @@ export interface AnalyzeAnswerFailure {
   success: false
   error: string
   provider: AIProviderName
+  providerUsed?: AIProviderName
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
   fallbackAvailable: true
 }
 
@@ -147,6 +155,10 @@ export interface TranscriptData {
   updatedAt: string
   generatedAt?: string
   provider?: string
+  model?: string
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
   language?: 'zh' | 'en' | 'mixed'
 }
 

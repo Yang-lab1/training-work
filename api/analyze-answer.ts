@@ -13,13 +13,28 @@ function json(payload: unknown, status = 200) {
   })
 }
 
+function withCallMetadata<T extends { provider?: string; rawProviderNote?: string }>(payload: T, startedAt: number) {
+  const isFallback = payload.provider === 'mock_fallback'
+  return {
+    ...payload,
+    providerUsed: payload.provider,
+    isFallback,
+    fallbackReason: isFallback ? payload.rawProviderNote || 'provider fallback' : undefined,
+    latencyMs: Date.now() - startedAt,
+  }
+}
+
 export default {
   async fetch(request: Request) {
+    const startedAt = Date.now()
     if (request.method !== 'POST') {
       return json({
         success: false,
-        error: '仅支持 POST 请求。',
+        error: 'Only POST is supported.',
         provider: 'mock',
+        providerUsed: 'mock',
+        isFallback: false,
+        latencyMs: Date.now() - startedAt,
         fallbackAvailable: true,
       } satisfies AnalyzeAnswerFailure, 405)
     }
@@ -28,17 +43,20 @@ export default {
       const origin = request.headers.get('origin')
       const host = request.headers.get('host')
       if (origin && host && new URL(origin).host !== host) {
-        throw new Error('不允许跨站调用此接口。')
+        throw new Error('Cross-origin API calls are not allowed.')
       }
       const contentLength = Number(request.headers.get('content-length') || 0)
-      if (contentLength > 100_000) throw new Error('请求内容过长。')
+      if (contentLength > 100_000) throw new Error('Request body is too large.')
       const input = validateAnalyzeAnswerRequest(await request.json())
-      return json(await analyzeAnswerWithProvider(input))
+      return json(withCallMetadata(await analyzeAnswerWithProvider(input), startedAt))
     } catch (error) {
       return json({
         success: false,
-        error: error instanceof Error ? error.message : '分析失败，请稍后重试。',
+        error: error instanceof Error ? error.message : 'Analyze answer failed.',
         provider: 'mock',
+        providerUsed: 'mock',
+        isFallback: false,
+        latencyMs: Date.now() - startedAt,
         fallbackAvailable: true,
       } satisfies AnalyzeAnswerFailure, 400)
     }

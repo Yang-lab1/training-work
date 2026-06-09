@@ -30,7 +30,11 @@ export interface TranscribeRequest {
 export interface TranscribeSuccess {
   success: true
   provider: ASRProviderName
+  providerUsed?: ASRProviderName
   model?: string
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
   transcript: string
   language: 'zh' | 'en' | 'mixed'
   durationSeconds?: number
@@ -42,6 +46,10 @@ export interface TranscribeFailure {
   success: false
   error: string
   provider: ASRProviderName
+  providerUsed?: ASRProviderName
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
   fallbackAvailable: true
 }
 

@@ -11,6 +11,13 @@ type TestJob = {
   }
 }
 
+type StoredMockInterviewForTest = {
+  answers?: Array<{
+    aiFeedbackStatus?: string
+    aiFeedback?: unknown
+  }>
+}
+
 async function writeJobFixture(path: string) {
   const workbook = XLSX.utils.book_new()
   const rows = [
@@ -168,6 +175,26 @@ test.beforeEach(async ({ page }) => {
     })
   })
 
+  await page.route('**/api/generate-follow-up', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-follow-up-v1',
+        generatedAt: new Date().toISOString(),
+        followUpQuestion: {
+          id: `follow-up-${Date.now()}`,
+          type: 'follow_up',
+          question: '请补充一个更具体的项目结果。',
+          source: 'mockProvider',
+          expectedFocus: '结果、数据和本人贡献',
+          followUpPolicy: '追问项目证据',
+        },
+      }),
+    })
+  })
+
   await page.route('**/api/generate-interview-report', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -280,12 +307,15 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   for (let index = 0; index < 3; index += 1) {
     await page.locator('.meeting-control-bar button').nth(0).click()
+    await expect(page.locator('.meeting-control-bar button').nth(1)).toBeEnabled()
     await page.waitForTimeout(450)
     await page.locator('.meeting-control-bar button').nth(1).click()
-    await page.locator('.meeting-control-bar button').nth(3).click()
     await expect(page.locator('.meeting-room-typebar')).toContainText('模拟转写')
-    await expect(page.locator('.dialogue-bubble.candidate')).toBeVisible()
-    await page.locator('.meeting-control-bar button').nth(4).click()
+    await expect(page.locator('.dialogue-bubble.candidate')).toBeVisible({ timeout: 10000 })
+    await page.waitForFunction(() => {
+      const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
+      return sessions.some((session) => session.answers?.some((answer) => answer.aiFeedbackStatus === 'completed' && answer.aiFeedback))
+    }, null, { timeout: 10000 })
     await page.locator('.meeting-panel-toggle').click()
     await page.locator('.meeting-side-tabs button').nth(1).click()
     await expect(page.getByTestId('meeting-side-panel')).toBeVisible()
@@ -320,11 +350,13 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   const backupPath = testInfo.outputPath('interview-os-backup.json')
   await download.saveAs(backupPath)
   const backup = JSON.parse(await fs.readFile(backupPath, 'utf8'))
-  expect(backup.appVersion).toBe('1.3A')
+  expect(backup.appVersion).toBe('1.4A')
   expect(backup.selectedJob.jobTitle).toBe('AI Product Manager')
   expect(backup.jobUserStatus[backup.selectedJob.id]).toBe('preparing')
   expect(backup.jobPacks).toHaveLength(1)
   expect(backup.mockInterviews[0].finalReport.report.overallScore).toBe(84)
+  expect(backup.providerState.lastTextCall.providerUsed).toBe('mock')
+  expect(backup.providerState.lastAsrCall.providerUsed).toBe('mock')
 
   await page.evaluate(() => localStorage.clear())
   await page.reload()

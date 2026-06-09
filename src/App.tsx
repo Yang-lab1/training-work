@@ -52,7 +52,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '1.3A'
+const APP_VERSION = '1.4A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -68,6 +68,7 @@ const QUESTION_BANK_KEY = 'interview_os_question_bank'
 const COMPANY_SOURCES_KEY = 'interview_os_company_sources'
 const COMPANY_KNOWLEDGE_PACKS_KEY = 'interview_os_company_knowledge_packs'
 const JOB_USER_STATUS_KEY = 'interview_os_job_user_status'
+const PROVIDER_STATE_KEY = 'interview_os_provider_state'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
@@ -206,6 +207,25 @@ interface BackupPayload {
   companySources: CompanySourceInput[]
   companyKnowledgePacks: StoredCompanyKnowledgePack[]
   jobUserStatus: JobUserStatusMap
+  providerState?: ProviderState
+}
+
+interface ProviderCallRecord {
+  type: 'text' | 'asr'
+  providerUsed?: string
+  model?: string
+  isFallback?: boolean
+  fallbackReason?: string
+  latencyMs?: number
+  success: boolean
+  error?: string
+  at: string
+}
+
+interface ProviderState {
+  lastTextCall?: ProviderCallRecord
+  lastAsrCall?: ProviderCallRecord
+  providerHistory: ProviderCallRecord[]
 }
 
 interface ProviderAvailability {
@@ -259,6 +279,16 @@ interface MockInterviewAnswer {
   transcriptStatus: TranscriptStatus
   aiFeedback?: StoredAIFeedback
   aiFeedbackStatus: AIFeedbackStatus
+  transcriptProvider?: string
+  transcriptModel?: string
+  transcriptIsFallback?: boolean
+  analysisProvider?: string
+  analysisModel?: string
+  analysisIsFallback?: boolean
+  autoAnalyzedAt?: string
+  followUpDecision?: 'follow_up' | 'next_question' | 'redo'
+  improvedShortVersion?: string
+  improvedFullVersion?: string
   durationSeconds: number
   createdAt: string
 }
@@ -398,6 +428,7 @@ function App() {
   const [companySources, setCompanySources] = useState<CompanySourceInput[]>(readCompanySources)
   const [companyKnowledgePacks, setCompanyKnowledgePacks] = useState<StoredCompanyKnowledgePack[]>(readCompanyKnowledgePacks)
   const [jobUserStatus, setJobUserStatus] = useState<JobUserStatusMap>(readJobUserStatus)
+  const [providerState, setProviderState] = useState<ProviderState>(readProviderState)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
@@ -519,6 +550,16 @@ function App() {
   useEffect(() => { localStorage.setItem(COMPANY_SOURCES_KEY, JSON.stringify(companySources)) }, [companySources])
   useEffect(() => { localStorage.setItem(COMPANY_KNOWLEDGE_PACKS_KEY, JSON.stringify(companyKnowledgePacks)) }, [companyKnowledgePacks])
   useEffect(() => { localStorage.setItem(JOB_USER_STATUS_KEY, JSON.stringify(jobUserStatus)) }, [jobUserStatus])
+  useEffect(() => { localStorage.setItem(PROVIDER_STATE_KEY, JSON.stringify(providerState)) }, [providerState])
+
+  function recordProviderCall(call: Omit<ProviderCallRecord, 'at'>) {
+    const nextCall: ProviderCallRecord = { ...call, at: new Date().toISOString() }
+    setProviderState((current) => ({
+      lastTextCall: call.type === 'text' ? nextCall : current.lastTextCall,
+      lastAsrCall: call.type === 'asr' ? nextCall : current.lastAsrCall,
+      providerHistory: [nextCall, ...(current.providerHistory || [])].slice(0, 20),
+    }))
+  }
 
   useEffect(() => {
     if (activeView === 'diagnostics') void refreshProviderStatus()
@@ -959,7 +1000,126 @@ function App() {
       currentPhase: 'feedback_ready',
       answers: [answer, ...item.answers.filter((existing) => existing.questionId !== questionId)],
     } : item))
+    window.setTimeout(() => {
+      void autoProcessInterviewAnswer(session, question, answer)
+    }, 0)
     setMockInterviewMessage('已保存本题录音。下一步生成转写。')
+  }
+
+  async function autoProcessInterviewAnswer(session: MockInterviewSession, question: MockInterviewQuestion, answer: MockInterviewAnswer) {
+    setMockInterviewLoading(`auto-${question.id}`)
+    setMockInterviewMessage('系统正在转写并分析本题回答。')
+    setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
+      ...item,
+      transcriptStatus: 'transcribing',
+      aiFeedbackStatus: 'transcript_needed',
+    })), session.id, 'transcribing'))
+    try {
+      const payload = {
+        trainingRecordId: answer.id,
+        trainingType: questionToTrainingType(question.type),
+        audioMetadata: answer.audioMetadata,
+        selectedJob: session.selectedJob,
+        sourceType: 'mock_interview',
+      }
+      const blob = answer.recordingId ? await readRecordingBlob(answer.recordingId) : null
+      const transcriptRequest: RequestInit = blob
+        ? (() => {
+          const form = new FormData()
+          form.append('payload', JSON.stringify(payload))
+          form.append('audio', blob, answer.recordingName || 'mock-answer.webm')
+          return { method: 'POST', body: form }
+        })()
+        : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+      const transcriptResponse = await fetch('/api/transcribe', transcriptRequest)
+      const transcriptResult = await transcriptResponse.json() as TranscribeResponse
+      if (!transcriptResponse.ok || !transcriptResult.success) throw new Error(transcriptResult.success ? 'Transcribe failed.' : transcriptResult.error)
+      recordProviderCall({
+        type: 'asr',
+        providerUsed: transcriptResult.providerUsed || transcriptResult.provider,
+        model: transcriptResult.model,
+        isFallback: Boolean(transcriptResult.isFallback || transcriptResult.provider === 'mock_fallback'),
+        fallbackReason: transcriptResult.fallbackReason,
+        latencyMs: transcriptResult.latencyMs,
+        success: true,
+      })
+      const transcript: TranscriptData = {
+        text: transcriptResult.transcript,
+        source: transcriptResult.provider === 'mock' || transcriptResult.provider === 'mock_fallback' ? 'mock' : 'asr',
+        updatedAt: transcriptResult.generatedAt,
+        generatedAt: transcriptResult.generatedAt,
+        provider: transcriptResult.provider,
+        model: transcriptResult.model,
+        language: transcriptResult.language,
+        isFallback: transcriptResult.isFallback,
+        fallbackReason: transcriptResult.fallbackReason,
+        latencyMs: transcriptResult.latencyMs,
+      }
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
+        ...item,
+        transcript,
+        transcriptStatus: transcript.source === 'mock' ? 'mock_ready' : 'completed',
+        transcriptProvider: transcriptResult.providerUsed || transcriptResult.provider,
+        transcriptModel: transcriptResult.model,
+        transcriptIsFallback: Boolean(transcriptResult.isFallback || transcriptResult.provider === 'mock_fallback'),
+        aiFeedbackStatus: 'ready_to_analyze',
+      })), session.id, 'analyzing'))
+
+      const feedbackResponse = await fetch('/api/analyze-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'analyze_answer',
+          trainingRecordId: answer.id,
+          trainingType: questionToTrainingType(question.type),
+          selectedJob: session.selectedJob,
+          question,
+          transcript: transcript.text,
+          durationSeconds: answer.durationSeconds,
+          targetSeconds: 90,
+          cvText: cvTextState.text.slice(0, 6000),
+          scriptText: question.question,
+        }),
+      })
+      const feedbackResult = await feedbackResponse.json() as AnalyzeAnswerResponse
+      if (!feedbackResponse.ok || !feedbackResult.success) throw new Error(feedbackResult.success ? 'Analyze failed.' : feedbackResult.error)
+      recordProviderCall({
+        type: 'text',
+        providerUsed: feedbackResult.providerUsed || feedbackResult.provider,
+        model: feedbackResult.model,
+        isFallback: Boolean(feedbackResult.isFallback || feedbackResult.provider === 'mock_fallback'),
+        fallbackReason: feedbackResult.fallbackReason || feedbackResult.rawProviderNote,
+        latencyMs: feedbackResult.latencyMs,
+        success: true,
+      })
+      const { success: _success, ...aiFeedback } = feedbackResult
+      void _success
+      const problemText = [aiFeedback.summary, ...aiFeedback.problems].join(' ')
+      const needsFollowUp = question.type !== 'follow_up'
+        && (aiFeedback.score < 70 || transcript.text.length < 80 || /too short|not answer|logic|role fit|unclear|no contribution|no data/.test(problemText))
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
+        ...item,
+        aiFeedback,
+        aiFeedbackStatus: 'completed',
+        analysisProvider: feedbackResult.providerUsed || feedbackResult.provider,
+        analysisModel: feedbackResult.model,
+        analysisIsFallback: Boolean(feedbackResult.isFallback || feedbackResult.provider === 'mock_fallback'),
+        autoAnalyzedAt: new Date().toISOString(),
+        followUpDecision: needsFollowUp ? 'follow_up' : 'next_question',
+        improvedShortVersion: aiFeedback.improvedShortVersion,
+        improvedFullVersion: aiFeedback.improvedLongVersion,
+      })), session.id, 'feedback_ready'))
+      setMockInterviewMessage(needsFollowUp ? '本题已分析，可继续追问或进入下一题。' : '本题已自动转写和分析。')
+    } catch (error) {
+      setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
+        ...item,
+        transcriptStatus: item.transcript ? item.transcriptStatus : 'failed',
+        aiFeedbackStatus: 'failed',
+      })), session.id, 'feedback_ready'))
+      setMockInterviewMessage(error instanceof Error ? error.message : '自动转写或分析失败。')
+    } finally {
+      setMockInterviewLoading('')
+    }
   }
 
   async function generateInterviewAnswerTranscript(sessionId: string, questionId: string) {
@@ -1401,6 +1561,7 @@ function App() {
       companySources,
       companyKnowledgePacks,
       jobUserStatus,
+      providerState,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -1426,6 +1587,7 @@ function App() {
       setCompanySources(normalizeCompanySources(parsed.companySources))
       setCompanyKnowledgePacks(normalizeCompanyKnowledgePacks(parsed.companyKnowledgePacks))
       setJobUserStatus(normalizeJobUserStatus(parsed.jobUserStatus))
+      setProviderState(normalizeProviderState(parsed.providerState))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -1451,7 +1613,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY, JOB_USER_STATUS_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY, JOB_USER_STATUS_KEY, PROVIDER_STATE_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -1467,6 +1629,7 @@ function App() {
     setCompanySources([])
     setCompanyKnowledgePacks([])
     setJobUserStatus({})
+    setProviderState({ providerHistory: [] })
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
@@ -2924,6 +3087,14 @@ function readQuestionBank() { return normalizeQuestionBank(readArray<QuestionBan
 function readCompanySources() { return normalizeCompanySources(readArray<CompanySourceInput>(COMPANY_SOURCES_KEY)) }
 function readCompanyKnowledgePacks() { return normalizeCompanyKnowledgePacks(readArray<StoredCompanyKnowledgePack>(COMPANY_KNOWLEDGE_PACKS_KEY)) }
 function readJobUserStatus() { return normalizeJobUserStatus(readObject<JobUserStatusMap>(JOB_USER_STATUS_KEY)) }
+function readProviderState(): ProviderState {
+  try {
+    const raw = localStorage.getItem(PROVIDER_STATE_KEY)
+    return normalizeProviderState(raw ? JSON.parse(raw) : undefined)
+  } catch {
+    return { providerHistory: [] }
+  }
+}
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
 function readObject<T extends Record<string, unknown>>(key: string): Partial<T> { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : {}; return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {} } catch { return {} } }
@@ -3053,6 +3224,37 @@ function normalizeCompanyKnowledgePacks(packs?: StoredCompanyKnowledgePack[]) {
 function normalizeJobUserStatus(input?: Partial<JobUserStatusMap>): JobUserStatusMap {
   const allowed = new Set(JOB_USER_STATUS_OPTIONS.map((item) => item.value))
   return Object.fromEntries(Object.entries(input || {}).filter(([, value]) => allowed.has(value as JobUserStatus))) as JobUserStatusMap
+}
+
+function normalizeProviderCall(input: unknown): ProviderCallRecord | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const call = input as Partial<ProviderCallRecord>
+  const type = call.type === 'asr' ? 'asr' : call.type === 'text' ? 'text' : undefined
+  if (!type) return undefined
+  return {
+    type,
+    providerUsed: call.providerUsed,
+    model: call.model,
+    isFallback: Boolean(call.isFallback),
+    fallbackReason: call.fallbackReason,
+    latencyMs: typeof call.latencyMs === 'number' ? call.latencyMs : undefined,
+    success: Boolean(call.success),
+    error: call.error,
+    at: call.at || new Date().toISOString(),
+  }
+}
+
+function normalizeProviderState(input: unknown): ProviderState {
+  if (!input || typeof input !== 'object') return { providerHistory: [] }
+  const state = input as Partial<ProviderState>
+  const history = Array.isArray(state.providerHistory)
+    ? state.providerHistory.map(normalizeProviderCall).filter(Boolean).slice(0, 20) as ProviderCallRecord[]
+    : []
+  return {
+    lastTextCall: normalizeProviderCall(state.lastTextCall),
+    lastAsrCall: normalizeProviderCall(state.lastAsrCall),
+    providerHistory: history,
+  }
 }
 
 function updateMockAnswer(
