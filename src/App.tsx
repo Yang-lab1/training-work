@@ -52,7 +52,7 @@ import type {
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
 
-const APP_VERSION = '1.1A'
+const APP_VERSION = '1.2A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
 const UPLOADED_FILES_KEY = 'interview_os_uploaded_files'
 const JOB_POOL_KEY = 'interview_os_job_pool'
@@ -67,6 +67,7 @@ const REAL_INTERVIEWS_KEY = 'interview_os_real_interviews'
 const QUESTION_BANK_KEY = 'interview_os_question_bank'
 const COMPANY_SOURCES_KEY = 'interview_os_company_sources'
 const COMPANY_KNOWLEDGE_PACKS_KEY = 'interview_os_company_knowledge_packs'
+const JOB_USER_STATUS_KEY = 'interview_os_job_user_status'
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
@@ -78,6 +79,8 @@ type ScriptTemplateKey = 'chineseIntro' | 'englishIntro' | 'miroProject'
 type InterviewUiState = 'lobby' | 'waiting_room' | 'interview_room' | 'review_room'
 type InterviewPhase = 'asking' | 'answering' | 'transcribing' | 'analyzing' | 'feedback_ready' | 'follow_up' | 'completed'
 type JobSortMode = 'match' | 'priority' | 'today' | 'city' | 'family'
+type JobUserStatus = 'not_started' | 'shortlisted' | 'preparing' | 'applied' | 'interviewing' | 'interviewed' | 'paused' | 'rejected'
+type JobUserStatusMap = Record<string, JobUserStatus>
 
 interface JobFilters {
   search: string
@@ -92,6 +95,8 @@ interface JobFilters {
   hideTravel: boolean
   hideLowSalary: boolean
   hideHighExperience: boolean
+  userStatus: '' | JobUserStatus
+  hideRejected: boolean
   sort: JobSortMode
 }
 
@@ -200,6 +205,7 @@ interface BackupPayload {
   questionBank: QuestionBankUpdate[]
   companySources: CompanySourceInput[]
   companyKnowledgePacks: StoredCompanyKnowledgePack[]
+  jobUserStatus: JobUserStatusMap
 }
 
 interface ProviderAvailability {
@@ -367,6 +373,17 @@ const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
   { id: 'diagnostics', label: '系统诊断', icon: <BrainCircuit size={17} /> },
 ]
 
+const JOB_USER_STATUS_OPTIONS: Array<{ value: JobUserStatus; label: string }> = [
+  { value: 'not_started', label: '未处理' },
+  { value: 'shortlisted', label: '短名单' },
+  { value: 'preparing', label: '准备中' },
+  { value: 'applied', label: '已投递' },
+  { value: 'interviewing', label: '面试中' },
+  { value: 'interviewed', label: '已面试' },
+  { value: 'paused', label: '暂缓' },
+  { value: 'rejected', label: '不适合' },
+]
+
 function App() {
   const [activeView, setActiveView] = useState<ViewId>('today')
   const [state, setState] = useState<StoredMvpState>(readStoredState)
@@ -380,6 +397,7 @@ function App() {
   const [questionBank, setQuestionBank] = useState<QuestionBankUpdate[]>(readQuestionBank)
   const [companySources, setCompanySources] = useState<CompanySourceInput[]>(readCompanySources)
   const [companyKnowledgePacks, setCompanyKnowledgePacks] = useState<StoredCompanyKnowledgePack[]>(readCompanyKnowledgePacks)
+  const [jobUserStatus, setJobUserStatus] = useState<JobUserStatusMap>(readJobUserStatus)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
@@ -405,6 +423,8 @@ function App() {
     hideTravel: false,
     hideLowSalary: false,
     hideHighExperience: false,
+    userStatus: '',
+    hideRejected: true,
     sort: 'match',
   })
   const [jobPackMessage, setJobPackMessage] = useState('')
@@ -434,10 +454,9 @@ function App() {
   const todayRecords = state.history.filter((record) => isToday(record.savedAt))
   const completedCount = defaultTasks.filter((task) => todayRecords.some((record) => record.taskId === task.id)).length
   const analyzedToday = todayRecords.filter((record) => record.aiFeedbackStatus === 'completed').length
-  const filteredJobs = useMemo(() => filterJobs(jobPool, filters), [jobPool, filters])
+  const filteredJobs = useMemo(() => filterJobs(jobPool, filters, jobUserStatus), [jobPool, filters, jobUserStatus])
   const filterOptions = useMemo(() => buildFilterOptions(jobPool), [jobPool])
   const jobStats = useMemo(() => buildJobStats(jobPool, filteredJobs), [jobPool, filteredJobs])
-  const nextActions = generateNextActions(jobPool, selectedJob, cvTextState, todayRecords)
   const currentJobPack = useMemo(
     () => selectedJob ? jobPacks.find((pack) => pack.selectedJobId === selectedJob.id) : undefined,
     [jobPacks, selectedJob],
@@ -454,6 +473,19 @@ function App() {
     () => mockInterviews.find((session) => session.status === 'in_progress') || mockInterviews[0],
     [mockInterviews],
   )
+  const dailyAction = useMemo(
+    () => buildDailyAction({
+      jobPool,
+      selectedJob,
+      currentJobPack,
+      mockInterviews,
+      realInterviews,
+      history: state.history,
+      cvText: cvTextState,
+    }),
+    [jobPool, selectedJob, currentJobPack, mockInterviews, realInterviews, state.history, cvTextState],
+  )
+  const nextActions = generateNextActions(jobPool, selectedJob, cvTextState, todayRecords, currentJobPack, mockInterviews)
 
   function commitState(updater: (current: StoredMvpState) => StoredMvpState) {
     setState((current) => ({ ...updater(current), lastSavedAt: new Date().toISOString() }))
@@ -484,6 +516,7 @@ function App() {
   useEffect(() => { localStorage.setItem(QUESTION_BANK_KEY, JSON.stringify(questionBank)) }, [questionBank])
   useEffect(() => { localStorage.setItem(COMPANY_SOURCES_KEY, JSON.stringify(companySources)) }, [companySources])
   useEffect(() => { localStorage.setItem(COMPANY_KNOWLEDGE_PACKS_KEY, JSON.stringify(companyKnowledgePacks)) }, [companyKnowledgePacks])
+  useEffect(() => { localStorage.setItem(JOB_USER_STATUS_KEY, JSON.stringify(jobUserStatus)) }, [jobUserStatus])
 
   useEffect(() => {
     if (activeView === 'diagnostics') void refreshProviderStatus()
@@ -569,6 +602,7 @@ function App() {
         if (!parsedJobs.length) throw new Error('未识别到岗位')
         setJobPool(parsedJobs)
         setSelectedJob(null)
+        setJobUserStatus({})
         setJobError('')
         setJobMessage(`已解析 ${parsedJobs.length} 个岗位。`)
         saveFileMeta(category, file, '已解析')
@@ -631,7 +665,19 @@ function App() {
 
   function selectJob(job: JobRecord) {
     setSelectedJob({ ...job, selectedAt: new Date().toISOString() })
+    setJobUserStatus((current) => ({
+      ...current,
+      [job.id]: current[job.id] && current[job.id] !== 'not_started' ? current[job.id] : 'preparing',
+    }))
     setActiveView('training')
+  }
+
+  function updateJobUserStatus(jobId: string, status: JobUserStatus) {
+    setJobUserStatus((current) => ({ ...current, [jobId]: status }))
+  }
+
+  function runDailyAction() {
+    setActiveView(dailyAction.view)
   }
 
   async function refreshProviderStatus() {
@@ -645,6 +691,59 @@ function App() {
       setProviderStatusMessage('状态已刷新。')
     } catch (error) {
       setProviderStatusMessage(error instanceof Error ? error.message : '诊断失败。')
+    } finally {
+      setProviderStatusLoading(false)
+    }
+  }
+
+  async function testTextProvider() {
+    setProviderStatusLoading(true)
+    setProviderStatusMessage('')
+    try {
+      const response = await fetch('/api/analyze-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskType: 'analyze_answer',
+          trainingRecordId: 'provider-smoke',
+          trainingType: 'chineseIntro',
+          selectedJob,
+          transcript: '这是一次 provider smoke。候选人正在练习 AI 产品岗位自我介绍。',
+          durationSeconds: 60,
+          targetSeconds: 90,
+          cvText: cvTextState.text.slice(0, 1000),
+          scriptText: selectedJob ? renderScript(defaultTasks[0].defaultReferenceTemplate, selectedJob) : defaultTasks[0].defaultReferenceTemplate,
+        }),
+      })
+      const result = await response.json() as AnalyzeAnswerResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '文本模型测试失败。' : result.error)
+      setProviderStatusMessage(`文本模型测试完成：${result.provider} / ${result.model}${result.provider === 'mock' || result.provider === 'mock_fallback' ? '（模拟或 fallback）' : '（真实模型）'}`)
+    } catch (error) {
+      setProviderStatusMessage(error instanceof Error ? error.message : '文本模型测试失败。')
+    } finally {
+      setProviderStatusLoading(false)
+    }
+  }
+
+  async function testAsrProvider() {
+    setProviderStatusLoading(true)
+    setProviderStatusMessage('')
+    try {
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trainingRecordId: 'provider-smoke',
+          trainingType: 'chineseIntro',
+          selectedJob,
+          audioMetadata: { durationSeconds: 30, recordingName: 'provider-smoke.webm' },
+        }),
+      })
+      const result = await response.json() as TranscribeResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '语音转写测试失败。' : result.error)
+      setProviderStatusMessage(`语音转写测试完成：${result.provider}${result.provider === 'mock' || result.provider === 'mock_fallback' ? '（模拟或 fallback）' : '（真实 ASR）'}`)
+    } catch (error) {
+      setProviderStatusMessage(error instanceof Error ? error.message : '语音转写测试失败。')
     } finally {
       setProviderStatusLoading(false)
     }
@@ -1288,6 +1387,7 @@ function App() {
       questionBank,
       companySources,
       companyKnowledgePacks,
+      jobUserStatus,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -1312,6 +1412,7 @@ function App() {
       setQuestionBank(normalizeQuestionBank(parsed.questionBank))
       setCompanySources(normalizeCompanySources(parsed.companySources))
       setCompanyKnowledgePacks(normalizeCompanyKnowledgePacks(parsed.companyKnowledgePacks))
+      setJobUserStatus(normalizeJobUserStatus(parsed.jobUserStatus))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -1337,7 +1438,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY, JOB_USER_STATUS_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -1352,6 +1453,7 @@ function App() {
     setQuestionBank([])
     setCompanySources([])
     setCompanyKnowledgePacks([])
+    setJobUserStatus({})
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
@@ -1440,38 +1542,43 @@ function App() {
 
       <main className="product-page">
         {activeView === 'today' && (
-          <Page title="今天完成一轮岗位训练" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先上传岗位表并选择目标岗位'}>
-            <section className="today-overview">
-              <Metric label="今日录音" value={`${completedCount}/3`} />
-              <Metric label="已完成 AI 反馈" value={`${analyzedToday}/${todayRecords.length || 0}`} />
-              <Metric label="待处理" value={`${todayRecords.filter((item) => item.aiFeedbackStatus !== 'completed').length}`} />
-            </section>
-            <section className="primary-flow">
-              <div>
-                <span className="eyebrow">当前岗位</span>
-                <h2>{selectedJob ? selectedJob.jobTitle : '尚未选择岗位'}</h2>
-                <p>{selectedJob ? `${selectedJob.companyName} · ${selectedJob.city || '城市未写'}` : '岗位必须来自 job.xlsx。'}</p>
+          <Page title="今日下一步" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先建立今天的目标岗位。'}>
+            <section className="daily-workbench" data-testid="daily-workbench">
+              <div className="daily-main">
+                <span className="eyebrow">推荐动作</span>
+                <h2>{dailyAction.title}</h2>
+                <p>{dailyAction.detail}</p>
+                <button className="primary-button" type="button" onClick={runDailyAction}>
+                  {dailyAction.icon}{dailyAction.cta}
+                </button>
               </div>
-              <button className="primary-button" type="button" onClick={() => setActiveView(selectedJob ? 'training' : 'materials')}>
-                {selectedJob ? <Mic size={17} /> : <Upload size={17} />}
-                {selectedJob ? '开始训练' : '上传岗位表'}
-              </button>
+              <aside className="daily-context">
+                <div>
+                  <span>当前岗位</span>
+                  <strong>{selectedJob ? selectedJob.jobTitle : '未选择'}</strong>
+                  <p>{selectedJob ? `${selectedJob.companyName} · ${selectedJob.city || '城市未写'}` : '岗位来自 job.xlsx，不手填。'}</p>
+                </div>
+                <div>
+                  <span>最近状态</span>
+                  <strong>{getLatestActivityLabel(state.history, mockInterviews, realInterviews)}</strong>
+                  <p>{currentJobPack ? '准备包已生成' : selectedJob ? '准备包待生成' : '等待岗位表'}</p>
+                </div>
+              </aside>
             </section>
-            <section className="training-shortcuts">
-              {defaultTasks.map((task) => {
-                const latest = todayRecords.find((record) => record.taskId === task.id)
-                return (
-                  <button type="button" key={task.id} onClick={() => setActiveView('training')}>
-                    <span>{latest ? <Check size={17} /> : <Mic size={17} />}</span>
-                    <strong>{task.title}</strong>
-                    <em>{latest ? statusLabel(latest.aiFeedbackStatus) : task.subtitle}</em>
-                  </button>
-                )
-              })}
+            <section className="today-compact-status" aria-label="今日训练状态">
+              <Metric label="今日录音" value={`${completedCount}/3`} />
+              <Metric label="AI 反馈" value={`${analyzedToday}/${todayRecords.length || 0}`} />
+              <Metric label="岗位库" value={`${jobPool.length}`} />
             </section>
-            <section className="next-actions">
-              <SectionHeading icon={<Sparkles size={20} />} title="下一步" />
-              <ol>{nextActions.map((action) => <li key={action}>{action}</li>)}</ol>
+            <section className="daily-remaining">
+              <div>
+                <span className="eyebrow">还差什么</span>
+                <ul>{nextActions.slice(0, 3).map((action) => <li key={action}>{action}</li>)}</ul>
+              </div>
+              <div>
+                <span className="eyebrow">数据状态</span>
+                <p>{buildDataStatusText({ jobPool, selectedJob, jobPacks, mockInterviews, realInterviews, companySources })}</p>
+              </div>
             </section>
           </Page>
         )}
@@ -1507,9 +1614,11 @@ function App() {
                     <FilterSelect label="求职主线" value={filters.roleTrack} options={filterOptions.roleTrack} onChange={(value) => setFilters({ ...filters, roleTrack: value })} />
                     <FilterSelect label="城市组" value={filters.cityGroup} options={filterOptions.cityGroup} onChange={(value) => setFilters({ ...filters, cityGroup: value })} />
                     <FilterSelect label="优先级" value={filters.priorityBucket} options={filterOptions.priorityBucket} onChange={(value) => setFilters({ ...filters, priorityBucket: value })} />
+                    <FilterSelect label="准备状态" value={filters.userStatus} options={JOB_USER_STATUS_OPTIONS.map((item) => item.value)} getLabel={jobUserStatusLabel} onChange={(value) => setFilters({ ...filters, userStatus: value as JobFilters['userStatus'] })} />
                     <label><span>排序</span><select value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as JobSortMode })}><option value="match">匹配度最高</option><option value="priority">优先级最高</option><option value="today">今日新增优先</option><option value="city">城市优先</option><option value="family">岗位族群</option></select></label>
                   </div>
                   <div className="risk-filter-bar">
+                    <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
                     <RiskToggle label="隐藏强代码" checked={filters.hideStrongCode} onChange={(checked) => setFilters({ ...filters, hideStrongCode: checked })} />
                     <RiskToggle label="隐藏纯算法" checked={filters.hideAlgorithm} onChange={(checked) => setFilters({ ...filters, hideAlgorithm: checked })} />
                     <RiskToggle label="隐藏强销售" checked={filters.hideSales} onChange={(checked) => setFilters({ ...filters, hideSales: checked })} />
@@ -1519,7 +1628,10 @@ function App() {
                     <RiskToggle label="隐藏高年限" checked={filters.hideHighExperience} onChange={(checked) => setFilters({ ...filters, hideHighExperience: checked })} />
                   </div>
                   <div className="job-list">
-                    {filteredJobs.slice(0, 30).map((job) => (
+                    {filteredJobs.slice(0, 30).map((job) => {
+                      const status = getJobUserStatus(jobUserStatus, job.id)
+                      const readiness = buildJobReadiness(job, { status, jobPacks, mockInterviews, realInterviews, history: state.history })
+                      return (
                       <article className={`job-row ${selectedJob?.id === job.id ? 'selected' : ''}`} key={job.id}>
                         <div>
                           <strong>{job.companyName} · {job.jobTitle}</strong>
@@ -1529,13 +1641,25 @@ function App() {
                             <em>{job.normalized.roleTrack}</em>
                             <em>{job.normalized.priorityBucket}</em>
                             <em>{job.normalized.matchScore} 分</em>
+                            <em className="status">{jobUserStatusLabel(status)}</em>
                             {job.normalized.riskFlags.map((flag) => <em className="risk" key={flag}>{flag}</em>)}
                           </div>
                           <p>{job.normalized.matchReasons.slice(0, 3).join('；')}</p>
+                          <div className="job-readiness">
+                            {readiness.signals.map((signal) => <span key={signal}>{signal}</span>)}
+                            <strong>{readiness.nextStep}</strong>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '已选择' : '选择岗位'}</button>
+                        <div className="job-row-actions">
+                          <select aria-label={`设置 ${job.jobTitle} 状态`} value={status} onChange={(event) => updateJobUserStatus(job.id, event.target.value as JobUserStatus)}>
+                            {JOB_USER_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                          </select>
+                          <button type="button" onClick={() => updateJobUserStatus(job.id, 'shortlisted')}>加入短名单</button>
+                          <button type="button" onClick={() => updateJobUserStatus(job.id, 'preparing')}>准备中</button>
+                          <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '已选择' : '选择岗位'}</button>
+                        </div>
                       </article>
-                    ))}
+                    )})}
                   </div>
                 </>
               ) : <p className="empty-state">上传 job.xlsx 后，岗位会显示在这里。</p>}
@@ -1793,7 +1917,19 @@ function App() {
         )}
 
         {activeView === 'backup' && (
-          <Page title="数据备份" subtitle="备份包含资料 metadata、岗位、转写状态和 AI 反馈；不包含音频 Blob。">
+          <Page title="数据管理" subtitle="查看本地数据，导出备份，必要时恢复。">
+            <section className="data-management-grid" data-testid="data-management">
+              <Metric label="岗位" value={`${jobPool.length}`} />
+              <Metric label="训练记录" value={`${state.history.length}`} />
+              <Metric label="模拟面试" value={`${mockInterviews.length}`} />
+              <Metric label="真实复盘" value={`${realInterviews.filter((item) => item.reviewReport).length}`} />
+              <Metric label="公司资料" value={`${companySources.length}`} />
+              <Metric label="准备包" value={`${jobPacks.length}`} />
+            </section>
+            <section className="storage-note">
+              <strong>本地存储</strong>
+              <p>JSON 备份包含岗位、训练、转写、AI 反馈、准备包、真实复盘和公司知识包。录音 Blob 仍保存在浏览器 IndexedDB，不会写入 JSON。</p>
+            </section>
             <section className="backup-actions">
               <button className="primary-button" type="button" onClick={exportBackup}><Download size={16} />导出 JSON</button>
               <label className="small-upload-button"><input type="file" accept=".json,application/json" onChange={(event) => void importBackup(event)} /><Upload size={16} />导入 JSON</label>
@@ -1811,6 +1947,8 @@ function App() {
               loading={providerStatusLoading}
               message={providerStatusMessage}
               onRefresh={() => void refreshProviderStatus()}
+              onTestText={() => void testTextProvider()}
+              onTestAsr={() => void testAsrProvider()}
             />
           </Page>
         )}
@@ -1836,22 +1974,34 @@ function DiagnosticsView({
   loading,
   message,
   onRefresh,
+  onTestText,
+  onTestAsr,
 }: {
   status: ProviderStatusPayload | null
   loading: boolean
   message: string
   onRefresh: () => void
+  onTestText: () => void
+  onTestAsr: () => void
 }) {
+  const mode = status
+    ? status.ai.fallbackMode || status.asr.fallbackMode
+      ? 'Mock / fallback 模式'
+      : '真实模型模式'
+    : '未检测'
   return (
     <section className="diagnostics-panel" data-testid="provider-diagnostics">
       <header>
         <div>
-          <span className="eyebrow">Provider 状态</span>
-          <h2>{status ? `${status.ai.provider} · ${status.asr.provider}` : '等待读取'}</h2>
+          <span className="eyebrow">当前模式</span>
+          <h2>{mode}</h2>
+          {status && <p>{status.ai.configured ? '文本模型已配置。' : '文本模型未配置，当前可用模拟反馈。'}{status.asr.configured ? '语音转写已配置。' : '语音转写未配置，当前可用模拟转写。'}</p>}
         </div>
-        <button className="primary-button" type="button" onClick={onRefresh} disabled={loading}>
-          <RotateCcw size={16} />{loading ? '检测中…' : '测试状态'}
-        </button>
+        <div className="inline-actions">
+          <button type="button" onClick={onRefresh} disabled={loading}><RotateCcw size={16} />刷新状态</button>
+          <button className="primary-button" type="button" onClick={onTestText} disabled={loading}><BrainCircuit size={16} />测试文本模型</button>
+          <button type="button" onClick={onTestAsr} disabled={loading}><FileAudio size={16} />测试语音转写</button>
+        </div>
       </header>
       {message && <p className={message.includes('失败') ? 'error-line' : 'success-line'}>{message}</p>}
       {status ? (
@@ -1915,8 +2065,8 @@ function UploadRow({ title, hint, file, button, accept, onChange, onRemove }: { 
   return <div className="upload-row"><div className="upload-main"><strong>{title}</strong><span>{file ? `${file.name} · ${file.status}` : hint}</span></div><label className="small-upload-button"><input type="file" accept={accept} onChange={onChange} /><Upload size={15} />{file ? '替换' : button}</label>{file && <button className="icon-button" type="button" onClick={onRemove} aria-label={`删除 ${title}`}><Trash2 size={16} /></button>}</div>
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">全部</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+function FilterSelect({ label, value, options, getLabel, onChange }: { label: string; value: string; options: string[]; getLabel?: (value: string) => string; onChange: (value: string) => void }) {
+  return <label><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}><option value="">全部</option>{options.map((option) => <option key={option} value={option}>{getLabel ? getLabel(option) : option}</option>)}</select></label>
 }
 
 function RiskToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
@@ -2148,6 +2298,11 @@ function MockInterviewPanel({
               <strong>{feedbackSummary}</strong>
             </div>
             {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>追问</button>}
+            <div className="meeting-short-feedback" data-testid="meeting-short-feedback">
+              <span>最重要的问题</span>
+              <strong>{currentAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</strong>
+              <p>{currentAnswer.aiFeedback.nextTasks[0] || '进入下一题。'}</p>
+            </div>
             <details className="meeting-detail">
               <summary>详细反馈</summary>
               <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
@@ -2556,24 +2711,34 @@ function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
       : feedback.provider === 'mock'
         ? '当前为模拟反馈，仅用于测试流程。'
         : `${feedback.provider} · ${feedback.model}`
+  const topProblems = feedback.problems.slice(0, 3)
+  const topTasks = feedback.nextTasks.slice(0, 3)
+  const shouldRetry = feedback.score < 78 || feedback.problems.length >= 3
   return (
     <div className="ai-report">
       <header><div><span>总分</span><strong>{feedback.score}</strong></div><p>{feedback.summary}</p><em>{providerLabel} · {feedback.model} · {formatDateTime(feedback.generatedAt)}</em></header>
       {isMock && <p className="mock-notice">{providerLabel}</p>}
       {feedback.rawProviderNote && <p className="provider-note">{feedback.rawProviderNote}</p>}
-      <div className="feedback-columns"><FeedbackList title="做得好的地方" items={feedback.strengths} /><FeedbackList title="主要问题" items={feedback.problems} /></div>
-      <dl className="feedback-detail-list">
-        <div><dt>岗位匹配</dt><dd>{feedback.roleFitFeedback}</dd></div>
-        <div><dt>结构</dt><dd>{feedback.structureFeedback}</dd></div>
-        <div><dt>表达</dt><dd>{feedback.expressionFeedback}</dd></div>
-        <div><dt>时长</dt><dd>{feedback.timingFeedback}</dd></div>
-        <div><dt>流畅度</dt><dd>{feedback.fluencyFeedback}</dd></div>
-        <div><dt>背稿风险</dt><dd>{feedback.memorizationRisk}</dd></div>
-        <div><dt>具体性</dt><dd>{feedback.specificityFeedback}</dd></div>
-      </dl>
-      <details><summary>30 秒优化版</summary><p>{feedback.improvedShortVersion}</p></details>
-      <details><summary>90 秒优化版</summary><p>{feedback.improvedLongVersion}</p></details>
-      <FeedbackList title="下一步任务" items={feedback.nextTasks} />
+      <div className="feedback-short-grid" data-testid="ai-short-report">
+        <FeedbackList title="最重要的问题" items={topProblems.length ? topProblems : ['当前没有明显硬伤。']} />
+        <FeedbackList title="下一步任务" items={topTasks.length ? topTasks : ['保持节奏，进入下一段训练。']} />
+        <section><strong>是否建议重答</strong><p>{shouldRetry ? '建议重答一次，只看骨架讲。' : '可以进入下一题。'}</p></section>
+      </div>
+      <details className="ai-report-detail">
+        <summary>查看详细报告</summary>
+        <div className="feedback-columns"><FeedbackList title="做得好的地方" items={feedback.strengths} /><FeedbackList title="全部问题" items={feedback.problems} /></div>
+        <dl className="feedback-detail-list">
+          <div><dt>岗位匹配</dt><dd>{feedback.roleFitFeedback}</dd></div>
+          <div><dt>结构</dt><dd>{feedback.structureFeedback}</dd></div>
+          <div><dt>表达</dt><dd>{feedback.expressionFeedback}</dd></div>
+          <div><dt>时长</dt><dd>{feedback.timingFeedback}</dd></div>
+          <div><dt>流畅度</dt><dd>{feedback.fluencyFeedback}</dd></div>
+          <div><dt>背稿风险</dt><dd>{feedback.memorizationRisk}</dd></div>
+          <div><dt>具体性</dt><dd>{feedback.specificityFeedback}</dd></div>
+        </dl>
+        <details><summary>30 秒优化版</summary><p>{feedback.improvedShortVersion}</p></details>
+        <details><summary>90 秒优化版</summary><p>{feedback.improvedLongVersion}</p></details>
+      </details>
     </div>
   )
 }
@@ -2661,8 +2826,10 @@ function readRealInterviews() { return normalizeRealInterviews(readArray<StoredR
 function readQuestionBank() { return normalizeQuestionBank(readArray<QuestionBankUpdate>(QUESTION_BANK_KEY)) }
 function readCompanySources() { return normalizeCompanySources(readArray<CompanySourceInput>(COMPANY_SOURCES_KEY)) }
 function readCompanyKnowledgePacks() { return normalizeCompanyKnowledgePacks(readArray<StoredCompanyKnowledgePack>(COMPANY_KNOWLEDGE_PACKS_KEY)) }
+function readJobUserStatus() { return normalizeJobUserStatus(readObject<JobUserStatusMap>(JOB_USER_STATUS_KEY)) }
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
+function readObject<T extends Record<string, unknown>>(key: string): Partial<T> { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : {}; return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {} } catch { return {} } }
 
 function normalizeTasks(tasks?: TrainingTask[]) {
   return defaultTasks.map((defaultTask) => {
@@ -2786,6 +2953,11 @@ function normalizeCompanyKnowledgePacks(packs?: StoredCompanyKnowledgePack[]) {
   }))
 }
 
+function normalizeJobUserStatus(input?: Partial<JobUserStatusMap>): JobUserStatusMap {
+  const allowed = new Set(JOB_USER_STATUS_OPTIONS.map((item) => item.value))
+  return Object.fromEntries(Object.entries(input || {}).filter(([, value]) => allowed.has(value as JobUserStatus))) as JobUserStatusMap
+}
+
 function updateMockAnswer(
   sessions: MockInterviewSession[],
   sessionId: string,
@@ -2808,7 +2980,7 @@ function ensureNormalizedJob(job: JobRecord): JobRecord {
   return job.normalized ? job : { ...job, normalized: normalizeJobRecord(job) }
 }
 
-function filterJobs(jobs: JobRecord[], filters: JobFilters) {
+function filterJobs(jobs: JobRecord[], filters: JobFilters, statusMap: JobUserStatusMap) {
   const normalizedJobs = jobs.map(ensureNormalizedJob)
   const search = filters.search.trim().toLowerCase()
   const riskChecks: Array<[boolean, string]> = [
@@ -2822,11 +2994,14 @@ function filterJobs(jobs: JobRecord[], filters: JobFilters) {
   ]
   const filtered = normalizedJobs.filter((job) => {
     const normalized = job.normalized
+    const status = getJobUserStatus(statusMap, job.id)
     return (!search || normalized.searchableText.toLowerCase().includes(search))
       && (!filters.roleFamily || normalized.roleFamily === filters.roleFamily)
       && (!filters.roleTrack || normalized.roleTrack === filters.roleTrack)
       && (!filters.cityGroup || normalized.cityGroup === filters.cityGroup)
       && (!filters.priorityBucket || normalized.priorityBucket === filters.priorityBucket)
+      && (!filters.userStatus || status === filters.userStatus)
+      && (!filters.hideRejected || status !== 'rejected')
       && riskChecks.every(([enabled, flag]) => !enabled || !normalized.riskFlags.includes(flag))
   })
 
@@ -2885,9 +3060,88 @@ function priorityRank(value: string) {
   return 5
 }
 
-function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[]) {
+function getJobUserStatus(statusMap: JobUserStatusMap, jobId?: string): JobUserStatus {
+  return jobId && statusMap[jobId] ? statusMap[jobId] : 'not_started'
+}
+
+function jobUserStatusLabel(status: string) {
+  return JOB_USER_STATUS_OPTIONS.find((item) => item.value === status)?.label || '未处理'
+}
+
+function buildJobReadiness(
+  job: JobRecord,
+  context: {
+    status: JobUserStatus
+    jobPacks: StoredJobPack[]
+    mockInterviews: MockInterviewSession[]
+    realInterviews: StoredRealInterview[]
+    history: TrainingRecord[]
+  },
+) {
+  const hasPack = context.jobPacks.some((pack) => pack.selectedJobId === job.id)
+  const hasMock = context.mockInterviews.some((session) => session.selectedJob.id === job.id)
+  const hasReal = context.realInterviews.some((interview) => interview.selectedJob.id === job.id)
+  const latestTraining = context.history.find((record) => record.selectedJob?.id === job.id)
+  const signals = [
+    hasPack ? '有准备包' : '无准备包',
+    hasMock ? '有模拟面试' : '未模拟',
+    hasReal ? '有真实复盘' : '未复盘',
+    latestTraining ? `最近训练 ${formatDateTime(latestTraining.savedAt)}` : '未训练',
+  ]
+  const nextStep = !hasPack ? '下一步：生成准备包' : !hasMock ? '下一步：开始模拟面试' : !hasReal ? '下一步：真实面试后复盘' : '下一步：进入下一轮训练'
+  return { signals, nextStep }
+}
+
+function getLatestActivityLabel(records: TrainingRecord[], mockInterviews: MockInterviewSession[], realInterviews: StoredRealInterview[]) {
+  const latestTraining = records[0]
+  const latestMock = mockInterviews[0]
+  const latestReal = realInterviews[0]
+  const candidates = [
+    latestTraining && { label: `${latestTraining.title} ${feedbackStatusLabel(latestTraining.aiFeedbackStatus)}`, time: latestTraining.savedAt },
+    latestMock && { label: `模拟面试 ${latestMock.status === 'completed' ? '已复盘' : '进行中'}`, time: latestMock.createdAt },
+    latestReal && { label: `真实面试 ${latestReal.reviewReport ? '已复盘' : transcriptStatusLabel(latestReal.transcriptStatus)}`, time: latestReal.updatedAt },
+  ].filter(Boolean) as Array<{ label: string; time: string }>
+  return candidates.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]?.label || '暂无训练'
+}
+
+function buildDailyAction(context: {
+  jobPool: JobRecord[]
+  selectedJob: JobRecord | null
+  currentJobPack?: StoredJobPack
+  mockInterviews: MockInterviewSession[]
+  realInterviews: StoredRealInterview[]
+  history: TrainingRecord[]
+  cvText: CvTextState
+}): { title: string; detail: string; cta: string; view: ViewId; icon: ReactNode } {
+  const latestRealNeedsReview = context.realInterviews.find((item) => !item.reviewReport)
+  const latestMock = context.mockInterviews[0]
+  if (!context.jobPool.length) return { title: '先上传岗位表', detail: '岗位库建立后，系统才能给出今天的训练路径。', cta: '上传岗位表', view: 'materials', icon: <Upload size={17} /> }
+  if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
+  if (!context.currentJobPack) return { title: '生成岗位准备包', detail: '先让系统读懂公司、岗位和你的匹配点。', cta: '生成准备包', view: 'jobPack', icon: <Sparkles size={17} /> }
+  if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主训练。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
+  if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮训练任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
+  if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
+  const missingFeedback = context.history.find((record) => record.transcript && !record.aiFeedback)
+  if (missingFeedback) return { title: '补齐 AI 反馈', detail: `${missingFeedback.title} 已有转写，等待生成短报告。`, cta: '生成 AI 反馈', view: 'feedback', icon: <BrainCircuit size={17} /> }
+  return { title: '继续岗位训练', detail: '今天可以重练一段回答，或直接进入下一轮模拟面试。', cta: '进入训练', view: 'training', icon: <Mic size={17} /> }
+}
+
+function buildDataStatusText(context: {
+  jobPool: JobRecord[]
+  selectedJob: JobRecord | null
+  jobPacks: StoredJobPack[]
+  mockInterviews: MockInterviewSession[]
+  realInterviews: StoredRealInterview[]
+  companySources: CompanySourceInput[]
+}) {
+  return `岗位 ${context.jobPool.length} 个，准备包 ${context.jobPacks.length} 个，模拟面试 ${context.mockInterviews.length} 场，真实复盘 ${context.realInterviews.filter((item) => item.reviewReport).length} 份，公司资料 ${context.companySources.length} 条。`
+}
+
+function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[], jobPack?: StoredJobPack, mockInterviews: MockInterviewSession[] = []) {
   if (!jobPool.length) return ['上传 job.xlsx，建立岗位库。']
   if (!selectedJob) return ['从岗位库选择一个目标岗位。']
+  if (!jobPack) return ['生成当前岗位准备包。']
+  if (!mockInterviews.length) return ['开始一轮模拟面试。']
   if (!cv.text) return ['上传 TXT / Markdown 简历文本版。']
   const missing = defaultTasks.filter((task) => !records.some((record) => record.taskId === task.id))
   if (missing.length) return [`完成剩余录音：${missing.map((task) => task.title).join('、')}。`]
@@ -2934,7 +3188,6 @@ function feedbackStatusLabel(status: AIFeedbackStatus) {
   return { not_ready: '尚未就绪', transcript_needed: '等待转写', ready_to_analyze: '待生成反馈', analyzing: '分析中', completed: '已完成', failed: '反馈失败' }[status]
 }
 
-function statusLabel(status: AIFeedbackStatus) { return status === 'completed' ? 'AI 反馈完成' : status === 'ready_to_analyze' ? '待 AI 分析' : '等待转写' }
 function createPreview(blob: Blob): AudioPreview { return { url: URL.createObjectURL(blob), size: blob.size, type: blob.type } }
 function getSupportedAudioMimeType() { return ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type)) || '' }
 function getFileExtension(name: string) { const index = name.lastIndexOf('.'); return index >= 0 ? name.slice(index) : '' }
