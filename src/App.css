@@ -1708,3 +1708,13 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .recorder-controls button, .backup-actions button, .backup-actions label { width: 100%; }
   audio { width: 100%; }
 }
+
+
+/* === 快速修复追加 === */
+.mock-badge { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#fff4d7;color:#775c15;font-size:11px;font-weight:600; }
+.real-badge { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#e7f3e9;color:var(--success);font-size:11px;font-weight:600; }
+.recording-banner { position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:#a12a2a;color:#fff;font-size:13px;font-weight:600;animation:recording-pulse 2s ease-in-out infinite; }
+.recording-banner::before { content:'';width:8px;height:8px;border-radius:50%;background:#fff;animation:recording-dot 1s ease-in-out infinite; }
+@keyframes recording-pulse { 0%,100%{opacity:1} 50%{opacity:.85} }
+@keyframes recording-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+@media (max-width:680px) { .meeting-control-bar button{min-height:48px;} .top-nav nav button{min-height:44px;} .training-shortcuts button{min-height:110px;} }
