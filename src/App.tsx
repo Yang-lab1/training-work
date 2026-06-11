@@ -51,6 +51,7 @@ import type {
 } from './lib/ai/types'
 import type { TranscribeResponse } from './lib/asr/types'
 import './App.css'
+import { useRecordingGuard } from './useRecordingGuard'
 
 const APP_VERSION = '1.4A'
 const STORAGE_KEY = 'interview-os-personal-mvp-v1'
@@ -430,6 +431,7 @@ function App() {
   const [jobUserStatus, setJobUserStatus] = useState<JobUserStatusMap>(readJobUserStatus)
   const [providerState, setProviderState] = useState<ProviderState>(readProviderState)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
+  useRecordingGuard(recordingTaskId, recordingInterviewQuestionId)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
   const [materialsMessage, setMaterialsMessage] = useState('')
