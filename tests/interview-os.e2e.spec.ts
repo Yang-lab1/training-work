@@ -232,6 +232,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.locator('.top-nav nav button')).toHaveCount(11)
   await expect(page.getByTestId('daily-workbench')).toBeVisible()
   await expect(page.getByTestId('daily-workbench').locator('button.primary-button')).toHaveCount(1)
+  await expect(page.getByTestId('job-battle-board')).toBeVisible()
+  await expect(page.getByTestId('ability-trend')).toBeVisible()
 
   await page.locator('.top-nav nav button').nth(1).click()
   await expect(page.getByTestId('resume-material-module')).toBeVisible()
@@ -324,16 +326,18 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
     const detailOpen = await page.locator('.ai-report-detail').last().evaluate((node) => (node as HTMLDetailsElement).open)
     expect(detailOpen).toBe(false)
     await page.locator('.meeting-panel-toggle').click()
-    if (index < 2) await page.locator('.meeting-control-bar button').nth(5).click()
+    if (index < 2) await page.locator('.meeting-control-bar button').nth(3).click()
   }
 
-  await page.locator('.meeting-control-bar button').nth(6).click()
+  await page.locator('.meeting-control-bar button').nth(4).click()
   await expect(page.getByTestId('interview-review-room')).toBeVisible()
   await expect(page.locator('.review-summary-report')).toContainText('84')
+  await expect(page.locator('.review-summary-report')).toContainText('可背回答版本')
 
   await page.locator('.top-nav nav button').nth(10).click()
   await expect(page.getByTestId('provider-diagnostics')).toContainText('Mock / fallback')
   await expect(page.getByTestId('provider-diagnostics')).toContainText('/api/provider-status')
+  await expect(page.getByTestId('provider-call-list')).toBeVisible()
   await page.getByRole('button', { name: /测试文本模型/ }).click()
   await expect(page.getByTestId('provider-diagnostics')).toContainText('文本模型测试完成')
   await page.getByRole('button', { name: /测试语音转写/ }).click()

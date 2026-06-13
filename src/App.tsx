@@ -520,6 +520,11 @@ function App() {
     }),
     [jobPool, selectedJob, currentJobPack, mockInterviews, realInterviews, state.history, cvTextState],
   )
+  const abilityTrend = useMemo(() => buildAbilityTrend(state.history, mockInterviews), [state.history, mockInterviews])
+  const jobBattleBoard = useMemo(
+    () => buildJobBattleBoard(jobPool, jobUserStatus),
+    [jobPool, jobUserStatus],
+  )
   const nextActions = generateNextActions(jobPool, selectedJob, cvTextState, todayRecords, currentJobPack, mockInterviews)
 
   function commitState(updater: (current: StoredMvpState) => StoredMvpState) {
@@ -999,7 +1004,7 @@ function App() {
     }
     setMockInterviews((current) => current.map((item) => item.id === session.id ? {
       ...item,
-      currentPhase: 'feedback_ready',
+      currentPhase: 'transcribing',
       answers: [answer, ...item.answers.filter((existing) => existing.questionId !== questionId)],
     } : item))
     window.setTimeout(() => {
@@ -1111,6 +1116,30 @@ function App() {
         improvedShortVersion: aiFeedback.improvedShortVersion,
         improvedFullVersion: aiFeedback.improvedLongVersion,
       })), session.id, 'feedback_ready'))
+      if (needsFollowUp) {
+        try {
+          const followResponse = await fetch('/api/generate-follow-up', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskType: 'generate_follow_up', selectedJob: session.selectedJob, question, transcript: transcript.text, aiFeedback }),
+          })
+          const followResult = await followResponse.json() as GenerateFollowUpResponse
+          if (followResponse.ok && followResult.success) {
+            setMockInterviews((current) => current.map((item) => {
+              if (item.id !== session.id) return item
+              const insertAt = Math.min(item.currentQuestionIndex + 1, item.questions.length)
+              return {
+                ...item,
+                questions: [...item.questions.slice(0, insertAt), followResult.followUpQuestion, ...item.questions.slice(insertAt)],
+                followUps: [...item.followUps, followResult.followUpQuestion],
+                currentPhase: 'feedback_ready',
+              }
+            }))
+          }
+        } catch {
+          setMockInterviews((current) => updateMockSessionPhase(current, session.id, 'feedback_ready'))
+        }
+      }
       setMockInterviewMessage(needsFollowUp ? '本题已分析，可继续追问或进入下一题。' : '本题已自动转写和分析。')
     } catch (error) {
       setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
@@ -1758,6 +1787,16 @@ function App() {
                 <p>{buildDataStatusText({ jobPool, selectedJob, jobPacks, mockInterviews, realInterviews, companySources })}</p>
               </div>
             </section>
+            <section className="daily-driver-grid" aria-label="Daily driver">
+              <article className="job-battle-board" data-testid="job-battle-board">
+                <div className="section-mini-heading"><span className="eyebrow">{'\u5c97\u4f4d\u4f5c\u6218\u677f'}</span><strong>{jobBattleBoard.total} {'\u4e2a\u5c97\u4f4d'} · {jobBattleBoard.activeCount} {'\u4e2a\u5728\u63a8\u8fdb'}</strong></div>
+                <div className="battle-columns">{jobBattleBoard.columns.map((column) => (<div className="battle-column" key={column.status}><span>{column.label}</span><strong>{column.jobs.length}</strong>{column.jobs.slice(0, 3).map((job) => (<p key={job.id}>{job.companyName} · {job.jobTitle}</p>))}</div>))}</div>
+              </article>
+              <article className="ability-trend" data-testid="ability-trend">
+                <div className="section-mini-heading"><span className="eyebrow">{'\u80fd\u529b\u8d8b\u52bf'}</span><strong>{abilityTrend.length ? '\u6700\u8fd1\u53cd\u9988\u63d0\u70bc' : '\u7b49\u5f85 AI \u53cd\u9988'}</strong></div>
+                {abilityTrend.length ? abilityTrend.map((item) => (<div className="trend-row" key={item.id}><span>{item.label}</span><meter min={0} max={100} value={item.score} /><strong>{item.score}</strong><em>{item.action}</em></div>)) : <p className="empty-state compact">{'\u5b8c\u6210\u4e00\u6b21 AI \u53cd\u9988\u540e\uff0c\u8fd9\u91cc\u4f1a\u663e\u793a\u5c97\u4f4d\u5339\u914d\u3001\u8868\u8fbe\u3001\u9879\u76ee\u5177\u4f53\u6027\u7b49\u5f31\u9879\u8d8b\u52bf\u3002'}</p>}
+              </article>
+            </section>
           </Page>
         )}
 
@@ -2174,6 +2213,7 @@ function App() {
           <Page title="系统诊断" subtitle="Provider 状态与 API 可用性。">
             <DiagnosticsView
               status={providerStatus}
+              providerState={providerState}
               loading={providerStatusLoading}
               message={providerStatusMessage}
               onRefresh={() => void refreshProviderStatus()}
@@ -2201,6 +2241,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function DiagnosticsView({
   status,
+  providerState,
   loading,
   message,
   onRefresh,
@@ -2208,6 +2249,7 @@ function DiagnosticsView({
   onTestAsr,
 }: {
   status: ProviderStatusPayload | null
+  providerState: ProviderState
   loading: boolean
   message: string
   onRefresh: () => void
@@ -2240,6 +2282,7 @@ function DiagnosticsView({
             <ProviderSummaryCard title="AI_PROVIDER" provider={status.ai.provider} configured={status.ai.configured} fallbackMode={status.ai.fallbackMode} />
             <ProviderSummaryCard title="ASR_PROVIDER" provider={status.asr.provider} configured={status.asr.configured} fallbackMode={status.asr.fallbackMode} />
           </div>
+          <ProviderCallList providerState={providerState} />
           <ProviderMatrix title="文本 Provider" providers={status.ai.availableProviders} />
           <ProviderMatrix title="ASR Provider" providers={status.asr.availableProviders} />
           <section className="route-status-grid" aria-label="API route 状态">
@@ -2253,6 +2296,23 @@ function DiagnosticsView({
           </section>
         </>
       ) : <p className="empty-state">尚未读取诊断状态。</p>}
+    </section>
+  )
+}
+
+function ProviderCallList({ providerState }: { providerState: ProviderState }) {
+  const calls = [providerState.lastTextCall, providerState.lastAsrCall].filter(Boolean) as ProviderCallRecord[]
+  return (
+    <section className="provider-call-list" data-testid="provider-call-list">
+      <h3>最近调用</h3>
+      {calls.length ? calls.map((call) => (
+        <div className="provider-call-row" key={`${call.type}-${call.at}`}>
+          <strong>{call.type === 'text' ? '文本模型' : '语音转写'}</strong>
+          <span>{call.providerUsed || 'mock'} · {call.model || '默认模型'} · {call.isFallback ? 'fallback' : 'direct'}</span>
+          <em>{call.success ? '成功' : '失败'}{call.latencyMs ? ` · ${call.latencyMs}ms` : ''}</em>
+          {call.fallbackReason && <p>{call.fallbackReason}</p>}
+        </div>
+      )) : <p className="empty-state compact">还没有真实调用记录。完成一次转写或反馈后会显示 provider、模型和 fallback 原因。</p>}
     </section>
   )
 }
@@ -2434,7 +2494,7 @@ function MockInterviewPanel({
           </div>
           <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
         </header>
-        {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} /> : (
+        {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} answers={session.answers} questions={session.questions} /> : (
           <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '生成整场复盘'}</button>
         )}
       </section>
@@ -2497,20 +2557,28 @@ function MockInterviewPanel({
       </div>
 
       {currentQuestion && (
-        <div className="meeting-control-bar" aria-label="底部控制栏">
-          <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId)}>
-            <Mic size={16} />开始回答
+        <div className="meeting-control-bar" aria-label="bottom-controls">
+          <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
+            <Mic size={16} />{'\u5f00\u59cb\u56de\u7b54'}
           </button>
-          <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />停止</button>
-          <button type="button" onClick={() => { if (preview?.url) void new Audio(preview.url).play() }} disabled={!preview}><FileAudio size={15} />回放</button>
-          <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
-            <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '转写中…' : '转写'}
-          </button>
-          <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
-            <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '分析中…' : '反馈'}
-          </button>
-          <button type="button" onClick={onNext} disabled={!canGoNext}>下一题</button>
-          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />结束面试</button>
+          <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />{'\u505c\u6b62'}</button>
+          <button type="button" onClick={() => { if (preview?.url) void new Audio(preview.url).play() }} disabled={!preview}><FileAudio size={15} />{'\u56de\u653e'}</button>
+          <span className="meeting-status-chip">{currentAnswer ? `${transcriptStatusLabel(currentAnswer.transcriptStatus)} · ${feedbackStatusLabel(currentAnswer.aiFeedbackStatus)}` : '\u5f55\u5b8c\u540e\u81ea\u52a8\u8f6c\u5199 / \u5206\u6790'}</span>
+          {currentAnswer?.followUpDecision === 'follow_up' && currentAnswer.aiFeedback ? (
+            <button type="button" onClick={onNext} disabled={loading === `follow-${currentQuestion.id}`}>{'\u8ffd\u95ee'}</button>
+          ) : (
+            <button type="button" onClick={onNext} disabled={!canGoNext || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>{'\u4e0b\u4e00\u9898'}</button>
+          )}
+          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{'\u7ed3\u675f\u9762\u8bd5'}</button>
+          <details className="meeting-backup-actions">
+            <summary>{'\u5907\u7528'}</summary>
+            <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
+              <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '\u8f6c\u5199\u4e2d' : '\u624b\u52a8\u8f6c\u5199'}
+            </button>
+            <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
+              <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '\u5206\u6790\u4e2d' : '\u624b\u52a8\u53cd\u9988'}
+            </button>
+          </details>
         </div>
       )}
 
@@ -2576,7 +2644,7 @@ function MockInterviewPanel({
   )
 }
 
-function InterviewFinalReportView({ finalReport }: { finalReport: NonNullable<MockInterviewSession['finalReport']> }) {
+function InterviewFinalReportView({ finalReport, answers, questions }: { finalReport: NonNullable<MockInterviewSession['finalReport']>; answers?: MockInterviewAnswer[]; questions?: MockInterviewQuestion[] }) {
   const isMock = finalReport.provider === 'mock' || finalReport.provider === 'mock_fallback'
   const retryItems = [
     finalReport.report.weakestAnswer,
@@ -2596,6 +2664,23 @@ function InterviewFinalReportView({ finalReport }: { finalReport: NonNullable<Mo
         <FeedbackList title="三个下一步任务" items={finalReport.report.nextTrainingPlan.slice(0, 3)} />
         <FeedbackList title="建议重练题目" items={retryItems} />
       </div>
+      {answers?.some((answer) => answer.aiFeedback) ? (
+        <details className="meeting-detail review-detail">
+          <summary>{'\u53ef\u80cc\u56de\u7b54\u7248\u672c'}</summary>
+          <div className="answer-version-list">
+            {answers.filter((answer) => answer.aiFeedback).map((answer) => {
+              const question = questions?.find((item) => item.id === answer.questionId)
+              return (
+                <article key={answer.id}>
+                  <strong>{question?.question || answer.questionId}</strong>
+                  <p><b>30-45 {'\u79d2'}：</b>{answer.improvedShortVersion || answer.aiFeedback?.improvedShortVersion}</p>
+                  <p><b>90-120 {'\u79d2'}：</b>{answer.improvedFullVersion || answer.aiFeedback?.improvedLongVersion}</p>
+                </article>
+              )
+            })}
+          </div>
+        </details>
+      ) : null}
       <details className="meeting-detail review-detail">
         <summary>展开详细复盘</summary>
         <dl className="feedback-detail-list">
@@ -3409,6 +3494,51 @@ function buildDataStatusText(context: {
   companySources: CompanySourceInput[]
 }) {
   return `岗位 ${context.jobPool.length} 个，准备包 ${context.jobPacks.length} 个，模拟面试 ${context.mockInterviews.length} 场，真实复盘 ${context.realInterviews.filter((item) => item.reviewReport).length} 份，公司资料 ${context.companySources.length} 条。`
+}
+
+function buildJobBattleBoard(
+  jobs: JobRecord[],
+  statusMap: JobUserStatusMap,
+) {
+  const columns: Array<{ status: JobUserStatus; label: string; jobs: JobRecord[] }> = [
+    { status: 'shortlisted', label: '\u77ed\u540d\u5355', jobs: [] },
+    { status: 'preparing', label: '\u51c6\u5907\u4e2d', jobs: [] },
+    { status: 'interviewing', label: '\u9762\u8bd5\u4e2d', jobs: [] },
+  ]
+  for (const job of jobs) {
+    const status = getJobUserStatus(statusMap, job.id)
+    const column = columns.find((item) => item.status === status)
+    if (column) column.jobs.push(job)
+  }
+  for (const column of columns) {
+    column.jobs.sort((a, b) => b.normalized.matchScore - a.normalized.matchScore)
+  }
+  return {
+    total: jobs.length,
+    activeCount: columns.reduce((sum, column) => sum + column.jobs.length, 0),
+    columns,
+  }
+}
+
+function buildAbilityTrend(records: TrainingRecord[], interviews: MockInterviewSession[]) {
+  const feedbacks: StoredAIFeedback[] = [
+    ...records.map((record) => record.aiFeedback).filter(Boolean) as StoredAIFeedback[],
+    ...interviews.flatMap((session) => session.answers.map((answer) => answer.aiFeedback).filter(Boolean) as StoredAIFeedback[]),
+  ].slice(0, 20)
+  if (!feedbacks.length) return []
+  const dimensions = [
+    { id: 'role-fit', label: '\u5c97\u4f4d\u5339\u914d', pick: (item: StoredAIFeedback) => `${item.roleFitFeedback} ${item.problems.join(' ')}`, action: '\u628a\u516c\u53f8\u4e1a\u52a1\u548c\u5c97\u4f4d\u5173\u952e\u8bcd\u653e\u8fdb\u5f00\u5934/\u7ed3\u5c3e\u3002' },
+    { id: 'structure', label: '\u7ed3\u6784\u8868\u8fbe', pick: (item: StoredAIFeedback) => `${item.structureFeedback} ${item.summary}`, action: '\u6309\u80cc\u666f-\u884c\u52a8-\u7ed3\u679c-\u5c97\u4f4d\u5173\u7cfb\u91cd\u8bb2\u3002' },
+    { id: 'specificity', label: '\u9879\u76ee\u5177\u4f53\u6027', pick: (item: StoredAIFeedback) => `${item.specificityFeedback} ${item.problems.join(' ')}`, action: '\u8865\u7528\u6237\u3001\u573a\u666f\u3001\u672c\u4eba\u8d21\u732e\u548c\u7ed3\u679c\u8bc1\u636e\u3002' },
+    { id: 'english', label: '\u82f1\u6587\u8868\u8fbe', pick: (item: StoredAIFeedback) => `${item.expressionFeedback} ${item.fluencyFeedback}`, action: '\u5148\u6162\u8bfb\u518d\u5f55\uff0c\u51cf\u5c11\u590d\u6742\u4ece\u53e5\u3002' },
+    { id: 'timing', label: '\u65f6\u957f\u63a7\u5236', pick: (item: StoredAIFeedback) => item.timingFeedback, action: '\u4fdd\u7559\u4e00\u6761\u4e3b\u7ebf\uff0c\u5220\u9664\u94fa\u57ab\u3002' },
+  ]
+  return dimensions.map((dimension) => {
+    const hits = feedbacks.filter((item) => /short|unclear|risk|problem|need|weak|lack|over|confus/i.test(dimension.pick(item)))
+    const baseScore = Math.round(feedbacks.reduce((sum, item) => sum + item.score, 0) / feedbacks.length)
+    const penalty = Math.min(28, hits.length * 7)
+    return { id: dimension.id, label: dimension.label, score: Math.max(42, baseScore - penalty), action: dimension.action }
+  }).sort((a, b) => a.score - b.score).slice(0, 4)
 }
 
 function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[], jobPack?: StoredJobPack, mockInterviews: MockInterviewSession[] = []) {
