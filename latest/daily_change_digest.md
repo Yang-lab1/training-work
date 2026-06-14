@@ -1,0 +1,323 @@
+# 每日岗位库变更日报 20260614
+
+- 工作簿：C:\Users\Yang\Desktop\job\job.xlsx
+- 地图：C:\Users\Yang\Desktop\job\maps\prd_job_map_interactive.html
+- 报告目录：C:\Users\Yang\Desktop\job\reports
+
+## 今日新增
+- 无适合新增
+
+## 下架/疑似下架
+- 共删除 40 行，涉及 40 个唯一岗位
+- 深圳市三旺通信股份有限公司｜AI人工智能产品经理/总监｜深圳-西丽｜200｜涉及表：次选_条件不完全符合
+- 长春捷翼汽车零部件有限公司｜具身智能机器人产品经理｜深圳-科技园｜200｜涉及表：次选_条件不完全符合
+- 香港多公司集合｜AI Product Intern / Digital Product Intern入口｜香港｜200｜涉及表：次选_条件不完全符合
+- SAP｜AI Solution / Business Analyst Intern入口｜香港｜200｜涉及表：次选_条件不完全符合
+- Archimedes Cat｜AI股票研究产品实习｜深圳｜200｜涉及表：次选_条件不完全符合
+- 美图｜AI产品实习生 MJ001479｜深圳｜200｜涉及表：次选_条件不完全符合
+- 虎一科技｜AI产品经理实习生（可转正）｜深圳｜200｜涉及表：次选_条件不完全符合
+- 百丽科技｜AI金融数据产品经理（深圳/香港）实习｜深圳/香港｜200｜涉及表：次选_条件不完全符合
+- 云之家｜AI SaaS产品经理实习｜深圳｜200｜涉及表：次选_条件不完全符合
+- 领智寻知｜产品经理实习生（偏UI）｜深圳｜200｜涉及表：次选_条件不完全符合
+- SHEIN｜AI产品实习生｜深圳｜200｜涉及表：次选_条件不完全符合
+- 腾讯｜AI产品策划实习生｜深圳｜200｜涉及表：次选_条件不完全符合
+- 香港/深圳多公司集合｜AI Product Manager / Product Analyst / AI Solution入口｜深圳/香港｜200｜涉及表：次选_条件不完全符合
+- Microsoft 微软｜AI Solution / Copilot / Product-adjacent入口｜香港｜200｜涉及表：次选_条件不完全符合
+- SAP｜AI Solution / Business AI / Product Associate入口｜香港/深圳｜200｜涉及表：次选_条件不完全符合
+- 创世易明｜AI产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
+- 百度APP｜AI产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
+- Shopee｜AI策略产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
+- 腾讯｜腾讯营销-微信小程序营销运营经理｜深圳｜200｜涉及表：次选_条件不完全符合
+- 腾讯｜腾讯营销-微信营销品牌发现产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
+- 腾讯｜腾讯营销-搜索营销运营｜深圳｜200｜涉及表：次选_条件不完全符合
+- DJI 大疆｜中/高级产品应用工程师（维修工程-大疆行业）｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
+- DJI 大疆｜高级营销数字化专家｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
+- DJI 大疆｜售后高级产品经理｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
+- DJI 大疆｜高级数据产品经理（Data Agent方向）｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
+- 美团｜AI硬件产品专员/工程师｜深圳｜200｜涉及表：扩源新增岗位
+- 荣耀｜AIoT产品经理实习/AI终端产品实习入口｜深圳｜200｜涉及表：扩源新增岗位
+- DJI 大疆｜产品经理/项目管理/产品体验实习入口｜深圳｜200｜涉及表：扩源新增岗位
+- 枢途科技｜AI智能硬件产品经理实习｜深圳｜200｜涉及表：扩源新增岗位
+- 蚯比｜Product Manager Intern｜深圳｜200｜涉及表：扩源新增岗位
+- Keep｜Product Management Intern｜深圳｜200｜涉及表：扩源新增岗位
+- Schneider Electric 施耐德电气｜Digital Product / Energy Management Solution入口｜深圳/香港｜200｜涉及表：扩源新增岗位
+- Siemens 西门子｜Digital Product / Solution / Project Manager入口｜深圳/香港｜200｜涉及表：扩源新增岗位
+- Apple｜Engineering Program Manager / Hardware Product / Operations入口｜深圳/香港｜200｜涉及表：扩源新增岗位
+- Insta360 影石｜后台产品实习｜深圳｜200｜涉及表：扩源新增岗位
+- Lenovo 联想｜AI PC/智能设备产品、方案产品、TPM/项目管理入口｜深圳/香港｜200｜涉及表：扩源新增岗位
+- vivo｜OS/AI产品经理、智能终端产品、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
+- OPPO｜AI产品经理、IoT产品、终端体验、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
+- 小米集团｜AIoT/智能硬件产品经理、产品企划、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
+- 某深圳知名上市公司｜具身智能产品经理｜深圳｜200｜涉及表：扩源新增岗位
+
+## 薪资变化
+- 无薪资变化
+
+## 优先级变化
+- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：P3次选验证 -> P1主线实习
+- DJI 大疆｜产品经理/项目管理/产品体验实习入口：P3次选验证 -> P1主线实习
+- 枢途科技｜AI智能硬件产品经理实习：P3次选验证 -> P1主线实习
+- 蚯比｜Product Manager Intern：P3次选验证 -> P1主线实习
+- Insta360 影石｜后台产品实习：P3次选验证 -> P1主线实习
+- Keep｜Product Management Intern：P3次选验证 -> P1主线实习
+- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：主攻-后置 -> 空
+- DJI 大疆｜产品经理/项目管理/产品体验实习入口：冲刺-后段 -> 空
+- 枢途科技｜AI智能硬件产品经理实习：练手-前段 -> 空
+- 蚯比｜Product Manager Intern：练手-前段 -> 空
+- Insta360 影石｜后台产品实习：主攻-中后段 -> 空
+- Keep｜Product Management Intern：主攻-中段 -> 空
+
+## 可信度变化
+- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：中 -> 中高
+- DJI 大疆｜产品经理/项目管理/产品体验实习入口：中 -> 中高
+- 枢途科技｜AI智能硬件产品经理实习：低 -> 中
+- 蚯比｜Product Manager Intern：低 -> 中
+- Insta360 影石｜后台产品实习：低 -> 中
+- Keep｜Product Management Intern：低 -> 中
+
+## 未上图原因 Top15
+- P1｜匿名智能硬件公司（猎头）｜东莞; 深圳｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜星河智联｜广州-海珠区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜某千亿上市精密制造龙头（猎头匿名）｜广州-黄埔区; 深圳-龙岗区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜阿里巴巴｜广州; 广州（另有杭州/北京，投前确认广州HC）｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜RabbitPre AI 兔展智能｜深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜匿名NAS/智能硬件公司（猎头）｜深圳-龙华区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜匿名具身智能公司（猎头）｜深圳-南山区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜匿名智能安防公司（猎头）｜深圳-龙华区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜埃尔梦创科技｜深圳-南山区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜广发证券｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜广州广日股份有限公司｜广州-番禺区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜广汽集团｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜斯沃德科技｜广州-黄埔区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜枢途科技｜深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜某人工智能/工业自动化公司（猎头匿名）｜广州｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+
+## 待复核清单
+- source_coverage_20260614.csv
+- source_candidates_20260614.csv
+- low_confidence_review_20260614.csv
+- unmapped_priority_20260614.csv
+- today_action_plan_20260614.xlsx
+- link_revalidation_20260614.csv
+
+## 当天覆盖来源
+- 外企｜Microsoft｜Product Manager / AI / Copilot / Hardware / Solution
+- 外企｜Google｜Product / AI / Cloud / Solutions / Hardware
+- 外企｜AWS｜Product Manager / AI / IoT / Solutions Architect / Startup
+- 外企｜Siemens｜Product / AI / Digitalization / IoT / Smart Infrastructure
+- 外企｜Schneider Electric｜Product / AI / IoT / Digital / Energy Management
+- 外企｜Honeywell｜Product / AI / IoT / Automation / NPI
+- 外企｜Bosch｜Product / AI / IoT / Smart Home / Mobility
+- 央国企｜中国移动｜人工智能产品 / AI产品 / 数字化产品 / 解决方案 / 物联网
+- 央国企｜中国电信｜人工智能产品 / AI产品经理 / 云网产品 / 数字化 / 物联网
+- 央国企｜中国联通｜人工智能产品 / AI产品经理 / 创新产品 / 数字化 / 物联网
+- 央国企｜南方电网｜人工智能 / 数字化产品 / 智能硬件 / 物联网 / 产品经理
+- 央国企/红筹｜中信系｜AI产品 / 数字化产品 / 金融科技产品 / 智能终端 / 产品经理
+- 央国企/红筹｜华润｜AI产品 / 数字化产品 / 智能硬件 / 创新产品 / 产品经理
+- 央国企/国企平台｜招商局/招商系｜AI产品 / 数字化产品 / 智慧物流 / 智慧园区 / 产品经理
+- 地方国企｜粤海控股｜数字化产品 / AI / 智慧水务 / 产品经理 / 信息化
+- 大厂集团/腾讯系｜腾讯 CSIG 云与智慧产业事业群｜AI产品 / 腾讯云 / 产业互联网 / 解决方案 / 物联网
+- 大厂集团/腾讯系｜腾讯云｜AI产品 / 云产品 / 物联网平台 / 解决方案 / 产品经理
+- 大厂集团/腾讯系｜腾讯会议｜AI产品 / 会议AI / 协同办公 / 产品经理
+- 大厂集团/腾讯系｜微信支付/腾讯金融科技｜AI产品 / 金融科技产品 / 数字化产品 / 产品经理
+- 大厂集团/腾讯系｜腾讯地图/位置服务｜AI产品 / 位置服务 / 车联网 / 产品经理
+- 大厂集团/腾讯系｜腾讯音乐 TME｜AI产品 / AIGC / 内容创作 / 产品经理
+- 大厂集团/字节系｜字节跳动｜AI产品 / 智能硬件 / 产品经理 / AI应用 / 解决方案
+- 大厂集团/字节系｜火山引擎｜AI产品 / 云产品 / 大模型应用 / 解决方案 / 产品经理
+- 大厂集团/字节系｜飞书｜AI产品 / 协同办公 / 企业产品 / 产品经理
+- 大厂集团/字节系｜PICO｜AI终端 / 智能硬件 / XR / 产品经理 / 交互
+- 大厂集团/字节系｜剪映 CapCut｜AI产品 / AIGC / 视频创作 / 产品经理
+- 大厂集团/阿里系｜阿里云｜AI产品 / 云产品 / IoT / 解决方案 / 产品经理
+- 大厂集团/阿里系｜钉钉｜AI产品 / 协同办公 / 企业产品 / 产品经理
+- 大厂集团/阿里系｜蚂蚁集团｜AI产品 / 金融科技产品 / 数字化产品 / 产品经理
+- 大厂集团/阿里系｜达摩院/阿里研究院｜AI应用 / 产品经理 / 智能硬件 / 解决方案
+- 大厂集团/华为系｜华为云｜AI产品 / 云产品 / 盘古大模型 / 解决方案 / 产品经理
+- 大厂集团/华为系｜华为终端 BG｜AI终端 / 智能硬件 / 产品经理 / HarmonyOS / IoT
+- 大厂集团/华为系｜华为车 BU｜智能座舱 / AI终端 / 车联网 / 产品经理
+- 大厂集团/华为系｜HarmonyOS 生态｜AI产品 / 操作系统生态 / IoT / 产品经理
+- 大厂集团/百度系｜百度智能云｜AI产品 / 智能云 / 大模型应用 / 解决方案 / 产品经理
+- 大厂集团/百度系｜小度科技｜AI终端 / 智能硬件 / 语音交互 / 产品经理
+- 大厂集团/JD系｜京东科技｜AI产品 / 数字化产品 / 供应链科技 / 产品经理
+- 大厂集团/JD系｜京东云｜AI产品 / 云产品 / 解决方案 / 产品经理
+- 大厂集团/美团系｜美团｜AI硬件 / 产品经理 / 机器人 / 智能终端
+- 大厂集团/美团系｜美团无人机｜智能硬件 / 无人机 / AI产品 / 产品经理
+- 大厂集团/小米系｜小米 IoT｜AIoT / 智能硬件 / 产品经理 / IoT平台
+- 大厂集团/小米系｜小米汽车｜智能座舱 / AI终端 / 车联网 / 产品经理
+- 大厂集团/硬件终端｜大疆 DJI｜AI硬件 / 机器人 / 产品经理 / 智能终端
+- 大厂集团/硬件终端｜OPPO｜AI终端 / IoT / 产品经理 / 智能硬件
+- 大厂集团/硬件终端｜vivo｜AI终端 / IoT / 产品经理 / 智能硬件
+- 大厂集团/硬件终端｜荣耀 Honor｜AI终端 / 智能硬件 / 产品经理 / IoT
+- 大厂集团/硬件终端｜比亚迪智能网联｜智能座舱 / 车联网 / AI产品 / 产品经理
+- 大厂集团/硬件终端｜美的集团 IoT/美云智数｜AIoT / 智能家居 / 数字化产品 / 产品经理
+- 大厂集团/硬件终端｜海尔智家/卡奥斯｜AIoT / 工业互联网 / 数字化产品 / 产品经理
+- 大厂集团/硬件终端｜联想 Lenovo｜AI PC / 智能终端 / 产品经理 / IoT
+- 外企/工业自动化｜ABB｜Product / AI / IoT / Digital / Automation
+- 外企/工业自动化｜Emerson｜Product / AI / IoT / Automation / Digital
+- 外企/工业自动化｜Johnson Controls｜Product / AI / Smart Building / IoT / Digital
+- 外企/工业自动化｜Rockwell Automation｜Product / AI / Industrial IoT / Digital
+- 外企/工业自动化｜Yokogawa｜Product / AI / Industrial Automation / Digital
+- 外企/工业自动化｜Omron｜Product / AI / IoT / Automation / Healthcare
+- 外企/工业自动化｜GE Vernova｜Product / AI / Digital / Energy / IoT
+- 外企/消费电子硬件｜Apple｜Product Manager / Hardware / AI / Operations / NPI
+- 外企/消费电子硬件｜Sony｜Product / AI / Imaging / Hardware / IoT
+- 外企/消费电子硬件｜Samsung｜Product / AI / IoT / Mobile / Hardware
+- 外企/消费电子硬件｜LG Electronics｜Product / AI / IoT / Smart Home
+- 外企/消费电子硬件｜HP｜Product / AI PC / Hardware / IoT
+- 外企/消费电子硬件｜Dell Technologies｜Product / AI PC / Hardware / Solutions
+- 外企/芯片与平台｜NVIDIA｜Product / AI / Edge AI / Robotics / Solutions
+- 外企/芯片与平台｜Intel｜Product / AI / Edge / IoT / Solutions
+- 外企/芯片与平台｜AMD｜Product / AI / Edge / Solutions
+- 外企/芯片与平台｜Qualcomm｜Product / AI / IoT / Edge AI / Mobile
+- 外企/芯片与平台｜Arm｜Product / AI / IoT / Edge / Solutions
+- 外企/企业软件云｜Oracle｜Product / AI / Cloud / Digital / Solutions
+- 外企/企业软件云｜SAP｜Product / AI / Business AI / Digital / Solutions
+- 外企/企业软件云｜Salesforce｜Product / AI / CRM / Agentforce / Solutions
+- 外企/企业软件云｜ServiceNow｜Product / AI / Workflow / Digital / Solutions
+- 外企/企业软件云｜Adobe｜Product / AI / Creative AI / AIGC / Digital
+- 外企/企业软件云｜IBM｜Product / AI / watsonx / Digital / Solutions
+- 外企/网络通信｜Cisco｜Product / AI / IoT / Networking / Solutions
+- 外企/网络通信｜Nokia｜Product / AI / IoT / Network / Digital
+- 外企/网络通信｜Ericsson｜Product / AI / IoT / Network / Digital
+- 央国企/电力能源数科｜南网数字集团｜数字电网 / AI产品 / 物联网 / 产品经理 / 解决方案
+- 央国企/电力能源数科｜中广核数字科技｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/电力能源数科｜国家电投｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/电力能源数科｜华能集团｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/电力能源数科｜华电集团｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/电力能源数科｜三峡集团｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/电子信息｜中国电子 CEC｜AI产品 / 数字化产品 / 信息安全 / 产品经理
+- 央国企/电子信息｜中国电子科技 CETC｜AI产品 / 智能硬件 / 数字化产品 / 产品经理
+- 央国企/电子信息｜中电金信｜AI产品 / 金融科技产品 / 数字化产品 / 产品经理
+- 央国企/运营商数科｜移动云｜AI产品 / 云产品 / 物联网平台 / 产品经理
+- 央国企/运营商数科｜咪咕｜AI产品 / AIGC / 内容产品 / 产品经理
+- 央国企/运营商数科｜联通数科｜AI产品 / 数字化产品 / 物联网 / 产品经理
+- 央国企/运营商数科｜天翼云｜AI产品 / 云产品 / 大模型应用 / 产品经理
+- 央国企/运营商数科｜中电信数智｜AI产品 / 数字化产品 / 云网产品 / 产品经理
+- 地方国企/深圳｜深圳市智慧城市科技发展集团 深智城｜AI产品 / 智慧城市 / 数字化产品 / 产品经理
+- 地方国企/深圳｜深投控｜AI产品 / 数字化产品 / 产业平台 / 产品经理
+- 地方国企/深圳｜深业集团｜AI产品 / 数字化产品 / 智慧园区 / 产品经理
+- 地方国企/深圳｜深圳能源｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 地方国企/深圳｜特区建工｜AI产品 / 数字化产品 / 智慧工地 / 产品经理
+- 地方国企/广州广东｜广汽集团｜AI产品 / 智能座舱 / 车联网 / 产品经理
+- 地方国企/广州广东｜广州数科集团｜AI产品 / 数字化产品 / 智慧城市 / 产品经理
+- 地方国企/广州广东｜越秀集团｜AI产品 / 数字化产品 / 智慧园区 / 产品经理
+- 地方国企/广州广东｜广新控股｜AI产品 / 数字化产品 / 产业互联网 / 产品经理
+- 地方国企/广州广东｜广晟控股｜AI产品 / 数字化产品 / 智能制造 / 产品经理
+- 香港/大湾区平台｜Jardine Matheson 怡和｜Product / AI / Digital / Innovation / Solutions
+- 香港/大湾区平台｜Swire 太古｜Product / AI / Digital / Innovation
+- 香港/大湾区平台｜CLP 中电｜Product / AI / Digital / Smart Energy
+- 香港/大湾区平台｜MTR 港铁｜Product / AI / Digital / Smart Mobility
+- 香港/大湾区平台｜HKEX 香港交易所｜Product / AI / Digital / FinTech
+- 香港/大湾区平台｜AIA 友邦｜Product / AI / Digital / InsurTech
+- 香港/大湾区平台｜HSBC 汇丰｜Product / AI / Digital / FinTech
+- 香港/大湾区平台｜Standard Chartered 渣打｜Product / AI / Digital / FinTech
+- FDE/AI部署｜OpenAI FDE｜Forward Deployed Engineer / Applied AI / Solutions Engineer / LLM deployment / Agent
+- FDE/AI部署｜Anthropic FDE / Applied AI｜Forward Deployed Engineer / Applied AI / Claude / MCP / Agent / AI deployment
+- FDE/AI部署｜Google Cloud FDE-adjacent｜Forward Deployed Engineer / Customer Engineer AI / AI Solutions Architect / Applied AI Engineer / Generative AI deployment / RAG / MCP
+- FDE/AI部署｜Databricks FDE-adjacent｜Delivery Solutions Architect / Resident Solutions Architect / Generative AI / Mosaic AI
+- FDE/AI部署｜Palantir FDE｜Forward Deployed Software Engineer / Deployment Strategist / AIP / AI deployment
+- FDE/AI部署｜Scale AI FDE-adjacent｜Forward Deployed Engineer / AI Solutions Engineer / Applied AI / LLM deployment
+- FDE/AI部署｜国内FDE相邻岗位｜AI应用工程师 / AI产品工程师 / 大模型解决方案架构师 / Agent/RAG交付 / 客户工程师
+- 外企/智能硬件与消费电子｜Philips 飞利浦｜Product / AI / IoT / Smart Home / Healthcare
+- 外企/智能硬件与消费电子｜Dyson 戴森｜Product / AI / Hardware / NPI / Robotics
+- 外企/智能硬件与消费电子｜Garmin 佳明｜Product / Wearable / AI / IoT / Hardware
+- 外企/智能硬件与消费电子｜Belkin 贝尔金｜Product / Smart Home / IoT / Hardware / AI
+- 外企/智能硬件与消费电子｜Jabra / GN Group｜Product / Audio / AI / Hardware / IoT
+- 外企/智能硬件与消费电子｜Sennheiser 森海塞尔｜Product / Audio / AI / Hardware
+- 外企/智能硬件与消费电子｜Bose 博士｜Product / Audio / AI / Hardware
+- 外企/智能硬件与消费电子｜Sonos｜Product / Audio / AI / Smart Home
+- 外企/智能硬件与消费电子｜GoPro｜Product / Camera / AI / Hardware
+- 外企/智能硬件与消费电子｜Logitech 罗技｜Product / AI / Video / Audio / Hardware
+- 外企/智能楼宇与工业自动化｜Signify 昕诺飞｜Product / AI / IoT / Smart Lighting / Digital
+- 外企/智能楼宇与工业自动化｜Legrand 罗格朗｜Product / IoT / Smart Building / Digital
+- 外企/智能楼宇与工业自动化｜Eaton 伊顿｜Product / AI / Digital / Energy / Automation
+- 外企/智能楼宇与工业自动化｜Danfoss 丹佛斯｜Product / IoT / Digital / Energy / Automation
+- 外企/智能楼宇与工业自动化｜Phoenix Contact 菲尼克斯电气｜Product / Industrial IoT / Automation / Digital
+- 外企/智能楼宇与工业自动化｜Festo 费斯托｜Product / Automation / AI / Industrial IoT / Digital
+- 外企/智能楼宇与工业自动化｜KUKA 库卡｜Product / Robotics / AI / Automation / Digital
+- 外企/智能楼宇与工业自动化｜ifm 易福门｜Product / Sensor / IoT / Automation / Digital
+- 外企/智能楼宇与工业自动化｜Balluff 巴鲁夫｜Product / Sensor / IoT / Automation
+- 外企/智能楼宇与工业自动化｜Pepperl+Fuchs 倍加福｜Product / Sensor / IoT / Automation
+- 外企/工业与物流智能硬件｜Zebra Technologies 斑马技术｜Product / AI / IoT / Mobile Computing / Solutions
+- 外企/工业与物流智能硬件｜SICK 西克｜Product / Sensor / AI / Automation / IoT
+- 外企/芯片与边缘AI｜Texas Instruments 德州仪器｜Product / AI / Edge / IoT / Solutions
+- 外企/芯片与边缘AI｜NXP 恩智浦｜Product / AI / Edge / IoT / Automotive
+- 外企/芯片与边缘AI｜STMicroelectronics 意法半导体｜Product / AI / Edge / IoT / Embedded
+- 外企/芯片与边缘AI｜Infineon 英飞凌｜Product / AI / IoT / Automotive / Power
+- 外企/芯片与边缘AI｜MediaTek 联发科｜Product / AI / Mobile / IoT / Edge
+- 外企/芯片与边缘AI｜Analog Devices 亚德诺｜Product / AI / Edge / IoT / Solutions
+- 外企/芯片与边缘AI｜Microchip 微芯科技｜Product / AI / IoT / Embedded / Solutions
+- 外企/医疗与健康智能硬件｜GE HealthCare｜Product / AI / Healthcare / Digital / IoT
+- 外企/医疗与健康智能硬件｜Johnson & Johnson MedTech 强生医疗科技｜Product / AI / MedTech / Digital / NPI
+- 外企/医疗与健康智能硬件｜Medtronic 美敦力｜Product / AI / MedTech / Digital / NPI
+- 外企/医疗与健康智能硬件｜Stryker 史赛克｜Product / AI / MedTech / Digital / NPI
+- 外企/企业AI与数字化｜Atlassian｜Product / AI / Enterprise / Workflow / Digital
+- 外企/企业AI与数字化｜Workday｜Product / AI / Enterprise / Digital / Solutions
+- 外企/企业AI与数字化｜Zoom｜Product / AI / Collaboration / Audio / Video
+- 外企/企业AI与数字化｜Dropbox｜Product / AI / Collaboration / Digital
+- 央国企/运营商与通信二级平台｜中国铁塔｜AI产品 / 物联网 / 数字化产品 / 解决方案 / 产品经理
+- 央国企/运营商与通信二级平台｜中国通信服务｜AI产品 / 数字化产品 / 物联网 / 解决方案 / 产品经理
+- 央国企/运营商与通信二级平台｜中国信科 CICT｜AI产品 / 通信 / 物联网 / 数字化产品 / 产品经理
+- 央国企/运营商与通信二级平台｜烽火通信 FiberHome｜AI产品 / 通信 / 物联网 / 数字化产品 / 解决方案
+- 央国企/金融与邮政数科｜中国邮政｜AI产品 / 数字化产品 / 金融科技 / 产品经理 / 解决方案
+- 央国企/金融与邮政数科｜邮储银行｜AI产品 / 数字化产品 / 金融科技 / 产品经理
+- 央国企/金融与邮政数科｜招商银行金融科技｜AI产品 / 金融科技产品 / 数字化产品 / 产品经理
+- 央国企/招商局系｜招商局金融科技｜AI产品 / 数字化产品 / 金融科技 / 产品经理
+- 央国企/招商局系｜招商蛇口｜AI产品 / 数字化产品 / 智慧园区 / 产品经理
+- 央国企/华润系｜华润数科｜AI产品 / 数字化产品 / 零售科技 / 产品经理 / 解决方案
+- 央国企/华润系｜华润电力｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 央国企/华润系｜华润置地｜AI产品 / 数字化产品 / 智慧建筑 / 产品经理
+- 央国企/CITIC系｜中信银行信用卡中心｜AI产品 / 金融科技产品 / 数字化产品 / 产品经理
+- 央国企/交通与先进制造｜中国中车 CRRC｜AI产品 / 智能制造 / 轨道交通 / 数字化产品 / 产品经理
+- 央国企/交通与先进制造｜中国通号 CRSC｜AI产品 / 轨道交通 / 数字化产品 / 解决方案 / 产品经理
+- 央国企/先进制造与军工电子｜中国船舶 CSSC｜AI产品 / 智能硬件 / 数字化产品 / 解决方案 / 产品经理
+- 央国企/先进制造与军工电子｜中航国际 AVIC INTL｜AI产品 / 智能制造 / 数字化产品 / 解决方案 / 产品经理
+- 央国企/电子信息二级平台｜中国长城科技集团｜AI产品 / 信创产品 / 智能硬件 / 数字化产品 / 产品经理
+- 央国企/电子信息二级平台｜深科技 KAIFA｜AI产品 / 智能制造 / NPI / 数字化产品 / 产品经理
+- 地方国企/深圳｜深圳地铁｜AI产品 / 数字化产品 / 智慧交通 / 产品经理
+- 地方国企/深圳｜深圳机场集团｜AI产品 / 数字化产品 / 智慧机场 / 产品经理
+- 地方国企/深圳｜深高速｜AI产品 / 数字化产品 / 智慧交通 / 产品经理
+- 地方国企/深圳｜深圳燃气｜AI产品 / 数字化产品 / 智慧能源 / 产品经理
+- 地方国企/深圳｜深粮控股｜AI产品 / 数字化产品 / 供应链科技 / 产品经理
+- 地方国企/广州广东｜广州无线电集团｜AI产品 / 智能硬件 / 数字化产品 / 产品经理
+- 地方国企/广州广东｜广电运通 GRG Banking｜AI产品 / 智能硬件 / 金融科技产品 / 产品经理
+- 地方国企/广州广东｜海格通信｜AI产品 / 智能硬件 / 通信 / 数字化产品 / 产品经理
+- 地方国企/广州广东｜广州地铁｜AI产品 / 智慧交通 / 数字化产品 / 产品经理
+- 地方国企/广州广东｜广州港集团｜AI产品 / 数字化产品 / 智慧港口 / 产品经理
+- 地方国企/广州广东｜粤海水务｜AI产品 / 数字化产品 / 智慧水务 / 产品经理
+- 香港/大湾区大型平台｜PCCW / HKT｜Product / AI / Digital / IoT / Solutions
+- 香港/大湾区大型平台｜Hong Kong Jockey Club 香港赛马会｜Product / AI / Digital / Customer / Data
+- 香港/大湾区大型平台｜Airport Authority Hong Kong 香港机场管理局｜Product / AI / Digital / Smart Airport / Solutions
+- 香港/大湾区大型平台｜Towngas 香港中华煤气｜Product / AI / Digital / Energy / IoT
+- 香港/大湾区大型平台｜New World Development 新世界发展｜Product / AI / Digital / Smart Building / Customer
+- 香港/大湾区大型平台｜Sun Hung Kai Properties 新鸿基地产｜Product / AI / Digital / Smart Building / Customer
+## Codex 2026-06-14 补充扫描
+
+- 上午自动脚本已完成全量复核与报告生成；Codex 本轮在其基础上追加补漏，不重建地图坐标。
+- AnySearch 免费额度已耗尽，本轮未保存自动生成的 API key，改用可访问的 Web 搜索结果做补充核验。
+- 补充新增 4 条，均写入 `次选_条件不完全符合`、`今日新增`、`面试顺序表`：
+  - SmartMore / 思谋科技｜AI产品经理-MJ001172｜深圳｜B80｜AI工业产品方向，薪资与驻场强度待确认。
+  - 深圳吉阳智能科技有限公司｜AI产品经理｜深圳｜B78｜AI+智能制造方向，3年以上与新能源背景风险。
+  - 杭州慕迪科技有限公司｜AI产品经理 / AI工具创作者｜深圳-南山区｜B76｜AI工具/原型方向，Python/JavaScript 风险。
+  - 航天科工资产管理有限公司｜AI产品培训经理｜深圳｜C72｜央企相关线索，但培训/售前属性较强。
+- 补充排除 1 条：沃尔玛中国投资有限公司｜AI智能体与低代码平台 产品负责人，因 5年以上与负责人要求明显偏高，不建议投递。
+- 地图未新增点：4 条补充岗位均未完成真实办公地址与 GCJ-02/香港坐标校准，按规则保留在 Excel，不上图。
+- Codex 验证：`今日新增` 4 条超链接 cell value 与 hyperlink target 一致；地图 HTML 浏览器截图通过，截图 `C:\tmp\job_map_20260614_codex.png`。
+
+## Interview OS JSON Feed
+
+- manifest.json: `C:\Users\Yang\Documents\New project\interview-os\latest\manifest.json`
+- jobs.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs.json`
+- jobs_delta.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs_delta.json`
+- job_sources.json: `C:\Users\Yang\Documents\New project\interview-os\latest\job_sources.json`
+- jobsCount: 255
+- newJobsCount: 4
+- updatedJobsCount: 0
+- removedJobsCount: 0
+- hash: `56935924b3548178008075a82c63982383f9ff6543cd75db28621d6532ced6fa`
+- GitHub upload: pending git commit/push from automation workspace
+- GitHub raw:
+  - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json
+  - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/jobs.json
+  - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/jobs_delta.json
+  - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/job_sources.json
+

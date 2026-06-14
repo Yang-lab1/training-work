@@ -20,6 +20,7 @@ const routes = {
   generateMockInterview: { path: '/api/generate-mock-interview', method: 'POST', available: true, mockSafe: true },
   reviewRealInterview: { path: '/api/review-real-interview', method: 'POST', available: true, mockSafe: true },
   generateCompanyKnowledgePack: { path: '/api/generate-company-knowledge-pack', method: 'POST', available: true, mockSafe: true },
+  jobDataLatest: { path: '/api/job-data/latest', method: 'GET', available: true, mockSafe: true },
 }
 
 export default {
