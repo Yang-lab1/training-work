@@ -314,7 +314,7 @@
 - updatedJobsCount: 0
 - removedJobsCount: 0
 - hash: `56935924b3548178008075a82c63982383f9ff6543cd75db28621d6532ced6fa`
-- GitHub upload: pending git commit/push from automation workspace
+- GitHub upload: success, pushed to `Yang-lab1/training-work` main at commit `4c7038f`
 - GitHub raw:
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/jobs.json
