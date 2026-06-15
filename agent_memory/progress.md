@@ -12,8 +12,10 @@
 - 已修复页面切换保留旧滚动位置、全屏按钮被遮挡、移动端抽屉无法关闭等问题。
 - `npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers` 已通过。
 - Playwright desktop + mobile：2 passed。
+- 已推送代码提交 `cc28091 refine interview flow and room`。
+- 已部署到 `https://interview-os-pi.vercel.app`。
+- 生产环境 Playwright desktop + mobile：2 passed。
 
 ## 下一步
 
-- 提交并推送本轮改动。
-- 部署生产并执行生产 smoke。
+- 等待用户实际体验反馈。
