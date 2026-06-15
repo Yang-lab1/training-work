@@ -425,9 +425,8 @@ const defaultTasks: TrainingTask[] = [
 const defaultState: StoredMvpState = { uploadedFiles: [], tasks: defaultTasks, history: [] }
 
 const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
-  { id: 'today', label: '今日训练', icon: <Home size={17} /> },
+  { id: 'today', label: '今日任务', icon: <Home size={17} /> },
   { id: 'materials', label: '资料与岗位', icon: <BriefcaseBusiness size={17} /> },
-  { id: 'training', label: '训练', icon: <Mic size={17} /> },
   { id: 'history', label: '历史', icon: <History size={17} /> },
   { id: 'feedback', label: 'AI 反馈', icon: <BrainCircuit size={17} /> },
   { id: 'jobPack', label: '岗位准备包', icon: <Sparkles size={17} /> },
@@ -525,8 +524,11 @@ function App() {
   const jobFile = getFileByCategory(state.uploadedFiles, 'job')
   const jobMapFile = getFileByCategory(state.uploadedFiles, 'job-map')
   const todayRecords = state.history.filter((record) => isToday(record.savedAt))
-  const completedCount = defaultTasks.filter((task) => todayRecords.some((record) => record.taskId === task.id)).length
-  const analyzedToday = todayRecords.filter((record) => record.aiFeedbackStatus === 'completed').length
+  const todayMockCount = mockInterviews.filter((session) => isToday(session.startedAt || session.createdAt)).length
+  const todayMockFeedbackCount = mockInterviews
+    .filter((session) => isToday(session.startedAt || session.createdAt))
+    .flatMap((session) => session.answers)
+    .filter((answer) => answer.aiFeedbackStatus === 'completed').length
   const filteredJobs = useMemo(() => filterJobs(jobPool, filters, jobUserStatus), [jobPool, filters, jobUserStatus])
   const filterOptions = useMemo(() => buildFilterOptions(jobPool), [jobPool])
   const currentJobPack = useMemo(
@@ -857,7 +859,7 @@ function App() {
       ...current,
       [job.id]: 'preparing',
     }))
-    setActiveView('training')
+    setActiveView('jobPack')
   }
 
   function updateJobUserStatus(jobId: string, status: JobUserStatus) {
@@ -1914,8 +1916,8 @@ function App() {
               </aside>
             </section>
             <section className="today-compact-status" aria-label="今日训练状态">
-              <Metric label="今日录音" value={`${completedCount}/3`} />
-              <Metric label="AI 反馈" value={`${analyzedToday}/${todayRecords.length || 0}`} />
+              <Metric label="今日模拟面试" value={`${todayMockCount}`} />
+              <Metric label="面试题反馈" value={`${todayMockFeedbackCount}`} />
               <Metric label="岗位库" value={`${jobPool.length}`} />
             </section>
             <section className="daily-remaining">
@@ -3719,7 +3721,7 @@ function buildDailyAction(context: {
   if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
   const missingFeedback = context.history.find((record) => record.transcript && !record.aiFeedback)
   if (missingFeedback) return { title: '补齐 AI 反馈', detail: `${missingFeedback.title} 已有转写，等待生成短报告。`, cta: '生成 AI 反馈', view: 'feedback', icon: <BrainCircuit size={17} /> }
-  return { title: '继续岗位训练', detail: '今天可以重练一段回答，或直接进入下一轮模拟面试。', cta: '进入训练', view: 'training', icon: <Mic size={17} /> }
+  return { title: '继续模拟面试', detail: '所有考察都在面试舱里完成，系统会自动转写、分析和追问。', cta: '进入面试舱', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
 }
 
 function buildDataStatusText(context: {
@@ -3802,13 +3804,15 @@ function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null
   if (!jobPack) return ['生成当前岗位准备包。']
   if (!mockInterviews.length) return ['开始一轮模拟面试。']
   if (!cv.text) return ['上传 TXT / Markdown 简历文本版。']
-  const missing = defaultTasks.filter((task) => !records.some((record) => record.taskId === task.id))
-  if (missing.length) return [`完成剩余录音：${missing.map((task) => task.title).join('、')}。`]
+  const activeMock = mockInterviews.find((session) => session.status !== 'completed' || !session.finalReport)
+  if (activeMock) return ['完成当前模拟面试，并生成整场复盘。']
   const withoutTranscript = records.find((record) => !record.transcript)
   if (withoutTranscript) return [`为${withoutTranscript.title}生成转写文本。`, '也可以使用模拟转写测试流程。']
   const withoutFeedback = records.find((record) => !record.aiFeedback)
   if (withoutFeedback) return [`为${withoutFeedback.title}生成 AI 反馈。`]
-  return records.flatMap((record) => record.aiFeedback?.nextTasks || []).slice(0, 3)
+  const interviewTasks = mockInterviews.flatMap((session) => session.finalReport?.report.nextTrainingPlan || [])
+  if (interviewTasks.length) return interviewTasks.slice(0, 3)
+  return ['进入下一轮模拟面试。']
 }
 
 function getScriptTextForTask(taskId: TaskId, tasks: TrainingTask[], templates: ScriptTemplates, job: JobRecord | null) {
