@@ -2631,3 +2631,577 @@ button,
     white-space: nowrap;
   }
 }
+
+/* Product Design V3: background preparation + video-first interview room */
+.risk-toggle input[type="checkbox"] {
+  appearance: auto;
+  inline-size: 16px;
+  block-size: 16px;
+  min-inline-size: 16px;
+  min-block-size: 16px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 16px;
+  border: 0;
+  box-shadow: none;
+}
+
+.interview-ready-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px 32px 20px;
+}
+
+.interview-ready-heading h2 {
+  max-width: none;
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+
+.interview-ready-heading p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.interview-quick-start {
+  min-height: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.quick-meeting-window {
+  min-height: 0;
+  aspect-ratio: 16 / 8.4;
+  margin: 0 32px;
+  border-radius: 14px;
+  background: #101112;
+}
+
+.quick-interviewer {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+
+.quick-interviewer::after,
+.interviewer-panel::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 42%;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .72));
+  pointer-events: none;
+}
+
+.quick-interviewer img,
+.interviewer-panel > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+
+.quick-interviewer-label {
+  position: absolute;
+  z-index: 2;
+  left: 24px;
+  bottom: 22px;
+  display: grid;
+  gap: 4px;
+  color: #fff;
+}
+
+.quick-interviewer-label strong {
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.quick-interviewer-label span {
+  color: rgba(255, 255, 255, .72);
+  font-size: 13px;
+}
+
+.quick-candidate {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  z-index: 3;
+  width: 210px;
+  min-height: 132px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 12px;
+  background: rgba(24, 25, 27, .82);
+  color: #fff;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+}
+
+.quick-candidate span,
+.quick-candidate p {
+  color: rgba(255, 255, 255, .68);
+}
+
+.quick-candidate strong {
+  font-size: 18px;
+}
+
+.quick-candidate .wave-bars i {
+  background: #fff;
+}
+
+.interview-lobby-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 32px 30px;
+}
+
+.interview-entry {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.interview-prep-status {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.interview-prep-status.ready {
+  color: var(--success);
+}
+
+.interview-prep-status.error {
+  color: var(--danger);
+}
+
+.interview-prep-status i {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(15, 15, 15, .16);
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: prep-spin .8s linear infinite;
+}
+
+@keyframes prep-spin {
+  to { transform: rotate(360deg); }
+}
+
+.meeting-room {
+  width: min(100%, 1280px);
+  padding: 12px;
+  gap: 12px;
+  border: 0;
+  border-radius: 16px;
+  background: #0c0d0e;
+  box-shadow: none;
+}
+
+.meeting-status-bar {
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(78px, auto)) auto;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: #f6f6f4;
+  position: relative;
+  z-index: 20;
+}
+
+.meeting-status-bar button {
+  background: #fff;
+}
+
+.meeting-status-actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.meeting-status-bar > div:not(.meeting-status-actions) {
+  pointer-events: none;
+}
+
+.meeting-status-actions button:last-child {
+  width: 42px;
+  padding: 0;
+}
+
+.meeting-stage,
+.meeting-stage.has-side-panel {
+  position: relative;
+  display: block;
+  min-height: 0;
+  aspect-ratio: 16 / 8.5;
+}
+
+.interviewer-panel {
+  position: absolute;
+  inset: 0;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #171819;
+  overflow: hidden;
+  text-align: left;
+}
+
+.interviewer-screen-badge {
+  position: absolute;
+  z-index: 2;
+  top: 18px;
+  left: 18px;
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(10, 10, 10, .72);
+  color: #fff;
+  font-size: 13px;
+  backdrop-filter: blur(12px);
+}
+
+.interviewer-question {
+  position: absolute;
+  z-index: 2;
+  right: 280px;
+  bottom: 22px;
+  left: 22px;
+  max-width: 720px;
+  padding: 15px 18px;
+  border-radius: 12px;
+  background: rgba(15, 15, 15, .78);
+  color: #fff;
+  backdrop-filter: blur(14px);
+}
+
+.interviewer-question span {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, .62);
+  font-size: 12px;
+}
+
+.interviewer-question p {
+  margin: 0;
+  color: #fff;
+  font-size: 17px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.meeting-stage .candidate-window {
+  position: absolute;
+  z-index: 3;
+  right: 20px;
+  bottom: 20px;
+  width: 224px;
+  min-height: 138px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 12px;
+  background: rgba(22, 23, 25, .84);
+  color: #fff;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.meeting-stage .candidate-window span,
+.meeting-stage .candidate-window p {
+  color: rgba(255, 255, 255, .65);
+}
+
+.meeting-stage .candidate-window strong {
+  font-size: 19px;
+}
+
+.meeting-stage .candidate-window .wave-bars {
+  height: 34px;
+}
+
+.meeting-stage .candidate-window .wave-bars i {
+  width: 5px;
+  background: #fff;
+}
+
+.meeting-control-bar {
+  position: relative;
+  bottom: auto;
+  flex-wrap: nowrap;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #f6f6f4;
+  box-shadow: none;
+}
+
+.meeting-control-bar button,
+.meeting-backup-actions summary {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.meeting-control-bar .primary-button {
+  background: #111;
+  color: #fff;
+}
+
+.meeting-control-bar .recording-control {
+  border-color: #8d2929;
+  background: #8d2929;
+  color: #fff;
+}
+
+.meeting-control-bar .end-interview-button {
+  border-color: rgba(0, 0, 0, .12);
+  background: #fff;
+  color: #111;
+}
+
+.meeting-control-bar .end-interview-button:disabled {
+  border-color: transparent;
+  background: #e8e8e5;
+  color: #8a8a86;
+}
+
+.meeting-status-chip {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+}
+
+.meeting-panel-toggle {
+  position: absolute;
+  z-index: 12;
+  top: 82px;
+  right: 26px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  background: rgba(18, 19, 20, .72);
+  color: #fff;
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+}
+
+.meeting-side-panel {
+  top: 134px;
+  right: 24px;
+  bottom: 90px;
+  width: min(340px, calc(100% - 48px));
+  border: 0;
+  border-radius: 12px;
+  background: rgba(248, 248, 246, .97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+}
+
+.meeting-room--fullscreen {
+  padding: 12px;
+  overflow: hidden;
+}
+
+.meeting-room--fullscreen .meeting-stage {
+  aspect-ratio: auto;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .interview-ready-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quick-meeting-window,
+  .meeting-stage,
+  .meeting-stage.has-side-panel {
+    aspect-ratio: 4 / 5;
+  }
+
+  .interviewer-question {
+    right: 18px;
+    bottom: 156px;
+    left: 18px;
+  }
+
+  .meeting-stage .candidate-window {
+    right: 18px;
+    bottom: 18px;
+    width: 184px;
+    min-height: 112px;
+  }
+
+  .meeting-control-bar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 680px) {
+  .interview-ready-heading {
+    padding: 24px 20px 16px;
+  }
+
+  .interview-ready-heading h2 {
+    font-size: 28px;
+  }
+
+  .quick-meeting-window {
+    margin: 0 12px;
+  }
+
+  .interview-lobby-actions {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px 20px 24px;
+  }
+
+  .interview-entry {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .meeting-room {
+    height: calc(100dvh - 126px);
+    min-height: 560px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 8px;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  .meeting-status-bar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .meeting-status-bar > div:nth-of-type(3),
+  .meeting-status-bar > div:nth-of-type(4) {
+    display: none;
+  }
+
+  .meeting-status-bar button {
+    padding-inline: 10px;
+    font-size: 0;
+  }
+
+  .meeting-status-actions {
+    gap: 5px;
+  }
+
+  .meeting-status-actions button {
+    width: 40px;
+    min-width: 40px;
+  }
+
+  .meeting-status-bar button svg {
+    margin: 0;
+  }
+
+  .meeting-control-bar button,
+  .meeting-control-bar .meeting-status-chip,
+  .meeting-control-bar .meeting-backup-actions {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .meeting-control-bar {
+    position: relative;
+    bottom: auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-height: 58px;
+    padding: 8px;
+  }
+
+  .meeting-stage,
+  .meeting-stage.has-side-panel {
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+
+  .meeting-control-bar .primary-button {
+    flex: 1 1 auto;
+  }
+
+  .meeting-control-bar button,
+  .meeting-backup-actions summary {
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: 13px;
+  }
+
+  .meeting-stage .candidate-window {
+    right: 12px;
+    bottom: 12px;
+    width: 132px;
+    min-height: 82px;
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .meeting-stage .candidate-window strong {
+    font-size: 15px;
+  }
+
+  .meeting-stage .candidate-window p {
+    display: none;
+  }
+
+  .meeting-stage .candidate-window .wave-bars {
+    height: 22px;
+  }
+
+  .interviewer-question {
+    right: 12px;
+    bottom: 104px;
+    left: 12px;
+    max-height: 112px;
+    padding: 12px 14px;
+    overflow: hidden;
+  }
+
+  .interviewer-question p {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .meeting-panel-toggle {
+    position: absolute;
+    z-index: 30;
+    top: 80px;
+    right: 20px;
+    justify-self: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interview-prep-status i {
+    animation: none;
+  }
+}

@@ -2,31 +2,37 @@
 
 ## Scope
 
-本轮按 Product Design 方案 2 + 3 执行视觉收口：
+本轮按 Product Design 的 Interview Room First 方向纠偏：
 
-- 2：Interview Room First，让模拟面试入口和面试房间更像线上会议。
-- 3：Studio Console，让首页成为日常面试工作台，而不是功能模块堆叠。
+- 岗位准备资料改为后台自动生成，只向用户显示准备状态。
+- 岗位列表不再展开内部处理节点。
+- 模拟面试改为大厅、等待室、正式面试房间和复盘室。
+- 正式面试房间以虚拟面试官为视觉焦点，资料面板默认关闭。
 
 ## Screenshots Checked
 
-- `test-results/product-design/today-desktop.png`
-- `test-results/product-design/mock-desktop.png`
-- `test-results/product-design/today-mobile.png`
+- `test-results/interview-os.e2e-*/materials-and-jobs.png`
+- `test-results/interview-os.e2e-*/interview-lobby.png`
+- `test-results/interview-os.e2e-*/interview-room.png`
+- 同时检查 desktop Chromium 与 Pixel 5 viewport。
 
 ## Product Design Judgment
 
-- 首页不再呈现重复大标题，视觉中心是今日推荐动作。
-- 顶部导航保持四个主入口和“我的”菜单，密度可控。
-- 模拟面试入口使用深色会议窗口、虚拟面试官区域和候选人小窗，明显区别于普通录音训练页。
-- 移动端已修复标题竖排、按钮竖排、指标断裂问题。
-- 卡片仍用于关键行动和会议窗口承载，但普通说明区域没有再新增卡片堆叠。
+- 岗位筛选复选框尺寸与其他控件一致，不再出现异常大图标。
+- 岗位准备不再作为独立导航或内容页面，用户只看到“准备中 / 已就绪 / 失败”。
+- 面试大厅只有岗位、面试类型、准备状态和一个主操作。
+- 面试房间使用单一深色会议画面，面试官是视觉焦点。
+- 当前问题、候选人窗口与控制栏层级清楚，右侧资料默认收起。
+- 桌面和移动端均没有文字、候选人窗口或控制栏互相遮挡。
+- 页面切换会回到顶部，不再把上一页滚动位置带入面试舱。
 
 ## Impeccable Review
 
-- 仅改动 CSS 视觉层，不改训练、岗位、Provider、备份等运行逻辑。
-- 移动端断点已补充单列布局、横向导航滚动和长文本保护。
-- 需要通过 `npm run build`、Playwright 与现有测试确认没有破坏核心路径。
+- 后台自动准备失败时保留重试入口，不会让用户进入未准备完成的面试。
+- 大厅到等待室再到正式面试房间的状态链路已恢复。
+- 全屏、资料抽屉、录音、自动转写、AI 反馈、复盘和备份路径均由 Playwright 覆盖。
+- 移动端资料抽屉开关移入状态栏，不再出现可见但无法点击的浮层按钮。
 
 ## Result
 
-Passed for implementation handoff after visual screenshot inspection.
+passed

@@ -15,6 +15,7 @@ import {
   MessagesSquare,
   Mic,
   Minimize2,
+  PanelRightOpen,
   RotateCcw,
   Save,
   Sparkles,
@@ -22,6 +23,7 @@ import {
   Trash2,
   Upload,
   UserCircle,
+  X,
 } from 'lucide-react'
 import { normalizeJobRecord, parseJobWorkbook } from './jobParser'
 import type { JobRecord } from './jobParser'
@@ -77,7 +79,7 @@ const REMOTE_JOB_MANIFEST_URL = import.meta.env.VITE_JOB_DATA_MANIFEST_URL || DE
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'jobPack' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup' | 'diagnostics'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup' | 'diagnostics'
 type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -433,7 +435,6 @@ const primaryNavigation: Array<{ id: ViewId; label: string; icon: ReactNode }> =
 ]
 
 const accountNavigation: Array<{ id: ViewId; label: string; helper: string; icon: ReactNode }> = [
-  { id: 'jobPack', label: '岗位准备包', helper: '公司、岗位和回答策略', icon: <Sparkles size={17} /> },
   { id: 'realInterview', label: '真实面试复盘', helper: '真实录音转写与反补', icon: <FileAudio size={17} /> },
   { id: 'companyKnowledge', label: '公司资料', helper: '官网、JD、文章资料', icon: <FileText size={17} /> },
   { id: 'history', label: '面试记录', helper: '录音、转写和反馈', icon: <History size={17} /> },
@@ -522,6 +523,7 @@ function App() {
   const chunksRef = useRef<BlobPart[]>([])
   const startedAtRef = useRef(0)
   const jobSelectionRef = useRef<HTMLElement | null>(null)
+  const autoJobPackAttemptRef = useRef<Set<string>>(new Set())
 
   const cvFile = getFileByCategory(state.uploadedFiles, 'cv')
   const projectFile = getFileByCategory(state.uploadedFiles, 'project')
@@ -609,6 +611,14 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!selectedJob || currentJobPack || autoJobPackAttemptRef.current.has(selectedJob.id)) return
+    autoJobPackAttemptRef.current.add(selectedJob.id)
+    void generateJobPack(selectedJob)
+    // Generate the internal interview context once for a restored or newly selected job.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJob?.id, currentJobPack?.id])
+
   function recordProviderCall(call: Omit<ProviderCallRecord, 'at'>) {
     const nextCall: ProviderCallRecord = { ...call, at: new Date().toISOString() }
     setProviderState((current) => ({
@@ -620,6 +630,10 @@ function App() {
 
   useEffect(() => {
     if (activeView === 'diagnostics') void refreshProviderStatus()
+  }, [activeView])
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
   }, [activeView])
 
   useEffect(() => {
@@ -863,7 +877,8 @@ function App() {
       ...current,
       [job.id]: 'preparing',
     }))
-    setActiveView('jobPack')
+    setJobPackMessage('')
+    setActiveView('mockInterview')
   }
 
   function updateJobUserStatus(jobId: string, status: JobUserStatus) {
@@ -1082,6 +1097,11 @@ function App() {
       setActiveView('materials')
       return
     }
+    if (!currentJobPack) {
+      setMockInterviewMessage(jobPackLoading ? '面试资料正在准备，请稍候。' : '面试资料尚未准备完成，请重试。')
+      if (!jobPackLoading) void generateJobPack(selectedJob)
+      return
+    }
     setMockInterviewLoading('start')
     setMockInterviewMessage('')
     try {
@@ -1108,8 +1128,7 @@ function App() {
         jobPackId: currentJobPack?.id,
         companyKnowledgePackId: currentKnowledgePack?.id,
         status: 'in_progress',
-        uiState: 'interview_room',
-        startedAt: new Date().toISOString(),
+        uiState: 'waiting_room',
         createdAt: new Date().toISOString(),
         interviewType,
         currentQuestionIndex: 0,
@@ -1813,8 +1832,9 @@ function App() {
     setBackupMessage('已清空全部本地数据。')
   }
 
-  async function generateJobPack() {
-    if (!selectedJob) {
+  async function generateJobPack(jobOverride?: JobRecord) {
+    const targetJob = jobOverride || selectedJob
+    if (!targetJob) {
       setJobPackMessage('请先在“资料与岗位”中选择目标岗位。')
       return
     }
@@ -1829,8 +1849,8 @@ function App() {
         signal: controller.signal,
         body: JSON.stringify({
           taskType: 'generate_job_pack',
-          selectedJob,
-          companyKnowledgePack: currentKnowledgePack?.companyKnowledgePack,
+          selectedJob: targetJob,
+          companyKnowledgePack: companyKnowledgePacks.find((pack) => pack.selectedJobId === targetJob.id)?.companyKnowledgePack,
           cvText: cvTextState.text.slice(0, 8000),
           trainingRecords: state.history.slice(0, 20),
           aiFeedbackRecords: state.history.map((record) => record.aiFeedback).filter(Boolean),
@@ -1840,33 +1860,23 @@ function App() {
       const result = await response.json() as GenerateJobPackResponse
       if (!response.ok || !result.success) throw new Error(result.success ? '岗位准备包生成失败。' : result.error)
       const pack: StoredJobPack = {
-        id: `${selectedJob.id || selectedJob.companyName}-${Date.now()}`,
-        selectedJobId: selectedJob.id,
-        selectedJob,
+        id: `${targetJob.id || targetJob.companyName}-${Date.now()}`,
+        selectedJobId: targetJob.id,
+        selectedJob: targetJob,
         provider: result.provider,
         model: result.model,
         generatedAt: result.generatedAt,
         jobPack: result.jobPack,
         rawProviderNote: result.rawProviderNote,
       }
-      setJobPacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== selectedJob.id)].slice(0, 20))
-      setJobPackMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟岗位准备包。' : '岗位准备包已生成。')
+      setJobPacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== targetJob.id)].slice(0, 20))
+      setJobPackMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '面试资料已准备，当前使用模拟数据。' : '面试资料已准备。')
     } catch (error) {
       setJobPackMessage(error instanceof Error && error.name === 'AbortError' ? '请求超时，未覆盖已有准备包。' : error instanceof Error ? error.message : '岗位准备包生成失败。')
     } finally {
       clearTimeout(timeout)
       setJobPackLoading(false)
     }
-  }
-
-  function deleteJobPack(packId: string) {
-    setJobPacks((current) => current.filter((pack) => pack.id !== packId))
-    setJobPackMessage('已删除岗位准备包。')
-  }
-
-  function exportJobPack(pack: StoredJobPack) {
-    downloadJson(pack, `interview-os-job-pack-${formatDateForFileName(new Date())}.json`)
-    setJobPackMessage('已导出岗位准备包。')
   }
 
   const sharedRecordProps = {
@@ -1937,7 +1947,7 @@ function App() {
                 <div>
                   <span>最近状态</span>
                   <strong>{getLatestActivityLabel(state.history, mockInterviews, realInterviews)}</strong>
-                  <p>{currentJobPack ? '准备包已生成' : selectedJob ? '准备包待生成' : '等待岗位表'}</p>
+                  <p>{currentJobPack ? '面试资料已就绪' : selectedJob ? '面试资料准备中' : '等待岗位表'}</p>
                 </div>
               </aside>
             </section>
@@ -2066,7 +2076,7 @@ function App() {
                   <div className="job-list">
                     {filteredJobs.slice(0, 30).map((job) => {
                       const status = getJobUserStatus(jobUserStatus, job.id)
-                      const readiness = buildJobReadiness(job, { status, jobPacks, mockInterviews, realInterviews, history: state.history })
+                      const readiness = buildJobReadiness(job, { jobPacks, mockInterviews, realInterviews, history: state.history })
                       return (
                       <article className={`job-row ${selectedJob?.id === job.id ? 'selected' : ''}`} key={job.id}>
                         <div>
@@ -2078,7 +2088,6 @@ function App() {
                           </div>
                           <p>{job.normalized.matchReasons.slice(0, 1).join('；') || job.companyBusiness || '从已筛岗位中选择一个准备。'}</p>
                           <div className="job-readiness">
-                            {readiness.signals.map((signal) => <span key={signal}>{signal}</span>)}
                             <strong>{readiness.nextStep}</strong>
                           </div>
                           <details className="job-detail-drawer">
@@ -2097,7 +2106,7 @@ function App() {
                             {JOB_USER_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                           </select>
                           <button type="button" onClick={() => updateJobUserStatus(job.id, 'shortlisted')}>我想投</button>
-                          <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '准备中' : '选择准备'}</button>
+                          <button type="button" onClick={() => selectJob(job)}>{selectedJob?.id === job.id ? '当前岗位' : '选择面试'}</button>
                         </div>
                       </article>
                     )})}
@@ -2163,40 +2172,6 @@ function App() {
           </Page>
         )}
 
-        {activeView === 'jobPack' && (
-          <Page title="岗位准备包" subtitle="根据岗位表、CV 文本和面试记录生成，不需要手填。">
-            {!selectedJob ? (
-              <section className="primary-flow">
-                <div>
-                  <span className="eyebrow">尚未选择岗位</span>
-                  <h2>先选择目标岗位</h2>
-                  <p>岗位准备包只能基于 job.xlsx 中的岗位生成。</p>
-                </div>
-                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><Upload size={17} />去选择岗位</button>
-              </section>
-            ) : (
-              <>
-                <section className="primary-flow">
-                  <div>
-                    <span className="eyebrow">当前岗位</span>
-                    <h2>{selectedJob.jobTitle}</h2>
-                    <p>{selectedJob.companyName} · {selectedJob.city || '城市未写'} · {selectedJob.mainTrack || selectedJob.companyBusiness || '方向未写'}</p>
-                  </div>
-                  <button className="primary-button" type="button" onClick={() => void generateJobPack()} disabled={jobPackLoading}>
-                    <Sparkles size={17} />{jobPackLoading ? '生成中…' : currentJobPack ? '重新生成准备包' : '生成岗位准备包'}
-                  </button>
-                </section>
-                {jobPackMessage && <p className={jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? 'error-line' : 'success-line'}>{jobPackMessage}</p>}
-                {currentJobPack ? (
-                  <JobPackReport pack={currentJobPack} onDelete={() => deleteJobPack(currentJobPack.id)} onExport={() => exportJobPack(currentJobPack)} />
-                ) : (
-                  <p className="empty-state">还没有岗位准备包。生成后会保存到本地，刷新后不会丢。</p>
-                )}
-              </>
-            )}
-          </Page>
-        )}
-
         {activeView === 'mockInterview' && (
           <div className="mock-interview-screen">
             {!selectedJob ? (
@@ -2207,19 +2182,24 @@ function App() {
             ) : (
               <>
                 {!activeMockInterview && <section className="interview-quick-start" data-testid="interview-room">
-                  <div className="quick-meeting-status">
-                    <span>{selectedJob.companyName} · {selectedJob.jobTitle}</span>
-                    <strong>{selectedMockType === 'pressure_mock' ? '英文压力面试' : selectedMockType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'}</strong>
+                  <div className="interview-ready-heading">
+                    <div>
+                      <h2>准备就绪，进入你的面试舱</h2>
+                      <p>{selectedJob.companyName} · {selectedJob.jobTitle}</p>
+                    </div>
+                    <button type="button" onClick={() => setActiveView('materials')}>更换岗位</button>
                   </div>
                   <div className="quick-meeting-window">
                     <article className="quick-interviewer" data-testid="virtual-interviewer">
-                      <div className="interviewer-avatar"><MessagesSquare size={32} /></div>
-                      <strong>面试官正在准备问题</strong>
-                      <span>点击进入面试后，直接开始一问一答。</span>
+                      <img src="/virtual-interviewer.png" alt="虚拟 AI 面试官" />
+                      <div className="quick-interviewer-label">
+                        <strong>面试官 · Helen</strong>
+                        <span>AI 产品与结构化行为面试</span>
+                      </div>
                     </article>
                     <aside className="candidate-window quick-candidate" data-testid="candidate-window">
-                      <span>我的窗口</span>
-                      <strong>麦克风待命</strong>
+                      <span>你</span>
+                      <strong>设备待命</strong>
                       <div className="wave-bars" aria-hidden="true"><i /><i /><i /><i /></div>
                     </aside>
                   </div>
@@ -2240,16 +2220,24 @@ function App() {
                         </button>
                       ))}
                     </div>
-                    <div className="inline-actions">
-                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading)}>
-                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '生成中…' : '进入面试'}
+                    <div className="interview-entry">
+                      <div className={`interview-prep-status ${currentJobPack ? 'ready' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? 'error' : 'loading'}`}>
+                        <span>{currentJobPack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? '面试资料准备失败' : '正在准备面试资料'}</span>
+                        {!currentJobPack && !jobPackMessage.includes('失败') && !jobPackMessage.includes('超时') && <i aria-hidden="true" />}
+                      </div>
+                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading) || jobPackLoading || !currentJobPack}>
+                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '正在进入…' : '进入面试舱'}
                       </button>
-                      {!currentJobPack && <button type="button" onClick={() => setActiveView('jobPack')}>准备包</button>}
+                      {!currentJobPack && (jobPackMessage.includes('失败') || jobPackMessage.includes('超时')) && (
+                        <button type="button" onClick={() => void generateJobPack(selectedJob)} disabled={jobPackLoading}>重新准备</button>
+                      )}
                     </div>
                   </div>
                 </section>}
                 {recorderError && <p className="error-line">{recorderError}</p>}
-                {mockInterviewMessage && <p className={mockInterviewMessage.includes('失败') || mockInterviewMessage.includes('缺少') ? 'error-line' : 'success-line'}>{mockInterviewMessage}</p>}
+                {mockInterviewMessage && (!activeMockInterview || mockInterviewMessage.includes('失败') || mockInterviewMessage.includes('缺少')) && (
+                  <p className={mockInterviewMessage.includes('失败') || mockInterviewMessage.includes('缺少') ? 'error-line' : 'success-line'}>{mockInterviewMessage}</p>
+                )}
                 {activeMockInterview ? (
                   <MockInterviewPanel
                     session={activeMockInterview}
@@ -2348,7 +2336,7 @@ function App() {
                   <div>
                     <span className="eyebrow">{currentCompanySources.length} 个来源</span>
                     <h2>生成公司知识包</h2>
-                    <p>{currentJobPack ? '会结合岗位准备包和真实面试复盘。' : '建议先生成岗位准备包，但也可以直接生成。'}</p>
+                    <p>{currentJobPack ? '会结合当前岗位资料和真实面试复盘。' : '系统会先在后台整理当前岗位资料。'}</p>
                   </div>
                   <button className="primary-button" type="button" onClick={() => void generateCompanyKnowledgePack()} disabled={companyKnowledgeLoading}>
                     <Sparkles size={16} />{companyKnowledgeLoading ? '生成中…' : currentKnowledgePack ? '重新生成知识包' : '生成公司知识包'}
@@ -2358,7 +2346,7 @@ function App() {
                 <CompanySourcesList sources={currentCompanySources} onDelete={deleteCompanySource} />
                 {currentKnowledgePack ? (
                   <CompanyKnowledgeReport pack={currentKnowledgePack} onDelete={() => deleteCompanyKnowledgePack(currentKnowledgePack.id)} />
-                ) : <p className="empty-state">还没有公司知识包。生成后会保存到本地，并可被岗位准备包和模拟面试引用。</p>}
+                ) : <p className="empty-state">还没有公司资料摘要。生成后会在后台用于模拟面试。</p>}
               </>
             )}
           </Page>
@@ -2654,7 +2642,7 @@ function MockInterviewPanel({
         </div>
         <details className="waiting-materials">
           <summary>查看准备资料</summary>
-          <p>岗位信息、准备包、公司知识包、题库会在后台参与出题。</p>
+          <p>岗位信息与过往练习会在后台参与出题。</p>
         </details>
         <div className="inline-actions">
           <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />开始面试</button>
@@ -2692,45 +2680,35 @@ function MockInterviewPanel({
         <div><span>题目</span><strong>第 {session.currentQuestionIndex + 1} / {session.questions.length}</strong></div>
         <div><span>计时</span><strong>{formatDuration(questionTimer)}</strong></div>
         <div><span>状态</span><strong>{visiblePhase}</strong></div>
-        <button type="button" onClick={() => isFullscreen ? void exitFullscreen() : void enterFullscreen()}>
-          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{isFullscreen ? '退出全屏' : '全屏面试'}
-        </button>
+        <div className="meeting-status-actions">
+          <button type="button" onClick={() => isFullscreen ? void exitFullscreen() : void enterFullscreen()}>
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{isFullscreen ? '退出全屏' : '全屏面试'}
+          </button>
+          <button
+            type="button"
+            aria-label={sidePanelOpen ? '收起资料面板' : '打开资料面板'}
+            title={sidePanelOpen ? '收起资料面板' : '打开资料面板'}
+            onClick={() => setSidePanelOpen((value) => !value)}
+          >
+            {sidePanelOpen ? <X size={18} /> : <PanelRightOpen size={18} />}
+          </button>
+        </div>
       </header>
-
-      <div className="meeting-room-typebar">
-        <span>{typeLabel}</span>
-        {currentAnswer?.transcript && <span>{transcriptStatusLabel(currentAnswer.transcriptStatus)}</span>}
-        {currentAnswer?.aiFeedback && <span>{currentAnswer.aiFeedback.provider === 'mock_fallback' ? 'fallback mock' : currentAnswer.aiFeedback.provider}</span>}
-      </div>
 
       <div className={`meeting-stage ${sidePanelOpen ? 'has-side-panel' : ''}`}>
         <article className="interviewer-panel" data-testid="virtual-interviewer">
-          <div className="interviewer-avatar"><MessagesSquare size={34} /></div>
-          <div className="interviewer-meta">
-            <span>虚拟面试官</span>
-            {session.currentPhase === 'follow_up' && <strong>追问</strong>}
+          <img src="/virtual-interviewer.png" alt="虚拟 AI 面试官 Helen" />
+          <div className="interviewer-screen-badge">
+            <Sparkles size={15} />
+            <span>{typeLabel}</span>
           </div>
-          <div className="dialogue-stream" data-testid="interview-dialogue">
-            <div className="dialogue-bubble interviewer">
-              <span>面试官</span>
-              <p>{displayedQuestion?.question || '面试问题生成中…'}</p>
-            </div>
-            {currentAnswer?.transcript && (
-              <div className="dialogue-bubble candidate">
-                <span>候选人</span>
-                <p>{currentAnswer.transcript.text}</p>
-              </div>
-            )}
-            {session.currentPhase === 'follow_up' && session.followUps.length > 0 && (
-              <div className="dialogue-bubble interviewer follow">
-                <span>追问</span>
-                <p>{session.followUps[session.followUps.length - 1].question}</p>
-              </div>
-            )}
+          <div className="interviewer-question" data-testid="interview-dialogue">
+            <span>{session.currentPhase === 'follow_up' ? '追问' : '面试官'}</span>
+            <p>{displayedQuestion?.question || '面试问题生成中…'}</p>
           </div>
         </article>
         <aside className="candidate-window" data-testid="candidate-window">
-          <span>我的窗口</span>
+          <span>你</span>
           <strong>{isRecording ? '录音中' : currentAnswer ? '已回答' : '待回答'}</strong>
           <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
           <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
@@ -2739,18 +2717,21 @@ function MockInterviewPanel({
 
       {currentQuestion && (
         <div className="meeting-control-bar" aria-label="bottom-controls">
-          <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
-            <Mic size={16} />{'\u5f00\u59cb\u56de\u7b54'}
-          </button>
-          <button type="button" onClick={onStopRecording} disabled={!isRecording}><Square size={15} />{'\u505c\u6b62'}</button>
-          <button type="button" onClick={() => { if (preview?.url) void new Audio(preview.url).play() }} disabled={!preview}><FileAudio size={15} />{'\u56de\u653e'}</button>
-          <span className="meeting-status-chip">{currentAnswer ? `${transcriptStatusLabel(currentAnswer.transcriptStatus)} · ${feedbackStatusLabel(currentAnswer.aiFeedbackStatus)}` : '\u5f55\u5b8c\u540e\u81ea\u52a8\u8f6c\u5199 / \u5206\u6790'}</span>
-          {currentAnswer?.followUpDecision === 'follow_up' && currentAnswer.aiFeedback ? (
-            <button type="button" onClick={onNext} disabled={loading === `follow-${currentQuestion.id}`}>{'\u8ffd\u95ee'}</button>
+          {isRecording ? (
+            <button className="primary-button recording-control" type="button" onClick={onStopRecording}><Square size={15} />停止回答</button>
           ) : (
-            <button type="button" onClick={onNext} disabled={!canGoNext || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>{'\u4e0b\u4e00\u9898'}</button>
+            <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
+              <Mic size={16} />开始回答
+            </button>
           )}
-          <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{'\u7ed3\u675f\u9762\u8bd5'}</button>
+          {preview && <button type="button" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={15} />回放</button>}
+          {(session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing') && <span className="meeting-status-chip">{visiblePhase}</span>}
+          {currentAnswer?.aiFeedback && (
+            <button type="button" onClick={onNext} disabled={session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
+              {currentAnswer.followUpDecision === 'follow_up' ? '继续追问' : canGoNext ? '下一题' : '完成本轮'}
+            </button>
+          )}
+          <button className="end-interview-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />结束面试</button>
           <details className="meeting-backup-actions">
             <summary>{'\u5907\u7528'}</summary>
             <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
@@ -2762,10 +2743,6 @@ function MockInterviewPanel({
           </details>
         </div>
       )}
-
-      <button className="meeting-panel-toggle" type="button" onClick={() => setSidePanelOpen((value) => !value)}>
-        {sidePanelOpen ? '收起面板' : '资料 / 反馈'}
-      </button>
 
       {sidePanelOpen && (
         <aside className="meeting-side-panel" data-testid="meeting-side-panel">
@@ -3271,60 +3248,6 @@ function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
   )
 }
 
-function JobPackReport({ pack, onDelete, onExport }: { pack: StoredJobPack; onDelete: () => void; onExport: () => void }) {
-  const isMock = pack.provider === 'mock' || pack.provider === 'mock_fallback'
-  const providerLabel = pack.provider === 'deepseek'
-    ? '由 DeepSeek 生成'
-    : pack.provider === 'mock_fallback'
-      ? '真实模型调用失败，已自动使用模拟准备包。'
-      : pack.provider === 'mock'
-        ? '当前为模拟准备包，仅用于测试流程。'
-        : `${pack.provider} · ${pack.model}`
-  return (
-    <article className="job-pack-report">
-      <header>
-        <div><span className="eyebrow">岗位准备包</span><h2>{pack.selectedJob.companyName} · {pack.selectedJob.jobTitle}</h2><p>{providerLabel} · {pack.model} · {formatDateTime(pack.generatedAt)}</p></div>
-        <div className="inline-actions"><button type="button" onClick={onExport}><Download size={15} />导出准备包</button><button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button></div>
-      </header>
-      {isMock && <p className="mock-notice">{providerLabel}</p>}
-      {pack.rawProviderNote && <p className="provider-note">{pack.rawProviderNote}</p>}
-      <section className="brief-section"><h3>公司业务总结</h3><p>{pack.jobPack.companySummary}</p></section>
-      <section className="brief-section"><h3>产品与业务方向</h3><p>{pack.jobPack.productAndBusiness}</p></section>
-      <div className="brief-grid">
-        <FeedbackList title="岗位要求拆解" items={pack.jobPack.jobRequirementBreakdown} />
-        <FeedbackList title="日常工作预测" items={pack.jobPack.workContentPrediction} />
-        <FeedbackList title="候选人匹配点" items={pack.jobPack.candidateFit} />
-        <FeedbackList title="风险点" items={pack.jobPack.riskPoints} />
-      </div>
-      <section className="brief-section"><h3>自我介绍策略</h3><p>{pack.jobPack.selfIntroductionStrategy}</p></section>
-      <section className="brief-section"><h3>Miro 项目讲法</h3><p>{pack.jobPack.miroProjectStrategy}</p></section>
-      <section className="question-list">
-        <h3>高频面试问题</h3>
-        {pack.jobPack.likelyQuestions.map((question) => (
-          <details key={question.question}>
-            <summary>{question.question}</summary>
-            <p><strong>考察：</strong>{question.whyItMatters}</p>
-            <p><strong>框架：</strong>{question.framework}</p>
-          </details>
-        ))}
-      </section>
-      <section className="question-list">
-        <h3>满分回答框架</h3>
-        {pack.jobPack.fullScoreAnswerFrameworks.map((framework) => (
-          <details key={`${framework.question}-${framework.frameworkName}`}>
-            <summary>{framework.question}</summary>
-            <p><strong>{framework.frameworkName}</strong></p>
-            <FeedbackList title="回答结构" items={framework.answerStructure} />
-            <FeedbackList title="可调用经历" items={framework.candidateEvidence} />
-            <FeedbackList title="雷区" items={framework.pitfalls} />
-          </details>
-        ))}
-      </section>
-      <FeedbackList title="面试前准备任务" items={pack.jobPack.preparationTasks} />
-    </article>
-  )
-}
-
 function FeedbackList({ title, items }: { title: string; items: string[] }) {
   return <section><strong>{title}</strong><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></section>
 }
@@ -3695,7 +3618,6 @@ function jobUserStatusLabel(status: string) {
 function buildJobReadiness(
   job: JobRecord,
   context: {
-    status: JobUserStatus
     jobPacks: StoredJobPack[]
     mockInterviews: MockInterviewSession[]
     realInterviews: StoredRealInterview[]
@@ -3706,14 +3628,16 @@ function buildJobReadiness(
   const hasMock = context.mockInterviews.some((session) => session.selectedJob.id === job.id)
   const hasReal = context.realInterviews.some((interview) => interview.selectedJob.id === job.id)
   const latestTraining = context.history.find((record) => record.selectedJob?.id === job.id)
-  const signals = [
-    hasPack ? '有准备包' : '无准备包',
-    hasMock ? '有模拟面试' : '未模拟',
-    hasReal ? '有真实复盘' : '未复盘',
-    latestTraining ? `最近面试练习 ${formatDateTime(latestTraining.savedAt)}` : '未练习',
-  ]
-  const nextStep = !hasPack ? '下一步：生成准备包' : !hasMock ? '下一步：开始模拟面试' : !hasReal ? '下一步：真实面试后复盘' : '下一步：进入下一轮准备'
-  return { signals, nextStep }
+  const nextStep = !hasPack
+    ? '面试资料正在后台准备'
+    : !hasMock
+      ? '资料已就绪，可以开始模拟面试'
+      : !hasReal
+        ? latestTraining
+          ? `上次练习 ${formatDateTime(latestTraining.savedAt)}`
+          : '已完成模拟面试，等待下一步'
+        : '已形成完整面试记录'
+  return { nextStep }
 }
 
 function getLatestActivityLabel(records: TrainingRecord[], mockInterviews: MockInterviewSession[], realInterviews: StoredRealInterview[]) {
@@ -3741,7 +3665,7 @@ function buildDailyAction(context: {
   const latestMock = context.mockInterviews[0]
   if (!context.jobPool.length) return { title: '先上传岗位表', detail: '岗位库建立后，系统才能给出今天的面试路径。', cta: '上传岗位表', view: 'materials', icon: <Upload size={17} /> }
   if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
-  if (!context.currentJobPack) return { title: '生成岗位准备包', detail: '先让系统读懂公司、岗位和你的匹配点。', cta: '生成准备包', view: 'jobPack', icon: <Sparkles size={17} /> }
+  if (!context.currentJobPack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看准备状态', view: 'mockInterview', icon: <Sparkles size={17} /> }
   if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主要考察。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
   if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮准备任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
   if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
@@ -3758,7 +3682,10 @@ function buildDataStatusText(context: {
   realInterviews: StoredRealInterview[]
   companySources: CompanySourceInput[]
 }) {
-  return `岗位 ${context.jobPool.length} 个，准备包 ${context.jobPacks.length} 个，模拟面试 ${context.mockInterviews.length} 场，真实复盘 ${context.realInterviews.filter((item) => item.reviewReport).length} 份，公司资料 ${context.companySources.length} 条。`
+  const preparationState = context.selectedJob
+    ? context.jobPacks.some((pack) => pack.selectedJobId === context.selectedJob?.id) ? '面试资料已就绪' : '面试资料准备中'
+    : '尚未选择岗位'
+  return `岗位 ${context.jobPool.length} 个，${preparationState}，模拟面试 ${context.mockInterviews.length} 场，真实复盘 ${context.realInterviews.filter((item) => item.reviewReport).length} 份。`
 }
 
 function formatRemoteJobStatus(remote: RemoteJobDataState, localCount: number) {
@@ -3827,7 +3754,7 @@ function buildAbilityTrend(records: TrainingRecord[], interviews: MockInterviewS
 function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[], jobPack?: StoredJobPack, mockInterviews: MockInterviewSession[] = []) {
   if (!jobPool.length) return ['上传 job.xlsx，建立岗位库。']
   if (!selectedJob) return ['从岗位库选择一个目标岗位。']
-  if (!jobPack) return ['生成当前岗位准备包。']
+  if (!jobPack) return ['等待面试资料准备完成。']
   if (!mockInterviews.length) return ['开始一轮模拟面试。']
   if (!cv.text) return ['上传 TXT / Markdown 简历文本版。']
   const activeMock = mockInterviews.find((session) => session.status !== 'completed' || !session.finalReport)

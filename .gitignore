@@ -27,5 +27,6 @@ dist-ssr
 *.sw?
 
 .vercel
+test-results/
 tmp/
 tmp_*.cjs
