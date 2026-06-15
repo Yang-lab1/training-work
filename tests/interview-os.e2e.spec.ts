@@ -299,7 +299,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
     const jobs = JSON.parse(localStorage.getItem('interview_os_job_pool') || '[]')
     return remote.hash === 'fixture-hash-remote-sync' && jobs.length === 1
   })
-  await expect(page.locator('.top-nav nav button')).toHaveCount(10)
+  await expect(page.locator('.top-nav nav button')).toHaveCount(4)
+  await expect(page.locator('.account-menu summary')).toContainText('我的')
   await expect(page.getByTestId('daily-workbench')).toBeVisible()
   await expect(page.getByTestId('daily-workbench').locator('button.primary-button')).toHaveCount(1)
   await expect(page.getByTestId('job-battle-board')).toBeVisible()
@@ -358,14 +359,14 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await page.locator('.top-nav nav button').nth(0).click()
   await expect(page.getByTestId('daily-workbench')).toContainText('生成岗位准备包')
 
-  await page.locator('.top-nav nav button').nth(4).click()
+  await page.getByTestId('daily-workbench').locator('button.primary-button').click()
   await page.locator('.primary-flow .primary-button').click()
   await expect(page.locator('.job-pack-report')).toContainText('测试科技公司做企业 AI 应用平台')
 
   await page.locator('.top-nav nav button').nth(0).click()
   await expect(page.getByTestId('daily-workbench')).toContainText('开始一轮模拟面试')
 
-  await page.locator('.top-nav nav button').nth(5).click()
+  await page.locator('.top-nav nav button').nth(2).click()
   await expect(page.getByTestId('interview-room')).toBeVisible()
   await expect(page.getByTestId('virtual-interviewer')).toBeVisible()
   await expect(page.getByTestId('candidate-window')).toBeVisible()
@@ -406,7 +407,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.locator('.review-summary-report')).toContainText('84')
   await expect(page.locator('.review-summary-report')).toContainText('可背回答版本')
 
-  await page.locator('.top-nav nav button').nth(9).click()
+  await page.locator('.account-menu summary').click()
+  await page.locator('.account-menu-panel button').filter({ hasText: '系统诊断' }).click()
   await expect(page.getByTestId('provider-diagnostics')).toContainText('Mock / fallback')
   await expect(page.getByTestId('provider-diagnostics')).toContainText('/api/provider-status')
   await expect(page.getByTestId('provider-call-list')).toBeVisible()
@@ -418,7 +420,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   expect(diagnosticsText).not.toContain('sk-')
   expect(diagnosticsText).not.toContain('test-key')
 
-  await page.locator('.top-nav nav button').nth(8).click()
+  await page.locator('.account-menu summary').click()
+  await page.locator('.account-menu-panel button').filter({ hasText: '数据管理' }).click()
   await expect(page.getByTestId('data-management')).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: /导出 JSON/ }).click()
@@ -437,7 +440,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   await page.evaluate(() => localStorage.clear())
   await page.reload()
-  await page.locator('.top-nav nav button').nth(8).click()
+  await page.locator('.account-menu summary').click()
+  await page.locator('.account-menu-panel button').filter({ hasText: '数据管理' }).click()
   page.once('dialog', (dialog) => void dialog.accept())
   await page.locator('input[accept=".json,application/json"]').setInputFiles(backupPath)
   await expect(page.getByText('导入成功。')).toBeVisible()

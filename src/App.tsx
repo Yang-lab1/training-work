@@ -21,6 +21,7 @@ import {
   Square,
   Trash2,
   Upload,
+  UserCircle,
 } from 'lucide-react'
 import { normalizeJobRecord, parseJobWorkbook } from './jobParser'
 import type { JobRecord } from './jobParser'
@@ -424,17 +425,20 @@ const defaultTasks: TrainingTask[] = [
 
 const defaultState: StoredMvpState = { uploadedFiles: [], tasks: defaultTasks, history: [] }
 
-const navigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
-  { id: 'today', label: '今日任务', icon: <Home size={17} /> },
+const primaryNavigation: Array<{ id: ViewId; label: string; icon: ReactNode }> = [
+  { id: 'today', label: '今日', icon: <Home size={17} /> },
   { id: 'materials', label: '资料与岗位', icon: <BriefcaseBusiness size={17} /> },
-  { id: 'history', label: '历史', icon: <History size={17} /> },
-  { id: 'feedback', label: 'AI 反馈', icon: <BrainCircuit size={17} /> },
-  { id: 'jobPack', label: '岗位准备包', icon: <Sparkles size={17} /> },
   { id: 'mockInterview', label: '模拟面试', icon: <MessagesSquare size={17} /> },
-  { id: 'realInterview', label: '真实面试复盘', icon: <FileAudio size={17} /> },
-  { id: 'companyKnowledge', label: '公司资料增强', icon: <FileText size={17} /> },
-  { id: 'backup', label: '数据备份', icon: <Archive size={17} /> },
-  { id: 'diagnostics', label: '系统诊断', icon: <BrainCircuit size={17} /> },
+  { id: 'feedback', label: '反馈', icon: <BrainCircuit size={17} /> },
+]
+
+const accountNavigation: Array<{ id: ViewId; label: string; helper: string; icon: ReactNode }> = [
+  { id: 'jobPack', label: '岗位准备包', helper: '公司、岗位和回答策略', icon: <Sparkles size={17} /> },
+  { id: 'realInterview', label: '真实面试复盘', helper: '真实录音转写与反补', icon: <FileAudio size={17} /> },
+  { id: 'companyKnowledge', label: '公司资料', helper: '官网、JD、文章资料', icon: <FileText size={17} /> },
+  { id: 'history', label: '面试记录', helper: '录音、转写和反馈', icon: <History size={17} /> },
+  { id: 'backup', label: '数据管理', helper: '导入、导出、本地存储', icon: <Archive size={17} /> },
+  { id: 'diagnostics', label: '系统诊断', helper: '模型、ASR 和 fallback', icon: <BrainCircuit size={17} /> },
 ]
 
 const JOB_USER_STATUS_OPTIONS: Array<{ value: JobUserStatus; label: string }> = [
@@ -1882,12 +1886,34 @@ function App() {
           <span>IO</span><strong>Interview OS</strong><em>V{APP_VERSION}</em>
         </button>
         <nav aria-label="主导航">
-          {navigation.map((item) => (
+          {primaryNavigation.map((item) => (
             <button className={activeView === item.id ? 'active' : ''} type="button" key={item.id} onClick={() => setActiveView(item.id)}>
               {item.icon}<span>{item.label}</span>
             </button>
           ))}
         </nav>
+        <details className={`account-menu ${accountNavigation.some((item) => item.id === activeView) ? 'active' : ''}`}>
+          <summary>
+            <UserCircle size={18} />
+            <span>我的</span>
+            <ChevronDown size={15} />
+          </summary>
+          <div className="account-menu-panel">
+            <div className="account-menu-header">
+              <strong>{selectedJob ? selectedJob.jobTitle : '未选择岗位'}</strong>
+              <span>{selectedJob ? selectedJob.companyName : '先从岗位库选择目标岗位'}</span>
+            </div>
+            {accountNavigation.map((item) => (
+              <button className={activeView === item.id ? 'active' : ''} type="button" key={item.id} onClick={(event) => {
+                setActiveView(item.id)
+                event.currentTarget.closest('details')?.removeAttribute('open')
+              }}>
+                {item.icon}
+                <span><strong>{item.label}</strong><em>{item.helper}</em></span>
+              </button>
+            ))}
+          </div>
+        </details>
       </header>
 
       <main className="product-page">
@@ -1915,7 +1941,7 @@ function App() {
                 </div>
               </aside>
             </section>
-            <section className="today-compact-status" aria-label="今日训练状态">
+            <section className="today-compact-status" aria-label="今日状态">
               <Metric label="今日模拟面试" value={`${todayMockCount}`} />
               <Metric label="面试题反馈" value={`${todayMockFeedbackCount}`} />
               <Metric label="岗位库" value={`${jobPool.length}`} />
@@ -1944,7 +1970,7 @@ function App() {
         )}
 
         {activeView === 'materials' && (
-          <Page title="资料与岗位" subtitle="上传资料，解析岗位表，选择本次训练岗位。">
+          <Page title="资料与岗位" subtitle="上传资料，解析岗位表，选择本次面试岗位。">
             <section className="section-block material-flow">
               <SectionHeading icon={<Upload size={20} />} title="资料" />
               <div className="material-modules">
@@ -2121,7 +2147,7 @@ function App() {
         )}
 
         {activeView === 'history' && (
-          <Page title="训练历史" subtitle="录音记录、转写状态和 AI 反馈状态。">
+          <Page title="面试记录" subtitle="录音、转写和 AI 反馈状态。">
             <RecordList records={state.history} mode="history" {...sharedRecordProps} onDelete={(id) => commitState((current) => ({ ...current, history: current.history.filter((item) => item.id !== id) }))} />
           </Page>
         )}
@@ -2138,7 +2164,7 @@ function App() {
         )}
 
         {activeView === 'jobPack' && (
-          <Page title="岗位准备包" subtitle="根据岗位表、CV 文本和训练记录生成，不需要手填。">
+          <Page title="岗位准备包" subtitle="根据岗位表、CV 文本和面试记录生成，不需要手填。">
             {!selectedJob ? (
               <section className="primary-flow">
                 <div>
@@ -2256,7 +2282,7 @@ function App() {
                 <div>
                   <span className="eyebrow">需要目标岗位</span>
                   <h2>先在岗位库选择岗位</h2>
-                  <p>真实面试复盘会把问题反补到该岗位的题库和下一轮训练。</p>
+                  <p>真实面试复盘会把问题反补到该岗位的题库和下一轮准备。</p>
                 </div>
                 <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
               </section>
@@ -2342,7 +2368,7 @@ function App() {
           <Page title="数据管理" subtitle="查看本地数据，导出备份，必要时恢复。">
             <section className="data-management-grid" data-testid="data-management">
               <Metric label="岗位" value={`${jobPool.length}`} />
-              <Metric label="训练记录" value={`${state.history.length}`} />
+              <Metric label="面试记录" value={`${state.history.length}`} />
               <Metric label="模拟面试" value={`${mockInterviews.length}`} />
               <Metric label="真实复盘" value={`${realInterviews.filter((item) => item.reviewReport).length}`} />
               <Metric label="公司资料" value={`${companySources.length}`} />
@@ -2351,7 +2377,7 @@ function App() {
             </section>
             <section className="storage-note">
               <strong>本地存储</strong>
-              <p>JSON 备份包含岗位、训练、转写、AI 反馈、准备包、真实复盘和公司知识包。录音 Blob 仍保存在浏览器 IndexedDB，不会写入 JSON。</p>
+              <p>JSON 备份包含岗位、面试记录、转写、AI 反馈、准备包、真实复盘和公司知识包。录音 Blob 仍保存在浏览器 IndexedDB，不会写入 JSON。</p>
               <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
             </section>
             <section className="backup-actions">
@@ -2383,7 +2409,7 @@ function App() {
 }
 
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
-  return <div className="page-view"><header className="page-heading"><h1>{title}</h1><p>{subtitle}</p></header>{children}</div>
+  return <div className="page-view"><header className="page-heading sr-only"><h1>{title}</h1><p>{subtitle}</p></header>{children}</div>
 }
 
 function SectionHeading({ icon, title }: { icon: ReactNode; title: string }) {
@@ -2896,7 +2922,7 @@ function RealInterviewCard({
           {isMock && <p className="mock-notice">当前为模拟真实面试复盘，仅用于测试流程。</p>}
           {interview.rawProviderNote && <p className="provider-note">{interview.rawProviderNote}</p>}
           <FeedbackList title="面试官实际问题" items={interview.extractedQuestions.map((question) => question.question)} />
-          <FeedbackList title="反补训练任务" items={interview.reviewReport.nextTrainingTasks} />
+          <FeedbackList title="反补面试任务" items={interview.reviewReport.nextTrainingTasks} />
           <FeedbackList title="题库更新" items={interview.reviewReport.questionBankUpdates.map((item) => item.question)} />
           <dl className="feedback-detail-list">
             <div><dt>面试官重点</dt><dd>{interview.reviewReport.interviewerFocus.join('、')}</dd></div>
@@ -2985,7 +3011,7 @@ function RecordList({
   onUpdate: (id: string, updater: (record: TrainingRecord) => TrainingRecord) => void
   onDelete?: (id: string) => void
 }) {
-  if (!records.length) return <p className="empty-state">还没有训练记录。</p>
+  if (!records.length) return <p className="empty-state">还没有面试记录。</p>
   return <div className="record-list">{records.map((record) => (
     <RecordRow
       key={record.id}
@@ -3149,7 +3175,7 @@ function RecordRow({
       setMessage('AI 反馈已保存。')
     } catch (error) {
       onUpdate((current) => ({ ...current, aiFeedbackStatus: 'failed' }))
-      setMessage(error instanceof Error && error.name === 'AbortError' ? '请求超时，训练记录未丢失。' : error instanceof Error ? error.message : '反馈生成失败。')
+      setMessage(error instanceof Error && error.name === 'AbortError' ? '请求超时，面试记录未丢失。' : error instanceof Error ? error.message : '反馈生成失败。')
     } finally {
       clearTimeout(timeout)
       setAnalyzing(false)
@@ -3223,7 +3249,7 @@ function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
       {feedback.rawProviderNote && <p className="provider-note">{feedback.rawProviderNote}</p>}
       <div className="feedback-short-grid" data-testid="ai-short-report">
         <FeedbackList title="最重要的问题" items={topProblems.length ? topProblems : ['当前没有明显硬伤。']} />
-        <FeedbackList title="下一步任务" items={topTasks.length ? topTasks : ['保持节奏，进入下一段训练。']} />
+        <FeedbackList title="下一步任务" items={topTasks.length ? topTasks : ['保持节奏，进入下一轮模拟面试。']} />
         <section><strong>是否建议重答</strong><p>{shouldRetry ? '建议重答一次，只看骨架讲。' : '可以进入下一题。'}</p></section>
       </div>
       <details className="ai-report-detail">
@@ -3684,9 +3710,9 @@ function buildJobReadiness(
     hasPack ? '有准备包' : '无准备包',
     hasMock ? '有模拟面试' : '未模拟',
     hasReal ? '有真实复盘' : '未复盘',
-    latestTraining ? `最近训练 ${formatDateTime(latestTraining.savedAt)}` : '未训练',
+    latestTraining ? `最近面试练习 ${formatDateTime(latestTraining.savedAt)}` : '未练习',
   ]
-  const nextStep = !hasPack ? '下一步：生成准备包' : !hasMock ? '下一步：开始模拟面试' : !hasReal ? '下一步：真实面试后复盘' : '下一步：进入下一轮训练'
+  const nextStep = !hasPack ? '下一步：生成准备包' : !hasMock ? '下一步：开始模拟面试' : !hasReal ? '下一步：真实面试后复盘' : '下一步：进入下一轮准备'
   return { signals, nextStep }
 }
 
@@ -3699,7 +3725,7 @@ function getLatestActivityLabel(records: TrainingRecord[], mockInterviews: MockI
     latestMock && { label: `模拟面试 ${latestMock.status === 'completed' ? '已复盘' : '进行中'}`, time: latestMock.createdAt },
     latestReal && { label: `真实面试 ${latestReal.reviewReport ? '已复盘' : transcriptStatusLabel(latestReal.transcriptStatus)}`, time: latestReal.updatedAt },
   ].filter(Boolean) as Array<{ label: string; time: string }>
-  return candidates.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]?.label || '暂无训练'
+  return candidates.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0]?.label || '暂无面试练习'
 }
 
 function buildDailyAction(context: {
@@ -3713,11 +3739,11 @@ function buildDailyAction(context: {
 }): { title: string; detail: string; cta: string; view: ViewId; icon: ReactNode } {
   const latestRealNeedsReview = context.realInterviews.find((item) => !item.reviewReport)
   const latestMock = context.mockInterviews[0]
-  if (!context.jobPool.length) return { title: '先上传岗位表', detail: '岗位库建立后，系统才能给出今天的训练路径。', cta: '上传岗位表', view: 'materials', icon: <Upload size={17} /> }
+  if (!context.jobPool.length) return { title: '先上传岗位表', detail: '岗位库建立后，系统才能给出今天的面试路径。', cta: '上传岗位表', view: 'materials', icon: <Upload size={17} /> }
   if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
   if (!context.currentJobPack) return { title: '生成岗位准备包', detail: '先让系统读懂公司、岗位和你的匹配点。', cta: '生成准备包', view: 'jobPack', icon: <Sparkles size={17} /> }
-  if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主训练。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
-  if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮训练任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
+  if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主要考察。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
+  if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮准备任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
   if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
   const missingFeedback = context.history.find((record) => record.transcript && !record.aiFeedback)
   if (missingFeedback) return { title: '补齐 AI 反馈', detail: `${missingFeedback.title} 已有转写，等待生成短报告。`, cta: '生成 AI 反馈', view: 'feedback', icon: <BrainCircuit size={17} /> }
