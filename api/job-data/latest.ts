@@ -1,5 +1,9 @@
 const DEFAULT_BASE_URL = 'https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest'
 
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
 type FeedFile = 'manifest' | 'jobs' | 'jobs_delta' | 'job_sources'
 
 const fileMap: Record<FeedFile, string> = {
