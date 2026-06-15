@@ -444,6 +444,28 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 
 .selected-job { display: grid; justify-content: initial; margin-top: 18px; }
 
+.remote-job-sync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.remote-job-sync > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.remote-job-sync span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .job-filters {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1811,7 +1833,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .provider-call-row { grid-template-columns: 1fr; gap: 6px; }
   .daily-context > div { padding: 18px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .training-shortcuts button { min-height: 95px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .primary-flow, .job-upload-line, .workflow-heading { align-items: stretch; flex-direction: column; }
+  .primary-flow, .job-upload-line, .remote-job-sync, .workflow-heading { align-items: stretch; flex-direction: column; }
   .job-pack-report > header { flex-direction: column; }
   .primary-flow .primary-button, .workflow-heading .primary-button { width: 100%; }
   .upload-row, .job-row, .record-row { grid-template-columns: 1fr; }

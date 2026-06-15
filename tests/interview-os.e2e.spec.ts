@@ -18,6 +18,63 @@ type StoredMockInterviewForTest = {
   }>
 }
 
+function buildRemoteJobFeed() {
+  return {
+    manifest: {
+      schemaVersion: '1.0',
+      dataVersion: '2026-06-15-test',
+      updatedAt: '2026-06-15T00:00:00+08:00',
+      jobsCount: 1,
+      newJobsCount: 1,
+      updatedJobsCount: 0,
+      removedJobsCount: 0,
+      jobsUrl: './jobs.json',
+      hash: 'fixture-hash-remote-sync',
+    },
+    jobs: {
+      schemaVersion: '1.0',
+      dataVersion: '2026-06-15-test',
+      updatedAt: '2026-06-15T00:00:00+08:00',
+      jobs: [{
+        id: 'remote-job-ai-pm',
+        stableId: 'remote-job-ai-pm',
+        companyName: '远程测试科技公司',
+        jobTitle: 'AI产品实习生',
+        city: '深圳',
+        jobType: '实习',
+        priority: 'A',
+        mainTrack: '主线B：AI应用落地 / AI产品 / Agent / RAG',
+        salary: '面议',
+        sourceSheet: 'latest/jobs.json',
+        source: 'GitHub latest',
+        link: 'https://example.com/remote-job',
+        companyBusiness: '企业 AI 应用平台',
+        jobContent: '负责 AI 产品需求分析、原型设计和落地协作',
+        jobRequirements: '理解 AI 应用、良好沟通、用户场景分析',
+        businessDirection: 'AI 应用产品',
+        roleFitReason: '远程同步测试岗位',
+        matchLevel: '高',
+        difficulty: '中',
+        isTodayNew: true,
+        status: 'active',
+        normalized: {
+          normalizedTitle: 'AI产品实习生',
+          roleFamily: 'AI产品 / AI应用产品',
+          roleTrack: '主线B：AI应用落地 / AI产品 / Agent / RAG',
+          roleLevel: '实习',
+          jobNature: '实习',
+          cityGroup: '深圳',
+          priorityBucket: 'A 优先',
+          riskFlags: [],
+          matchScore: 92,
+          matchReasons: ['远程岗位库自动同步测试'],
+          searchableText: '远程测试科技公司 AI产品实习生 深圳 AI应用产品',
+        },
+      }],
+    },
+  }
+}
+
 async function writeJobFixture(path: string) {
   const workbook = XLSX.utils.book_new()
   const rows = [
@@ -49,6 +106,14 @@ async function writeJobFixture(path: string) {
 }
 
 test.beforeEach(async ({ page }) => {
+  const remoteFeed = buildRemoteJobFeed()
+  await page.route('https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json', async (route) => {
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(remoteFeed.manifest) })
+  })
+  await page.route('https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/jobs.json', async (route) => {
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(remoteFeed.jobs) })
+  })
+
   await page.route('**/api/provider-status', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -229,6 +294,11 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await fs.writeFile(projectFixturePath, '# Miro project\nCross-cultural AI communication training project.', 'utf8')
 
   await page.goto('/')
+  await page.waitForFunction(() => {
+    const remote = JSON.parse(localStorage.getItem('interview_os_remote_job_data') || '{}')
+    const jobs = JSON.parse(localStorage.getItem('interview_os_job_pool') || '[]')
+    return remote.hash === 'fixture-hash-remote-sync' && jobs.length === 1
+  })
   await expect(page.locator('.top-nav nav button')).toHaveCount(11)
   await expect(page.getByTestId('daily-workbench')).toBeVisible()
   await expect(page.getByTestId('daily-workbench').locator('button.primary-button')).toHaveCount(1)
@@ -236,6 +306,8 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.getByTestId('ability-trend')).toBeVisible()
 
   await page.locator('.top-nav nav button').nth(1).click()
+  await expect(page.getByTestId('remote-job-sync')).toContainText('远程岗位库')
+  await expect(page.getByTestId('remote-job-sync')).toContainText('2026-06-15-test')
   await expect(page.getByTestId('resume-material-module')).toBeVisible()
   await expect(page.getByTestId('project-material-module')).toBeVisible()
   await expect(page.getByTestId('job-material-module')).toBeVisible()
@@ -361,6 +433,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   expect(backup.mockInterviews[0].finalReport.report.overallScore).toBe(84)
   expect(backup.providerState.lastTextCall.providerUsed).toBe('mock')
   expect(backup.providerState.lastAsrCall.providerUsed).toBe('mock')
+  expect(backup.remoteJobData.hash).toBe('fixture-hash-remote-sync')
 
   await page.evaluate(() => localStorage.clear())
   await page.reload()

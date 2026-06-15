@@ -70,6 +70,9 @@ const COMPANY_SOURCES_KEY = 'interview_os_company_sources'
 const COMPANY_KNOWLEDGE_PACKS_KEY = 'interview_os_company_knowledge_packs'
 const JOB_USER_STATUS_KEY = 'interview_os_job_user_status'
 const PROVIDER_STATE_KEY = 'interview_os_provider_state'
+const REMOTE_JOB_DATA_KEY = 'interview_os_remote_job_data'
+const DEFAULT_REMOTE_JOB_MANIFEST_URL = 'https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json'
+const REMOTE_JOB_MANIFEST_URL = import.meta.env.VITE_JOB_DATA_MANIFEST_URL || DEFAULT_REMOTE_JOB_MANIFEST_URL
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
@@ -209,6 +212,37 @@ interface BackupPayload {
   companyKnowledgePacks: StoredCompanyKnowledgePack[]
   jobUserStatus: JobUserStatusMap
   providerState?: ProviderState
+  remoteJobData?: RemoteJobDataState
+}
+
+interface RemoteJobManifest {
+  schemaVersion?: string
+  dataVersion?: string
+  updatedAt?: string
+  timezone?: string
+  jobsCount?: number
+  newJobsCount?: number
+  updatedJobsCount?: number
+  removedJobsCount?: number
+  jobsUrl?: string
+  hash?: string
+}
+
+interface RemoteJobDataState {
+  status: 'idle' | 'synced' | 'unchanged' | 'failed'
+  source: 'github_raw' | 'api_proxy'
+  manifestUrl: string
+  jobsUrl?: string
+  dataVersion?: string
+  updatedAt?: string
+  jobsCount?: number
+  newJobsCount?: number
+  updatedJobsCount?: number
+  removedJobsCount?: number
+  hash?: string
+  lastCheckedAt?: string
+  lastSyncedAt?: string
+  error?: string
 }
 
 interface ProviderCallRecord {
@@ -430,9 +464,12 @@ function App() {
   const [companyKnowledgePacks, setCompanyKnowledgePacks] = useState<StoredCompanyKnowledgePack[]>(readCompanyKnowledgePacks)
   const [jobUserStatus, setJobUserStatus] = useState<JobUserStatusMap>(readJobUserStatus)
   const [providerState, setProviderState] = useState<ProviderState>(readProviderState)
+  const [remoteJobData, setRemoteJobData] = useState<RemoteJobDataState>(readRemoteJobData)
   const [legacyRole, setLegacyRole] = useState(readLegacyRole)
   const [jobError, setJobError] = useState('')
   const [jobMessage, setJobMessage] = useState('')
+  const [remoteJobMessage, setRemoteJobMessage] = useState('')
+  const [remoteJobSyncing, setRemoteJobSyncing] = useState(false)
   const [materialsMessage, setMaterialsMessage] = useState('')
   const [backupMessage, setBackupMessage] = useState('')
   const [importError, setImportError] = useState('')
@@ -558,6 +595,13 @@ function App() {
   useEffect(() => { localStorage.setItem(COMPANY_KNOWLEDGE_PACKS_KEY, JSON.stringify(companyKnowledgePacks)) }, [companyKnowledgePacks])
   useEffect(() => { localStorage.setItem(JOB_USER_STATUS_KEY, JSON.stringify(jobUserStatus)) }, [jobUserStatus])
   useEffect(() => { localStorage.setItem(PROVIDER_STATE_KEY, JSON.stringify(providerState)) }, [providerState])
+  useEffect(() => { localStorage.setItem(REMOTE_JOB_DATA_KEY, JSON.stringify(remoteJobData)) }, [remoteJobData])
+
+  useEffect(() => {
+    void syncRemoteJobData({ silent: true })
+    // Only run once on app boot. Manual sync is available in the materials page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function recordProviderCall(call: Omit<ProviderCallRecord, 'at'>) {
     const nextCall: ProviderCallRecord = { ...call, at: new Date().toISOString() }
@@ -672,6 +716,100 @@ function App() {
       if (parseStatus === '已提取文本') saveCvText(await file.text(), file.name, 'upload')
     }
     saveFileMeta(category, file, '已选择', parseStatus)
+  }
+
+  async function syncRemoteJobData(options: { silent?: boolean } = {}) {
+    if (remoteJobSyncing) return
+    setRemoteJobSyncing(true)
+    if (!options.silent) setRemoteJobMessage('正在同步 GitHub 最新岗位库…')
+    const checkedAt = new Date().toISOString()
+    try {
+      const manifest = await fetchRemoteManifest()
+      const jobsUrl = resolveRemoteUrl(REMOTE_JOB_MANIFEST_URL, manifest.jobsUrl || './jobs.json')
+      const unchanged = Boolean(manifest.hash && remoteJobData.hash === manifest.hash && jobPool.length > 0)
+
+      if (unchanged) {
+        setRemoteJobData((current) => ({
+          ...current,
+          status: 'unchanged',
+          source: 'github_raw',
+          manifestUrl: REMOTE_JOB_MANIFEST_URL,
+          jobsUrl,
+          dataVersion: manifest.dataVersion,
+          updatedAt: manifest.updatedAt,
+          jobsCount: manifest.jobsCount,
+          newJobsCount: manifest.newJobsCount,
+          updatedJobsCount: manifest.updatedJobsCount,
+          removedJobsCount: manifest.removedJobsCount,
+          hash: manifest.hash,
+          lastCheckedAt: checkedAt,
+          error: undefined,
+        }))
+        if (!options.silent) setRemoteJobMessage(`已是最新岗位库：${manifest.jobsCount || jobPool.length} 个岗位。`)
+        return
+      }
+
+      const jobsPayload = await fetchJsonWithTimeout(jobsUrl)
+      const remoteJobs = Array.isArray((jobsPayload as { jobs?: unknown }).jobs) ? (jobsPayload as { jobs: JobRecord[] }).jobs : []
+      if (!remoteJobs.length) throw new Error('远程 jobs.json 没有 jobs 数组。')
+      const normalizedJobs = remoteJobs.map(ensureNormalizedJob)
+      setJobPool(normalizedJobs)
+      setSelectedJob((current) => matchSelectedJobFromRemote(current, normalizedJobs))
+      setJobError('')
+      setJobMessage(`已同步 GitHub 岗位库：${normalizedJobs.length} 个岗位。`)
+      setRemoteJobData({
+        status: 'synced',
+        source: 'github_raw',
+        manifestUrl: REMOTE_JOB_MANIFEST_URL,
+        jobsUrl,
+        dataVersion: manifest.dataVersion,
+        updatedAt: manifest.updatedAt,
+        jobsCount: manifest.jobsCount || normalizedJobs.length,
+        newJobsCount: manifest.newJobsCount,
+        updatedJobsCount: manifest.updatedJobsCount,
+        removedJobsCount: manifest.removedJobsCount,
+        hash: manifest.hash,
+        lastCheckedAt: checkedAt,
+        lastSyncedAt: checkedAt,
+      })
+      if (!options.silent) setRemoteJobMessage(`已同步最新岗位库：${normalizedJobs.length} 个岗位。`)
+    } catch (error) {
+      try {
+        const proxyResult = await fetchProxyJobData()
+        const normalizedJobs = proxyResult.jobs.map(ensureNormalizedJob)
+        if (!normalizedJobs.length) throw new Error('API 代理没有返回岗位数据。', { cause: error })
+        setJobPool(normalizedJobs)
+        setSelectedJob((current) => matchSelectedJobFromRemote(current, normalizedJobs))
+        setJobMessage(`已通过服务端代理同步岗位库：${normalizedJobs.length} 个岗位。`)
+        setRemoteJobData({
+          status: 'synced',
+          source: 'api_proxy',
+          manifestUrl: '/api/job-data/latest',
+          jobsUrl: '/api/job-data/latest?file=jobs',
+          dataVersion: proxyResult.manifest.dataVersion,
+          updatedAt: proxyResult.manifest.updatedAt,
+          jobsCount: proxyResult.manifest.jobsCount || normalizedJobs.length,
+          newJobsCount: proxyResult.manifest.newJobsCount,
+          updatedJobsCount: proxyResult.manifest.updatedJobsCount,
+          removedJobsCount: proxyResult.manifest.removedJobsCount,
+          hash: proxyResult.manifest.hash,
+          lastCheckedAt: checkedAt,
+          lastSyncedAt: checkedAt,
+        })
+        if (!options.silent) setRemoteJobMessage(`已通过服务端代理同步：${normalizedJobs.length} 个岗位。`)
+      } catch (proxyError) {
+        const message = proxyError instanceof Error ? proxyError.message : error instanceof Error ? error.message : '同步失败'
+        setRemoteJobData((current) => ({
+          ...current,
+          status: 'failed',
+          lastCheckedAt: checkedAt,
+          error: message,
+        }))
+        if (!options.silent) setRemoteJobMessage(`同步失败，已保留本地岗位库：${message}`)
+      }
+    } finally {
+      setRemoteJobSyncing(false)
+    }
   }
 
   function saveFileMeta(category: UploadCategory, file: File, status: UploadedFileMeta['status'], parseStatus?: CvParseStatus) {
@@ -1593,6 +1731,7 @@ function App() {
       companyKnowledgePacks,
       jobUserStatus,
       providerState,
+      remoteJobData,
     }
     downloadJson(payload, `interview-os-backup-${formatDateForFileName(new Date())}.json`)
     setBackupMessage('已导出备份。')
@@ -1619,6 +1758,7 @@ function App() {
       setCompanyKnowledgePacks(normalizeCompanyKnowledgePacks(parsed.companyKnowledgePacks))
       setJobUserStatus(normalizeJobUserStatus(parsed.jobUserStatus))
       setProviderState(normalizeProviderState(parsed.providerState))
+      setRemoteJobData(normalizeRemoteJobData(parsed.remoteJobData))
       setState({
         uploadedFiles: normalizeFiles(parsed.uploadedFiles),
         tasks: defaultTasks.map((task) => {
@@ -1644,7 +1784,7 @@ function App() {
 
   async function clearAllData() {
     if (!window.confirm('确认清空全部本地数据？此操作不可恢复。')) return
-    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY, JOB_USER_STATUS_KEY, PROVIDER_STATE_KEY]) {
+    for (const key of [STORAGE_KEY, UPLOADED_FILES_KEY, JOB_POOL_KEY, SELECTED_JOB_KEY, LEGACY_TARGET_ROLE_KEY, CV_TEXT_KEY, SCRIPT_TEMPLATES_KEY, TRAINING_RECORDS_KEY, JOB_PACKS_KEY, MOCK_INTERVIEWS_KEY, REAL_INTERVIEWS_KEY, QUESTION_BANK_KEY, COMPANY_SOURCES_KEY, COMPANY_KNOWLEDGE_PACKS_KEY, JOB_USER_STATUS_KEY, PROVIDER_STATE_KEY, REMOTE_JOB_DATA_KEY]) {
       localStorage.removeItem(key)
     }
     await deleteRecordingDatabase()
@@ -1661,6 +1801,7 @@ function App() {
     setCompanyKnowledgePacks([])
     setJobUserStatus({})
     setProviderState({ providerHistory: [] })
+    setRemoteJobData({ status: 'idle', source: 'github_raw', manifestUrl: REMOTE_JOB_MANIFEST_URL })
     setLegacyRole(null)
     setAudioPreviews({})
     setBackupMessage('已清空全部本地数据。')
@@ -1850,8 +1991,18 @@ function App() {
 
             <section className="section-block" ref={jobSelectionRef}>
               <SectionHeading icon={<BriefcaseBusiness size={20} />} title="选择目标岗位" />
+              <div className="remote-job-sync" data-testid="remote-job-sync">
+                <div>
+                  <strong>远程岗位库</strong>
+                  <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
+                </div>
+                <button type="button" onClick={() => void syncRemoteJobData()} disabled={remoteJobSyncing}>
+                  {remoteJobSyncing ? '同步中…' : '同步最新岗位库'}
+                </button>
+              </div>
+              {remoteJobMessage && <p className={remoteJobMessage.includes('失败') ? 'error-line' : 'success-line'}>{remoteJobMessage}</p>}
               <div className="job-upload-line simple">
-                <div><strong>从已筛岗位中选一个今天准备</strong><span>{jobFile ? `${jobFile.name} · ${jobPool.length} 个岗位` : '请先在上方上传岗位表。'}</span></div>
+                <div><strong>从已筛岗位中选一个今天准备</strong><span>{jobPool.length ? `${getJobPoolSourceLabel(jobFile, remoteJobData)} · ${jobPool.length} 个岗位` : '请同步远程岗位库，或在上方上传岗位表。'}</span></div>
               </div>
               {jobMessage && <p className="success-line">{jobMessage}</p>}
               {jobError && <p className="error-line">{jobError}</p>}
@@ -2194,10 +2345,12 @@ function App() {
               <Metric label="真实复盘" value={`${realInterviews.filter((item) => item.reviewReport).length}`} />
               <Metric label="公司资料" value={`${companySources.length}`} />
               <Metric label="准备包" value={`${jobPacks.length}`} />
+              <Metric label="岗位库版本" value={remoteJobData.dataVersion || '本地'} />
             </section>
             <section className="storage-note">
               <strong>本地存储</strong>
               <p>JSON 备份包含岗位、训练、转写、AI 反馈、准备包、真实复盘和公司知识包。录音 Blob 仍保存在浏览器 IndexedDB，不会写入 JSON。</p>
+              <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
             </section>
             <section className="backup-actions">
               <button className="primary-button" type="button" onClick={exportBackup}><Download size={16} />导出 JSON</button>
@@ -3165,6 +3318,30 @@ function readStoredState(): StoredMvpState {
 
 function readJobPool() { return readArray<JobRecord>(JOB_POOL_KEY).map(ensureNormalizedJob) }
 function readSelectedJob() { try { const raw = localStorage.getItem(SELECTED_JOB_KEY); return raw ? ensureNormalizedJob(JSON.parse(raw) as JobRecord) : null } catch { return null } }
+function readRemoteJobData(): RemoteJobDataState {
+  try {
+    const raw = localStorage.getItem(REMOTE_JOB_DATA_KEY)
+    const parsed = raw ? JSON.parse(raw) as Partial<RemoteJobDataState> : {}
+    return {
+      status: parsed.status || 'idle',
+      source: parsed.source || 'github_raw',
+      manifestUrl: parsed.manifestUrl || REMOTE_JOB_MANIFEST_URL,
+      jobsUrl: parsed.jobsUrl,
+      dataVersion: parsed.dataVersion,
+      updatedAt: parsed.updatedAt,
+      jobsCount: parsed.jobsCount,
+      newJobsCount: parsed.newJobsCount,
+      updatedJobsCount: parsed.updatedJobsCount,
+      removedJobsCount: parsed.removedJobsCount,
+      hash: parsed.hash,
+      lastCheckedAt: parsed.lastCheckedAt,
+      lastSyncedAt: parsed.lastSyncedAt,
+      error: parsed.error,
+    }
+  } catch {
+    return { status: 'idle', source: 'github_raw', manifestUrl: REMOTE_JOB_MANIFEST_URL }
+  }
+}
 function readCvTextState(): CvTextState { try { const raw = localStorage.getItem(CV_TEXT_KEY); return raw ? { text: '', source: 'upload', ...JSON.parse(raw) } : { text: '', source: 'upload' } } catch { return { text: '', source: 'upload' } } }
 function readScriptTemplates(): ScriptTemplates { try { const raw = localStorage.getItem(SCRIPT_TEMPLATES_KEY); return raw ? JSON.parse(raw) : {} } catch { return {} } }
 function readJobPacks() { return normalizeJobPacks(readArray<StoredJobPack>(JOB_PACKS_KEY)) }
@@ -3185,6 +3362,45 @@ function readProviderState(): ProviderState {
 function readLegacyRole() { try { const raw = localStorage.getItem(LEGACY_TARGET_ROLE_KEY); return raw ? JSON.parse(raw) : null } catch { return null } }
 function readArray<T>(key: string): T[] { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
 function readObject<T extends Record<string, unknown>>(key: string): Partial<T> { try { const raw = localStorage.getItem(key); const parsed = raw ? JSON.parse(raw) : {}; return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {} } catch { return {} } }
+
+async function fetchRemoteManifest(): Promise<RemoteJobManifest> {
+  const manifest = await fetchJsonWithTimeout(REMOTE_JOB_MANIFEST_URL)
+  if (!manifest || typeof manifest !== 'object') throw new Error('远程 manifest.json 格式无效。')
+  return manifest as RemoteJobManifest
+}
+
+async function fetchProxyJobData(): Promise<{ manifest: RemoteJobManifest; jobs: JobRecord[] }> {
+  const payload = await fetchJsonWithTimeout('/api/job-data/latest')
+  const data = payload as { success?: boolean; manifest?: RemoteJobManifest; jobs?: { jobs?: JobRecord[] } | JobRecord[]; error?: string }
+  if (!data.success) throw new Error(data.error || '服务端岗位数据代理不可用。')
+  const jobsPayload = data.jobs
+  const jobs = Array.isArray(jobsPayload) ? jobsPayload : Array.isArray(jobsPayload?.jobs) ? jobsPayload.jobs : []
+  return { manifest: data.manifest || {}, jobs }
+}
+
+async function fetchJsonWithTimeout(url: string, timeoutMs = 8000): Promise<unknown> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { cache: 'no-store', signal: controller.signal })
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    return response.json()
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
+function resolveRemoteUrl(baseUrl: string, maybeRelative: string) {
+  return new URL(maybeRelative, baseUrl).toString()
+}
+
+function matchSelectedJobFromRemote(current: JobRecord | null, jobs: JobRecord[]) {
+  if (!current) return null
+  const match = jobs.find((job) => job.id === current.id)
+    || jobs.find((job) => (job as JobRecord & { stableId?: string }).stableId && (job as JobRecord & { stableId?: string }).stableId === (current as JobRecord & { stableId?: string }).stableId)
+    || jobs.find((job) => job.companyName === current.companyName && job.jobTitle === current.jobTitle && job.city === current.city)
+  return match ? { ...match, selectedAt: current.selectedAt || new Date().toISOString() } : current
+}
 
 function normalizeTasks(tasks?: TrainingTask[]) {
   return defaultTasks.map((defaultTask) => {
@@ -3344,6 +3560,27 @@ function normalizeProviderState(input: unknown): ProviderState {
   }
 }
 
+function normalizeRemoteJobData(input: unknown): RemoteJobDataState {
+  if (!input || typeof input !== 'object') return { status: 'idle', source: 'github_raw', manifestUrl: REMOTE_JOB_MANIFEST_URL }
+  const value = input as Partial<RemoteJobDataState>
+  return {
+    status: value.status || 'idle',
+    source: value.source || 'github_raw',
+    manifestUrl: value.manifestUrl || REMOTE_JOB_MANIFEST_URL,
+    jobsUrl: value.jobsUrl,
+    dataVersion: value.dataVersion,
+    updatedAt: value.updatedAt,
+    jobsCount: value.jobsCount,
+    newJobsCount: value.newJobsCount,
+    updatedJobsCount: value.updatedJobsCount,
+    removedJobsCount: value.removedJobsCount,
+    hash: value.hash,
+    lastCheckedAt: value.lastCheckedAt,
+    lastSyncedAt: value.lastSyncedAt,
+    error: value.error,
+  }
+}
+
 function updateMockAnswer(
   sessions: MockInterviewSession[],
   sessionId: string,
@@ -3494,6 +3731,24 @@ function buildDataStatusText(context: {
   companySources: CompanySourceInput[]
 }) {
   return `岗位 ${context.jobPool.length} 个，准备包 ${context.jobPacks.length} 个，模拟面试 ${context.mockInterviews.length} 场，真实复盘 ${context.realInterviews.filter((item) => item.reviewReport).length} 份，公司资料 ${context.companySources.length} 条。`
+}
+
+function formatRemoteJobStatus(remote: RemoteJobDataState, localCount: number) {
+  const source = remote.source === 'api_proxy' ? '服务端代理' : 'GitHub Raw'
+  if (remote.status === 'failed') return `同步失败，保留本地 ${localCount} 个岗位。${remote.error || ''}`
+  if (!remote.hash && !localCount) return '打开网站会自动读取 GitHub latest/jobs.json；私有仓库时走 /api/job-data/latest。'
+  const version = remote.dataVersion ? `版本 ${remote.dataVersion}` : '版本未记录'
+  const count = `${remote.jobsCount || localCount} 个岗位`
+  const delta = typeof remote.newJobsCount === 'number' ? `今日新增 ${remote.newJobsCount}` : ''
+  const hash = remote.hash ? `hash ${remote.hash.slice(0, 8)}` : ''
+  const synced = remote.lastSyncedAt ? `同步 ${formatDateTime(remote.lastSyncedAt)}` : remote.lastCheckedAt ? `检查 ${formatDateTime(remote.lastCheckedAt)}` : ''
+  return [source, version, count, delta, hash, synced].filter(Boolean).join(' · ')
+}
+
+function getJobPoolSourceLabel(jobFile: UploadedFileMeta | undefined, remote: RemoteJobDataState) {
+  if (remote.status === 'synced' || remote.status === 'unchanged') return remote.source === 'api_proxy' ? 'API 代理岗位库' : 'GitHub latest 岗位库'
+  if (jobFile) return jobFile.name
+  return '本地岗位库'
 }
 
 function buildJobBattleBoard(
