@@ -1,104 +1,50 @@
-# 每日岗位库变更日报 20260614
+# 每日岗位库变更日报 20260615
 
 - 工作簿：C:\Users\Yang\Desktop\job\job.xlsx
 - 地图：C:\Users\Yang\Desktop\job\maps\prd_job_map_interactive.html
 - 报告目录：C:\Users\Yang\Desktop\job\reports
 
 ## 今日新增
-- 无适合新增
+- 腾讯｜用户研究（应届实习）｜深圳总部/北京｜实习薪资未公开｜ABC 未分档｜来源A/官网/公司招聘页
+- 腾讯｜产品体验设计（应届实习）｜深圳总部/北京/广州｜实习薪资未公开｜ABC 未分档｜来源A/官网/公司招聘页
+- 腾讯｜AI应用开发（应届实习）｜深圳总部/北京/上海/广州｜实习薪资未公开｜ABC 未分档｜来源A/官网/公司招聘页
 
 ## 下架/疑似下架
-- 共删除 40 行，涉及 40 个唯一岗位
-- 深圳市三旺通信股份有限公司｜AI人工智能产品经理/总监｜深圳-西丽｜200｜涉及表：次选_条件不完全符合
-- 长春捷翼汽车零部件有限公司｜具身智能机器人产品经理｜深圳-科技园｜200｜涉及表：次选_条件不完全符合
-- 香港多公司集合｜AI Product Intern / Digital Product Intern入口｜香港｜200｜涉及表：次选_条件不完全符合
-- SAP｜AI Solution / Business Analyst Intern入口｜香港｜200｜涉及表：次选_条件不完全符合
-- Archimedes Cat｜AI股票研究产品实习｜深圳｜200｜涉及表：次选_条件不完全符合
-- 美图｜AI产品实习生 MJ001479｜深圳｜200｜涉及表：次选_条件不完全符合
-- 虎一科技｜AI产品经理实习生（可转正）｜深圳｜200｜涉及表：次选_条件不完全符合
-- 百丽科技｜AI金融数据产品经理（深圳/香港）实习｜深圳/香港｜200｜涉及表：次选_条件不完全符合
-- 云之家｜AI SaaS产品经理实习｜深圳｜200｜涉及表：次选_条件不完全符合
-- 领智寻知｜产品经理实习生（偏UI）｜深圳｜200｜涉及表：次选_条件不完全符合
-- SHEIN｜AI产品实习生｜深圳｜200｜涉及表：次选_条件不完全符合
-- 腾讯｜AI产品策划实习生｜深圳｜200｜涉及表：次选_条件不完全符合
-- 香港/深圳多公司集合｜AI Product Manager / Product Analyst / AI Solution入口｜深圳/香港｜200｜涉及表：次选_条件不完全符合
-- Microsoft 微软｜AI Solution / Copilot / Product-adjacent入口｜香港｜200｜涉及表：次选_条件不完全符合
-- SAP｜AI Solution / Business AI / Product Associate入口｜香港/深圳｜200｜涉及表：次选_条件不完全符合
-- 创世易明｜AI产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
-- 百度APP｜AI产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
-- Shopee｜AI策略产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
-- 腾讯｜腾讯营销-微信小程序营销运营经理｜深圳｜200｜涉及表：次选_条件不完全符合
-- 腾讯｜腾讯营销-微信营销品牌发现产品经理｜深圳｜200｜涉及表：次选_条件不完全符合
-- 腾讯｜腾讯营销-搜索营销运营｜深圳｜200｜涉及表：次选_条件不完全符合
-- DJI 大疆｜中/高级产品应用工程师（维修工程-大疆行业）｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
-- DJI 大疆｜高级营销数字化专家｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
-- DJI 大疆｜售后高级产品经理｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
-- DJI 大疆｜高级数据产品经理（Data Agent方向）｜深圳-南山区｜200｜涉及表：次选_条件不完全符合
-- 美团｜AI硬件产品专员/工程师｜深圳｜200｜涉及表：扩源新增岗位
-- 荣耀｜AIoT产品经理实习/AI终端产品实习入口｜深圳｜200｜涉及表：扩源新增岗位
-- DJI 大疆｜产品经理/项目管理/产品体验实习入口｜深圳｜200｜涉及表：扩源新增岗位
-- 枢途科技｜AI智能硬件产品经理实习｜深圳｜200｜涉及表：扩源新增岗位
-- 蚯比｜Product Manager Intern｜深圳｜200｜涉及表：扩源新增岗位
-- Keep｜Product Management Intern｜深圳｜200｜涉及表：扩源新增岗位
-- Schneider Electric 施耐德电气｜Digital Product / Energy Management Solution入口｜深圳/香港｜200｜涉及表：扩源新增岗位
-- Siemens 西门子｜Digital Product / Solution / Project Manager入口｜深圳/香港｜200｜涉及表：扩源新增岗位
-- Apple｜Engineering Program Manager / Hardware Product / Operations入口｜深圳/香港｜200｜涉及表：扩源新增岗位
-- Insta360 影石｜后台产品实习｜深圳｜200｜涉及表：扩源新增岗位
-- Lenovo 联想｜AI PC/智能设备产品、方案产品、TPM/项目管理入口｜深圳/香港｜200｜涉及表：扩源新增岗位
-- vivo｜OS/AI产品经理、智能终端产品、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
-- OPPO｜AI产品经理、IoT产品、终端体验、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
-- 小米集团｜AIoT/智能硬件产品经理、产品企划、校招/实习入口｜深圳｜200｜涉及表：扩源新增岗位
-- 某深圳知名上市公司｜具身智能产品经理｜深圳｜200｜涉及表：扩源新增岗位
+- 无下架/疑似下架变化
 
 ## 薪资变化
 - 无薪资变化
 
 ## 优先级变化
-- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：P3次选验证 -> P1主线实习
-- DJI 大疆｜产品经理/项目管理/产品体验实习入口：P3次选验证 -> P1主线实习
-- 枢途科技｜AI智能硬件产品经理实习：P3次选验证 -> P1主线实习
-- 蚯比｜Product Manager Intern：P3次选验证 -> P1主线实习
-- Insta360 影石｜后台产品实习：P3次选验证 -> P1主线实习
-- Keep｜Product Management Intern：P3次选验证 -> P1主线实习
-- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：主攻-后置 -> 空
-- DJI 大疆｜产品经理/项目管理/产品体验实习入口：冲刺-后段 -> 空
-- 枢途科技｜AI智能硬件产品经理实习：练手-前段 -> 空
-- 蚯比｜Product Manager Intern：练手-前段 -> 空
-- Insta360 影石｜后台产品实习：主攻-中后段 -> 空
-- Keep｜Product Management Intern：主攻-中段 -> 空
+- 无优先级变化
 
 ## 可信度变化
-- 荣耀｜AIoT产品经理实习/AI终端产品实习入口：中 -> 中高
-- DJI 大疆｜产品经理/项目管理/产品体验实习入口：中 -> 中高
-- 枢途科技｜AI智能硬件产品经理实习：低 -> 中
-- 蚯比｜Product Manager Intern：低 -> 中
-- Insta360 影石｜后台产品实习：低 -> 中
-- Keep｜Product Management Intern：低 -> 中
+- 无可信度变化
 
 ## 未上图原因 Top15
-- P1｜匿名智能硬件公司（猎头）｜东莞; 深圳｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
 - P1｜星河智联｜广州-海珠区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
-- P1｜某千亿上市精密制造龙头（猎头匿名）｜广州-黄埔区; 深圳-龙岗区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
 - P1｜阿里巴巴｜广州; 广州（另有杭州/北京，投前确认广州HC）｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜RabbitPre AI 兔展智能｜深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
-- P1｜匿名NAS/智能硬件公司（猎头）｜深圳-龙华区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
 - P1｜匿名具身智能公司（猎头）｜深圳-南山区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
-- P1｜匿名智能安防公司（猎头）｜深圳-龙华区｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
-- P1｜埃尔梦创科技｜深圳-南山区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜广发证券｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜广州广日股份有限公司｜广州-番禺区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜广汽集团｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
-- P1｜斯沃德科技｜广州-黄埔区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜枢途科技｜深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
-- P1｜某人工智能/工业自动化公司（猎头匿名）｜广州｜匿名/猎头隐藏公司，无法核验真实公司实体，不上图
+- P1｜深圳市厚时人工智能科技有限公司｜深圳-南山区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜深圳欣盛商科技有限公司｜深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜科创集团｜香港/深圳联动且岗位地深圳｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜腾讯（企业微信）｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜腾讯（微信）｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P1｜路特创新｜深圳-南山区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P2｜Apple｜深圳/上海; 深圳/长沙｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 
 ## 待复核清单
-- source_coverage_20260614.csv
-- source_candidates_20260614.csv
-- low_confidence_review_20260614.csv
-- unmapped_priority_20260614.csv
-- today_action_plan_20260614.xlsx
-- link_revalidation_20260614.csv
+- source_coverage_20260615.csv
+- source_candidates_20260615.csv
+- low_confidence_review_20260615.csv
+- unmapped_priority_20260615.csv
+- today_action_plan_20260615.xlsx
+- link_revalidation_20260615.csv
 
 ## 当天覆盖来源
 - 外企｜Microsoft｜Product Manager / AI / Copilot / Hardware / Solution
@@ -290,18 +236,6 @@
 - 香港/大湾区大型平台｜Towngas 香港中华煤气｜Product / AI / Digital / Energy / IoT
 - 香港/大湾区大型平台｜New World Development 新世界发展｜Product / AI / Digital / Smart Building / Customer
 - 香港/大湾区大型平台｜Sun Hung Kai Properties 新鸿基地产｜Product / AI / Digital / Smart Building / Customer
-## Codex 2026-06-14 补充扫描
-
-- 上午自动脚本已完成全量复核与报告生成；Codex 本轮在其基础上追加补漏，不重建地图坐标。
-- AnySearch 免费额度已耗尽，本轮未保存自动生成的 API key，改用可访问的 Web 搜索结果做补充核验。
-- 补充新增 4 条，均写入 `次选_条件不完全符合`、`今日新增`、`面试顺序表`：
-  - SmartMore / 思谋科技｜AI产品经理-MJ001172｜深圳｜B80｜AI工业产品方向，薪资与驻场强度待确认。
-  - 深圳吉阳智能科技有限公司｜AI产品经理｜深圳｜B78｜AI+智能制造方向，3年以上与新能源背景风险。
-  - 杭州慕迪科技有限公司｜AI产品经理 / AI工具创作者｜深圳-南山区｜B76｜AI工具/原型方向，Python/JavaScript 风险。
-  - 航天科工资产管理有限公司｜AI产品培训经理｜深圳｜C72｜央企相关线索，但培训/售前属性较强。
-- 补充排除 1 条：沃尔玛中国投资有限公司｜AI智能体与低代码平台 产品负责人，因 5年以上与负责人要求明显偏高，不建议投递。
-- 地图未新增点：4 条补充岗位均未完成真实办公地址与 GCJ-02/香港坐标校准，按规则保留在 Excel，不上图。
-- Codex 验证：`今日新增` 4 条超链接 cell value 与 hyperlink target 一致；地图 HTML 浏览器截图通过，截图 `C:\tmp\job_map_20260614_codex.png`。
 
 ## Interview OS JSON Feed
 
@@ -309,12 +243,12 @@
 - jobs.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs.json`
 - jobs_delta.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs_delta.json`
 - job_sources.json: `C:\Users\Yang\Documents\New project\interview-os\latest\job_sources.json`
-- jobsCount: 255
+- jobsCount: 265
 - newJobsCount: 4
-- updatedJobsCount: 0
+- updatedJobsCount: 21
 - removedJobsCount: 0
-- hash: `56935924b3548178008075a82c63982383f9ff6543cd75db28621d6532ced6fa`
-- GitHub upload: success, pushed to `Yang-lab1/training-work` main and raw URLs verified
+- hash: `340624d9cbb91b7189b925225b5fe9bdbd7a26f8e83e8fe0d638a3cf37e6df3b`
+- GitHub upload: pending git commit/push from automation workspace
 - GitHub raw:
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/jobs.json
