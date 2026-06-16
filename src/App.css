@@ -3205,3 +3205,286 @@ button,
     animation: none;
   }
 }
+
+/* Product Design correction: make mock interview behave like a call room, not a recorder page. */
+.interviewer-panel > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  opacity: .94;
+}
+
+.interviewer-panel::after {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  content: "";
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, .14), rgba(0, 0, 0, .04) 42%, rgba(0, 0, 0, .5)),
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .14), transparent 30%);
+}
+
+.interviewer-screen-badge,
+.interviewer-question,
+.meeting-stage .candidate-window {
+  isolation: isolate;
+}
+
+.meeting-control-bar {
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: calc(100% - 28px);
+  margin-inline: auto;
+}
+
+.meeting-control-bar button,
+.meeting-control-bar .meeting-status-chip,
+.meeting-control-bar .meeting-backup-actions {
+  flex: 0 0 auto;
+  width: auto;
+  writing-mode: horizontal-tb;
+}
+
+.meeting-backup-actions {
+  display: none;
+}
+
+.meeting-control-bar .icon-call-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 48px;
+  border-radius: 999px;
+}
+
+.meeting-control-bar .icon-call-button span {
+  font-weight: 760;
+}
+
+.meeting-control-bar .call-control-main {
+  min-width: 104px;
+  border-radius: 999px;
+}
+
+.meeting-control-bar .secondary-call-button {
+  background: rgba(255, 255, 255, .72);
+  color: #202124;
+}
+
+.meeting-control-bar .call-hangup-button {
+  min-width: 86px;
+  border-color: rgba(176, 37, 37, .22);
+  background: #fff3f1;
+  color: #9f1f1f;
+}
+
+.meeting-control-bar .call-hangup-button:not(:disabled):hover {
+  background: #9f1f1f;
+  color: #fff;
+}
+
+.meeting-room--fullscreen,
+.meeting-room:fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 12px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #090a0b;
+  color: #f7f7f5;
+}
+
+.meeting-room--fullscreen .meeting-status-bar,
+.meeting-room:fullscreen .meeting-status-bar {
+  min-height: 64px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(250, 250, 248, .96);
+  color: #101112;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .22);
+}
+
+.meeting-room--fullscreen .meeting-stage,
+.meeting-room--fullscreen .meeting-stage.has-side-panel,
+.meeting-room:fullscreen .meeting-stage,
+.meeting-room:fullscreen .meeting-stage.has-side-panel {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #111214;
+}
+
+.meeting-room--fullscreen .interviewer-panel,
+.meeting-room:fullscreen .interviewer-panel {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.meeting-room--fullscreen .interviewer-question,
+.meeting-room:fullscreen .interviewer-question {
+  right: auto;
+  bottom: 24px;
+  left: 24px;
+  width: min(680px, calc(100% - 330px));
+  max-height: 148px;
+  overflow: hidden;
+}
+
+.meeting-room--fullscreen .meeting-stage .candidate-window,
+.meeting-room:fullscreen .meeting-stage .candidate-window {
+  right: 24px;
+  bottom: 24px;
+  width: 240px;
+  min-height: 150px;
+  border-radius: 18px;
+  background: rgba(250, 250, 248, .9);
+  color: #101112;
+  box-shadow: 0 18px 58px rgba(0, 0, 0, .28);
+}
+
+.meeting-room--fullscreen .meeting-stage .candidate-window span,
+.meeting-room--fullscreen .meeting-stage .candidate-window p,
+.meeting-room:fullscreen .meeting-stage .candidate-window span,
+.meeting-room:fullscreen .meeting-stage .candidate-window p {
+  color: #6d7177;
+}
+
+.meeting-room--fullscreen .meeting-stage .candidate-window .wave-bars i,
+.meeting-room:fullscreen .meeting-stage .candidate-window .wave-bars i {
+  background: #101112;
+}
+
+.meeting-room--fullscreen .meeting-control-bar,
+.meeting-room:fullscreen .meeting-control-bar {
+  position: relative;
+  bottom: auto;
+  z-index: 22;
+  width: max-content;
+  max-width: min(760px, calc(100vw - 32px));
+  min-height: 66px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(250, 250, 248, .96);
+  color: #101112;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, .28);
+}
+
+.meeting-room--fullscreen .meeting-control-bar button,
+.meeting-room:fullscreen .meeting-control-bar button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  writing-mode: horizontal-tb;
+}
+
+.meeting-room--fullscreen .meeting-control-bar .primary-button,
+.meeting-room:fullscreen .meeting-control-bar .primary-button {
+  min-width: 104px;
+}
+
+.meeting-room--fullscreen .meeting-control-bar .call-hangup-button,
+.meeting-room:fullscreen .meeting-control-bar .call-hangup-button {
+  min-width: 86px;
+}
+
+.meeting-room--fullscreen .meeting-side-panel,
+.meeting-room:fullscreen .meeting-side-panel {
+  top: 90px;
+  right: 18px;
+  bottom: 92px;
+  z-index: 24;
+}
+
+@media (max-width: 760px) {
+  .meeting-room--fullscreen,
+  .meeting-room:fullscreen {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .meeting-room--fullscreen .meeting-status-bar,
+  .meeting-room:fullscreen .meeting-status-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 56px;
+    padding: 10px 12px;
+  }
+
+  .meeting-room--fullscreen .meeting-status-bar > div:nth-of-type(2),
+  .meeting-room--fullscreen .meeting-status-bar > div:nth-of-type(3),
+  .meeting-room--fullscreen .meeting-status-bar > div:nth-of-type(4),
+  .meeting-room:fullscreen .meeting-status-bar > div:nth-of-type(2),
+  .meeting-room:fullscreen .meeting-status-bar > div:nth-of-type(3),
+  .meeting-room:fullscreen .meeting-status-bar > div:nth-of-type(4) {
+    display: none;
+  }
+
+  .meeting-room--fullscreen .interviewer-question,
+  .meeting-room:fullscreen .interviewer-question {
+    right: 12px;
+    bottom: 112px;
+    left: 12px;
+    width: auto;
+    max-height: 118px;
+  }
+
+  .meeting-room--fullscreen .meeting-stage .candidate-window,
+  .meeting-room:fullscreen .meeting-stage .candidate-window {
+    right: 12px;
+    bottom: 12px;
+    width: 140px;
+    min-height: 88px;
+    padding: 11px;
+  }
+
+  .meeting-room--fullscreen .meeting-control-bar,
+  .meeting-room:fullscreen .meeting-control-bar {
+    width: 100%;
+    max-width: calc(100vw - 16px);
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .meeting-room--fullscreen .meeting-control-bar button,
+  .meeting-room:fullscreen .meeting-control-bar button {
+    min-height: 42px;
+    padding-inline: 11px;
+    font-size: 13px;
+  }
+
+  .meeting-room--fullscreen .meeting-control-bar .primary-button,
+  .meeting-room:fullscreen .meeting-control-bar .primary-button {
+    flex: 1 1 auto;
+    min-width: 112px;
+  }
+}

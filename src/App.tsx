@@ -16,6 +16,7 @@ import {
   Mic,
   Minimize2,
   PanelRightOpen,
+  PhoneOff,
   RotateCcw,
   Save,
   Sparkles,
@@ -1288,22 +1289,39 @@ function App() {
           })
           const followResult = await followResponse.json() as GenerateFollowUpResponse
           if (followResponse.ok && followResult.success) {
-            setMockInterviews((current) => current.map((item) => {
-              if (item.id !== session.id) return item
-              const insertAt = Math.min(item.currentQuestionIndex + 1, item.questions.length)
-              return {
-                ...item,
-                questions: [...item.questions.slice(0, insertAt), followResult.followUpQuestion, ...item.questions.slice(insertAt)],
-                followUps: [...item.followUps, followResult.followUpQuestion],
-                currentPhase: 'feedback_ready',
-              }
-            }))
+            window.setTimeout(() => {
+              setMockInterviews((current) => current.map((item) => {
+                if (item.id !== session.id) return item
+                const insertAt = Math.min(item.currentQuestionIndex + 1, item.questions.length)
+                return {
+                  ...item,
+                  questions: [...item.questions.slice(0, insertAt), followResult.followUpQuestion, ...item.questions.slice(insertAt)],
+                  followUps: [...item.followUps, followResult.followUpQuestion],
+                  currentQuestionIndex: insertAt,
+                  currentPhase: 'follow_up',
+                }
+              }))
+            }, 900)
           }
         } catch {
-          setMockInterviews((current) => updateMockSessionPhase(current, session.id, 'feedback_ready'))
+          window.setTimeout(() => {
+            setMockInterviews((current) => current.map((item) => {
+              if (item.id !== session.id) return item
+              const nextIndex = Math.min(item.currentQuestionIndex + 1, item.questions.length - 1)
+              return { ...item, currentQuestionIndex: nextIndex, currentPhase: nextIndex === item.currentQuestionIndex ? 'feedback_ready' : 'asking' }
+            }))
+          }, 900)
         }
+      } else if (session.currentQuestionIndex < session.questions.length - 1) {
+        window.setTimeout(() => {
+          setMockInterviews((current) => current.map((item) => item.id === session.id ? {
+            ...item,
+            currentQuestionIndex: Math.min(item.currentQuestionIndex + 1, item.questions.length - 1),
+            currentPhase: 'asking',
+          } : item))
+        }, 900)
       }
-      setMockInterviewMessage(needsFollowUp ? '本题已分析，可继续追问或进入下一题。' : '本题已自动转写和分析。')
+      setMockInterviewMessage(needsFollowUp ? '面试官正在准备追问。' : session.currentQuestionIndex < session.questions.length - 1 ? '面试官正在继续提问。' : '本轮面试已结束，可以挂断查看复盘。')
     } catch (error) {
       setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
         ...item,
@@ -1433,10 +1451,6 @@ function App() {
     } finally {
       setMockInterviewLoading('')
     }
-  }
-
-  function nextInterviewQuestion(sessionId: string) {
-    setMockInterviews((current) => current.map((session) => session.id === sessionId ? { ...session, currentQuestionIndex: Math.min(session.currentQuestionIndex + 1, session.questions.length - 1), currentPhase: 'asking' } : session))
   }
 
   function enterMockInterviewRoom(sessionId: string) {
@@ -2252,7 +2266,6 @@ function App() {
                     onTranscript={(questionId) => void generateInterviewAnswerTranscript(activeMockInterview.id, questionId)}
                     onFeedback={(questionId) => void generateInterviewAnswerFeedback(activeMockInterview.id, questionId)}
                     onFollowUp={(questionId) => void generateFollowUpQuestion(activeMockInterview.id, questionId)}
-                    onNext={() => nextInterviewQuestion(activeMockInterview.id)}
                     onEnterRoom={() => enterMockInterviewRoom(activeMockInterview.id)}
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
@@ -2545,7 +2558,6 @@ function MockInterviewPanel({
   onTranscript,
   onFeedback,
   onFollowUp,
-  onNext,
   onEnterRoom,
   onFinish,
   onDelete,
@@ -2562,7 +2574,6 @@ function MockInterviewPanel({
   onTranscript: (questionId: string) => void
   onFeedback: (questionId: string) => void
   onFollowUp: (questionId: string) => void
-  onNext: () => void
   onEnterRoom: () => void
   onFinish: () => void
   onDelete: () => void
@@ -2572,14 +2583,13 @@ function MockInterviewPanel({
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [sidePanelTab, setSidePanelTab] = useState<'dialogue' | 'feedback' | 'materials' | 'questions'>('dialogue')
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
-  const canGoNext = session.currentQuestionIndex < session.questions.length - 1
   const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
   const phaseLabel: Record<InterviewPhase, string> = {
     asking: '提问中',
     answering: '回答中',
     transcribing: '转写中',
     analyzing: '分析中',
-    feedback_ready: '下一题',
+    feedback_ready: '准备中',
     follow_up: '可追问',
     completed: '已结束',
   }
@@ -2700,16 +2710,16 @@ function MockInterviewPanel({
           <img src="/virtual-interviewer.png" alt="虚拟 AI 面试官 Helen" />
           <div className="interviewer-screen-badge">
             <Sparkles size={15} />
-            <span>{typeLabel}</span>
+            <span>AI 面试官 · 语音通话中</span>
           </div>
           <div className="interviewer-question" data-testid="interview-dialogue">
-            <span>{session.currentPhase === 'follow_up' ? '追问' : '面试官'}</span>
+            <span>{session.currentPhase === 'follow_up' ? '面试官追问' : '面试官'}</span>
             <p>{displayedQuestion?.question || '面试问题生成中…'}</p>
           </div>
         </article>
         <aside className="candidate-window" data-testid="candidate-window">
-          <span>你</span>
-          <strong>{isRecording ? '录音中' : currentAnswer ? '已回答' : '待回答'}</strong>
+          <span>我的麦克风</span>
+          <strong>{isRecording ? '收音中' : currentAnswer ? '已回答' : '待回答'}</strong>
           <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
           <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
         </aside>
@@ -2718,21 +2728,16 @@ function MockInterviewPanel({
       {currentQuestion && (
         <div className="meeting-control-bar" aria-label="bottom-controls">
           {isRecording ? (
-            <button className="primary-button recording-control" type="button" onClick={onStopRecording}><Square size={15} />停止回答</button>
+            <button className="primary-button recording-control call-control-main icon-call-button" type="button" aria-label="停止收音" title="停止收音" onClick={onStopRecording}><Square size={18} /><span>停止收音</span></button>
           ) : (
-            <button className="primary-button" type="button" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
-              <Mic size={16} />开始回答
+            <button className="primary-button call-control-main icon-call-button" type="button" aria-label="打开麦克风" title="打开麦克风" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
+              <Mic size={19} /><span>麦克风</span>
             </button>
           )}
-          {preview && <button type="button" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={15} />回放</button>}
+          {preview && <button className="icon-call-button secondary-call-button" type="button" aria-label="回放刚才回答" title="回放刚才回答" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={17} /><span>回放</span></button>}
           {(session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing') && <span className="meeting-status-chip">{visiblePhase}</span>}
-          {currentAnswer?.aiFeedback && (
-            <button type="button" onClick={onNext} disabled={session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
-              {currentAnswer.followUpDecision === 'follow_up' ? '继续追问' : canGoNext ? '下一题' : '完成本轮'}
-            </button>
-          )}
-          <button className="end-interview-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />结束面试</button>
-          <details className="meeting-backup-actions">
+          <button className="end-interview-button call-hangup-button icon-call-button" type="button" aria-label="挂断" title="挂断" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><PhoneOff size={18} /><span>挂断</span></button>
+          <details className="meeting-backup-actions" aria-label="开发备用操作">
             <summary>{'\u5907\u7528'}</summary>
             <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
               <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '\u8f6c\u5199\u4e2d' : '\u624b\u52a8\u8f6c\u5199'}
@@ -2772,7 +2777,7 @@ function MockInterviewPanel({
                     <span>最重要的问题</span>
                     <p>{currentAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</p>
                     <span>下一步</span>
-                    <p>{currentAnswer.aiFeedback.nextTasks[0] || '进入下一题。'}</p>
+                    <p>{currentAnswer.aiFeedback.nextTasks[0] || '等待面试官继续提问。'}</p>
                   </div>
                   {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>面试官追问</button>}
                   <details className="meeting-detail">
@@ -3227,7 +3232,7 @@ function AIFeedbackReport({ feedback }: { feedback: StoredAIFeedback }) {
       <div className="feedback-short-grid" data-testid="ai-short-report">
         <FeedbackList title="最重要的问题" items={topProblems.length ? topProblems : ['当前没有明显硬伤。']} />
         <FeedbackList title="下一步任务" items={topTasks.length ? topTasks : ['保持节奏，进入下一轮模拟面试。']} />
-        <section><strong>是否建议重答</strong><p>{shouldRetry ? '建议重答一次，只看骨架讲。' : '可以进入下一题。'}</p></section>
+        <section><strong>是否建议重答</strong><p>{shouldRetry ? '建议重答一次，只看骨架讲。' : '可以继续本场面试。'}</p></section>
       </div>
       <details className="ai-report-detail">
         <summary>查看详细报告</summary>

@@ -383,14 +383,23 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   await page.getByRole('button', { name: '全屏面试' }).click()
   await expect(page.getByTestId('interview-room')).toHaveClass(/meeting-room--fullscreen/)
+  await expect(page.getByTestId('virtual-interviewer').locator('img')).toBeVisible()
+  const viewport = page.viewportSize()
+  const fullscreenStageBox = await page.locator('.meeting-stage').boundingBox()
+  expect(fullscreenStageBox?.width).toBeGreaterThan((viewport?.width || 1200) * 0.82)
+  expect(fullscreenStageBox?.height).toBeGreaterThan((viewport?.height || 720) * 0.48)
+  const fullscreenControlBox = await page.locator('.meeting-control-bar').boundingBox()
+  expect(fullscreenControlBox?.height).toBeLessThan(96)
+  const fullscreenMainButtonBox = await page.locator('.meeting-control-bar .call-control-main').boundingBox()
+  expect(fullscreenMainButtonBox?.width).toBeGreaterThan(fullscreenMainButtonBox?.height || 0)
   await page.getByRole('button', { name: '退出全屏' }).click()
   await expect(page.getByTestId('interview-room')).not.toHaveClass(/meeting-room--fullscreen/)
 
   for (let index = 0; index < 3; index += 1) {
-    await page.getByRole('button', { name: '开始回答' }).click()
-    await expect(page.getByRole('button', { name: '停止回答' })).toBeEnabled()
+    await page.getByRole('button', { name: '打开麦克风' }).click()
+    await expect(page.getByRole('button', { name: '停止收音' })).toBeEnabled()
     await page.waitForTimeout(450)
-    await page.getByRole('button', { name: '停止回答' }).click()
+    await page.getByRole('button', { name: '停止收音' }).click()
     await page.waitForFunction(() => {
       const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
       return sessions.some((session) => session.answers?.some((answer) => answer.aiFeedbackStatus === 'completed' && answer.aiFeedback))
@@ -403,10 +412,17 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
     const detailOpen = await page.locator('.ai-report-detail').last().evaluate((node) => (node as HTMLDetailsElement).open)
     expect(detailOpen).toBe(false)
     await page.getByRole('button', { name: '收起资料面板' }).click()
-    if (index < 2) await page.getByRole('button', { name: /下一题|继续追问/ }).click()
+    await expect(page.getByRole('button', { name: /下一题|继续追问|完成本轮/ })).toHaveCount(0)
+    if (index < 2) {
+      await page.waitForFunction((minimumIndex) => {
+        const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
+        const session = sessions[0]
+        return Boolean(session && session.currentPhase !== 'transcribing' && session.currentPhase !== 'analyzing' && session.currentQuestionIndex >= minimumIndex)
+      }, index + 1, { timeout: 10000 })
+    }
   }
 
-  await page.getByRole('button', { name: '结束面试' }).click()
+  await page.getByRole('button', { name: '挂断' }).click()
   await expect(page.getByTestId('interview-review-room')).toBeVisible()
   await expect(page.locator('.review-summary-report')).toContainText('84')
   await expect(page.locator('.review-summary-report')).toContainText('可背回答版本')
