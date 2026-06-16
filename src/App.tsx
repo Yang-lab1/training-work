@@ -2596,8 +2596,11 @@ function MockInterviewPanel({
   const displayedQuestion = session.currentPhase === 'follow_up' && session.followUps.length ? session.followUps[session.followUps.length - 1] : currentQuestion
   const questionTimer = isRecording ? recordingSeconds : currentAnswer?.durationSeconds || 0
   const visiblePhase = session.currentPhase === 'asking' && !currentAnswer ? '待回答' : phaseLabel[session.currentPhase]
-  const feedbackSummary = currentAnswer?.aiFeedback
-    ? truncateText(`${currentAnswer.aiFeedback.score} 分 · ${currentAnswer.aiFeedback.summary}`, 96)
+  const panelAnswer = currentAnswer?.aiFeedback
+    ? currentAnswer
+    : [...session.answers].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).find((answer) => answer.aiFeedback)
+  const feedbackSummary = panelAnswer?.aiFeedback
+    ? truncateText(`${panelAnswer.aiFeedback.score} 分 · ${panelAnswer.aiFeedback.summary}`, 96)
     : ''
 
   useEffect(() => {
@@ -2770,19 +2773,19 @@ function MockInterviewPanel({
           )}
           {sidePanelTab === 'feedback' && (
             <div className="side-panel-section" data-testid="interview-feedback-summary">
-              {currentAnswer?.aiFeedback ? (
+              {panelAnswer?.aiFeedback ? (
                 <>
                   <strong>{feedbackSummary}</strong>
                   <div className="meeting-short-feedback" data-testid="meeting-short-feedback">
                     <span>最重要的问题</span>
-                    <p>{currentAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</p>
+                    <p>{panelAnswer.aiFeedback.problems[0] || '没有明显硬伤。'}</p>
                     <span>下一步</span>
-                    <p>{currentAnswer.aiFeedback.nextTasks[0] || '等待面试官继续提问。'}</p>
+                    <p>{panelAnswer.aiFeedback.nextTasks[0] || '等待面试官继续提问。'}</p>
                   </div>
                   {currentQuestion && <button type="button" onClick={() => onFollowUp(currentQuestion.id)} disabled={loading === `follow-${currentQuestion.id}`}>面试官追问</button>}
                   <details className="meeting-detail">
                     <summary>详细反馈</summary>
-                    <AIFeedbackReport feedback={currentAnswer.aiFeedback} />
+                    <AIFeedbackReport feedback={panelAnswer.aiFeedback} />
                   </details>
                 </>
               ) : <span>生成反馈后会显示一句话评价和下一步动作。</span>}
