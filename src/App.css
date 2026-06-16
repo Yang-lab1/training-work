@@ -3327,13 +3327,13 @@ button,
 
 .meeting-control-bar .call-hangup-button {
   min-width: 86px;
-  border-color: rgba(176, 37, 37, .22);
-  background: #fff3f1;
-  color: #9f1f1f;
+  border-color: rgba(159, 31, 31, .16);
+  background: #a32626;
+  color: #fff;
 }
 
 .meeting-control-bar .call-hangup-button:not(:disabled):hover {
-  background: #9f1f1f;
+  background: #871d1d;
   color: #fff;
 }
 

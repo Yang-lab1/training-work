@@ -14,6 +14,7 @@ import {
   Maximize2,
   MessagesSquare,
   Mic,
+  MicOff,
   Minimize2,
   PanelRightOpen,
   PhoneOff,
@@ -1178,12 +1179,12 @@ function App() {
     window.setTimeout(() => {
       void autoProcessInterviewAnswer(session, question, answer)
     }, 0)
-    setMockInterviewMessage('已保存本题录音。下一步生成转写。')
+    setMockInterviewMessage('收到回答，正在转写和分析。')
   }
 
   async function autoProcessInterviewAnswer(session: MockInterviewSession, question: MockInterviewQuestion, answer: MockInterviewAnswer) {
     setMockInterviewLoading(`auto-${question.id}`)
-    setMockInterviewMessage('系统正在转写并分析本题回答。')
+    setMockInterviewMessage('系统正在整理你的回答。')
     setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
       ...item,
       transcriptStatus: 'transcribing',
@@ -1325,7 +1326,7 @@ function App() {
           } : item))
         }, 900)
       }
-      setMockInterviewMessage(needsFollowUp ? '面试官正在准备追问。' : session.currentQuestionIndex < session.questions.length - 1 ? '面试官正在继续提问。' : '本轮面试已结束，可以挂断查看复盘。')
+      setMockInterviewMessage(needsFollowUp ? '面试官正在准备追问。' : session.currentQuestionIndex < session.questions.length - 1 ? '面试官正在继续提问。' : '本轮面试已完成，可以挂断查看复盘。')
     } catch (error) {
       setMockInterviews((current) => updateMockSessionPhase(updateMockAnswer(current, session.id, question.id, (item) => ({
         ...item,
@@ -1469,6 +1470,17 @@ function App() {
   async function finishMockInterview(sessionId: string) {
     const session = mockInterviews.find((item) => item.id === sessionId)
     if (!session) return
+    if (!session.answers.length) {
+      setMockInterviews((current) => current.map((item) => item.id === sessionId ? {
+        ...item,
+        status: 'completed',
+        uiState: 'review_room',
+        currentPhase: 'completed',
+        completedAt: new Date().toISOString(),
+      } : item))
+      setMockInterviewMessage('面试已挂断。')
+      return
+    }
     setMockInterviewLoading('report')
     setMockInterviewMessage('')
     try {
@@ -2608,13 +2620,13 @@ function MockInterviewPanel({
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
   const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
   const phaseLabel: Record<InterviewPhase, string> = {
-    asking: '提问中',
-    answering: '回答中',
-    transcribing: '转写中',
-    analyzing: '分析中',
-    feedback_ready: '准备中',
-    follow_up: '可追问',
-    completed: '已结束',
+    asking: '对方发问',
+    answering: '你在回答',
+    transcribing: '整理回答',
+    analyzing: '分析匹配',
+    feedback_ready: '继续面试',
+    follow_up: '继续追问',
+    completed: '已挂断',
   }
   const displayedQuestion = session.currentPhase === 'follow_up' && session.followUps.length ? session.followUps[session.followUps.length - 1] : currentQuestion
   const questionTimer = isRecording ? recordingSeconds : currentAnswer?.durationSeconds || 0
@@ -2677,8 +2689,8 @@ function MockInterviewPanel({
           <div><span>模式</span><strong>{typeLabel}</strong></div>
         </div>
         <details className="waiting-materials">
-          <summary>查看准备资料</summary>
-          <p>岗位信息与过往练习会在后台参与出题。</p>
+          <summary>查看本场面试设定</summary>
+          <p>岗位信息、公司知识和你过往的训练记录都会在后台参与出题。</p>
         </details>
         <div className="inline-actions">
           <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />开始面试</button>
@@ -2744,8 +2756,8 @@ function MockInterviewPanel({
           </div>
         </article>
         <aside className="candidate-window" data-testid="candidate-window">
-          <span>我的麦克风</span>
-          <strong>{isRecording ? '收音中' : currentAnswer ? '已回答' : '待回答'}</strong>
+          <span>我的窗口</span>
+          <strong>{isRecording ? '通话中' : currentAnswer ? '已回应' : '等待回答'}</strong>
           <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
           <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
         </aside>
@@ -2754,17 +2766,17 @@ function MockInterviewPanel({
       {currentQuestion && (
         <div className="meeting-control-bar" aria-label="bottom-controls">
           {isRecording ? (
-            <button className="primary-button recording-control call-control-main icon-call-button" type="button" aria-label="停止收音" title="停止收音" onClick={onStopRecording}><Square size={18} /><span>停止收音</span></button>
+            <button className="primary-button recording-control call-control-main icon-call-button" type="button" aria-label="关闭麦克风" title="关闭麦克风" onClick={onStopRecording}><MicOff size={18} /><span>静音</span></button>
           ) : (
             <button className="primary-button call-control-main icon-call-button" type="button" aria-label="打开麦克风" title="打开麦克风" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
               <Mic size={19} /><span>麦克风</span>
             </button>
           )}
-          {preview && <button className="icon-call-button secondary-call-button" type="button" aria-label="回放刚才回答" title="回放刚才回答" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={17} /><span>回放</span></button>}
           {(session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing') && <span className="meeting-status-chip">{visiblePhase}</span>}
-          <button className="end-interview-button call-hangup-button icon-call-button" type="button" aria-label="挂断" title="挂断" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><PhoneOff size={18} /><span>挂断</span></button>
+          <button className="end-interview-button call-hangup-button icon-call-button" type="button" aria-label="挂断" title="挂断" onClick={onFinish} disabled={loading === 'report'}><PhoneOff size={18} /><span>挂断</span></button>
           <details className="meeting-backup-actions" aria-label="开发备用操作">
             <summary>{'\u5907\u7528'}</summary>
+            {preview && <button type="button" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={15} />回放刚才回答</button>}
             <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
               <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '\u8f6c\u5199\u4e2d' : '\u624b\u52a8\u8f6c\u5199'}
             </button>

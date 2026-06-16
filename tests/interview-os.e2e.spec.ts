@@ -404,9 +404,9 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   for (let index = 0; index < 3; index += 1) {
     await page.getByRole('button', { name: '打开麦克风' }).click()
-    await expect(page.getByRole('button', { name: '停止收音' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '关闭麦克风' })).toBeEnabled()
     await page.waitForTimeout(450)
-    await page.getByRole('button', { name: '停止收音' }).click()
+    await page.getByRole('button', { name: '关闭麦克风' }).click()
     await page.waitForFunction(() => {
       const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
       return sessions.some((session) => session.answers?.some((answer) => answer.aiFeedbackStatus === 'completed' && answer.aiFeedback))
