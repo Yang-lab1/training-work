@@ -1,21 +1,16 @@
 # 当前进度
 
-- 已按 Product Design 的 Interview Room First 方向完成本轮纠偏。
-- 已移除“岗位准备包”独立前台页面和导航入口。
-- 选择岗位后自动在后台生成面试资料，模拟面试大厅只显示准备状态。
-- 岗位卡片不再暴露“无准备包 / 未模拟 / 未复盘”等内部节点。
-- 已修复岗位筛选“隐藏不适合”复选框异常放大。
-- 已加入真实大厅 → 等待室 → 面试房间流程。
-- 面试大厅和房间使用新的虚拟面试官图像。
-- 正式面试房间只保留岗位、题次、问题、候选人窗和控制栏。
-- 资料 / 反馈面板默认关闭，开关已移入顶部状态栏。
-- 已修复页面切换保留旧滚动位置、全屏按钮被遮挡、移动端抽屉无法关闭等问题。
-- `npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers` 已通过。
-- Playwright desktop + mobile：2 passed。
-- 已推送代码提交 `cc28091 refine interview flow and room`。
-- 已部署到 `https://interview-os-pi.vercel.app`。
-- 生产环境 Playwright desktop + mobile：2 passed。
+- 已完成 AGNES 公司/岗位面试知识包 provider 配置与线上验证。
+- 当前线上分工：普通文本反馈走 DeepSeek；公司/岗位面试知识包走 AGNES。
+- 已把“公司资料”从用户前台导航中移除，不再作为独立用户流程暴露。
+- 选中岗位后，系统会先在后台生成岗位面试资料，再自动生成公司/岗位面试知识包。
+- 模拟面试入口现在要求岗位资料和公司知识包都准备好；未就绪时只显示“面试资料正在后台准备”。
+- 系统诊断页已显示任务级 provider 分工，避免误以为所有文本任务都走 DeepSeek。
+- Playwright 已补充公司知识包 mock，覆盖后台知识包准备链路。
+- `npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers`、`npx playwright test` 均已通过。
+- 已提交并推送 `dbe09d0 training work`，已部署到 `https://interview-os-pi.vercel.app`。
 
 ## 下一步
 
-- 等待用户实际体验反馈。
+- 继续把面试舱做成更接近真实语音/视频通话的体验，减少“题目按钮式”交互。
+- 如需要真实实时语音，需要进一步接入实时 ASR / 对话模型 / 音频流能力；当前仍是录音片段转写闭环。
