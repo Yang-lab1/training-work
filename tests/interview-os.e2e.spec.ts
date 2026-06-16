@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
 import * as fs from 'node:fs/promises'
-import * as XLSX from 'xlsx'
 
 type TestJob = {
   id: string
@@ -19,64 +18,6 @@ type StoredMockInterviewForTest = {
 }
 
 function buildRemoteJobFeed() {
-  return {
-    manifest: {
-      schemaVersion: '1.0',
-      dataVersion: '2026-06-15-test',
-      updatedAt: '2026-06-15T00:00:00+08:00',
-      jobsCount: 1,
-      newJobsCount: 1,
-      updatedJobsCount: 0,
-      removedJobsCount: 0,
-      jobsUrl: './jobs.json',
-      hash: 'fixture-hash-remote-sync',
-    },
-    jobs: {
-      schemaVersion: '1.0',
-      dataVersion: '2026-06-15-test',
-      updatedAt: '2026-06-15T00:00:00+08:00',
-      jobs: [{
-        id: 'remote-job-ai-pm',
-        stableId: 'remote-job-ai-pm',
-        companyName: '远程测试科技公司',
-        jobTitle: 'AI产品实习生',
-        city: '深圳',
-        jobType: '实习',
-        priority: 'A',
-        mainTrack: '主线B：AI应用落地 / AI产品 / Agent / RAG',
-        salary: '面议',
-        sourceSheet: 'latest/jobs.json',
-        source: 'GitHub latest',
-        link: 'https://example.com/remote-job',
-        companyBusiness: '企业 AI 应用平台',
-        jobContent: '负责 AI 产品需求分析、原型设计和落地协作',
-        jobRequirements: '理解 AI 应用、良好沟通、用户场景分析',
-        businessDirection: 'AI 应用产品',
-        roleFitReason: '远程同步测试岗位',
-        matchLevel: '高',
-        difficulty: '中',
-        isTodayNew: true,
-        status: 'active',
-        normalized: {
-          normalizedTitle: 'AI产品实习生',
-          roleFamily: 'AI产品 / AI应用产品',
-          roleTrack: '主线B：AI应用落地 / AI产品 / Agent / RAG',
-          roleLevel: '实习',
-          jobNature: '实习',
-          cityGroup: '深圳',
-          priorityBucket: 'A 优先',
-          riskFlags: [],
-          matchScore: 92,
-          matchReasons: ['远程岗位库自动同步测试'],
-          searchableText: '远程测试科技公司 AI产品实习生 深圳 AI应用产品',
-        },
-      }],
-    },
-  }
-}
-
-async function writeJobFixture(path: string) {
-  const workbook = XLSX.utils.book_new()
   const rows = [
     ['测试科技公司', 'AI Product Manager', '深圳', '面议', 'AI应用产品', 'A', '正式', 'https://example.com/ai-pm', '企业 AI 应用平台', '负责 AI Agent、RAG 知识库和产品需求分析', '理解 AI 应用、用户场景和产品落地'],
     ['测试科技公司', 'AI产品经理', '深圳', '面议', 'AI应用产品', 'A', '正式', 'https://example.com/ai-product', '企业 AI 应用平台', '负责大模型产品规划、原型设计和研发协作', '理解 LLM、Agent、RAG 产品'],
@@ -88,21 +29,48 @@ async function writeJobFixture(path: string) {
     ['测试云公司', '后端开发工程师', '深圳', '25K', '云平台', 'C', '社招', 'https://example.com/backend', '云原生平台', '负责 Java、Go、K8s、SRE 和后端平台开发', '强代码、云原生、3 年以上经验'],
     ['测试销售公司', '销售经理', '广州', '底薪+提成', '销售', 'C', '社招', 'https://example.com/sales', '企业服务销售', '负责 BD、拓客、客户开发和业绩指标', '销售经验、客户开发、业绩指标'],
   ]
-  const sheet = XLSX.utils.json_to_sheet(rows.map((row) => ({
-    公司名称: row[0],
-    岗位名称: row[1],
-    城市: row[2],
-    薪资: row[3],
-    主线分类: row[4],
-    申请优先级: row[5],
-    岗位类型: row[6],
-    招聘链接: row[7],
-    公司业务: row[8],
-    岗位内容: row[9],
-    岗位要求: row[10],
-  })))
-  XLSX.utils.book_append_sheet(workbook, sheet, '正式岗_校招岗')
-  XLSX.writeFile(workbook, path)
+  const jobs = rows.map((row, index) => ({
+    id: `remote-job-${index}`,
+    stableId: `remote-job-${index}`,
+    companyName: row[0],
+    jobTitle: row[1],
+    city: row[2],
+    salary: row[3],
+    mainTrack: row[4],
+    priority: row[5],
+    jobType: row[6],
+    link: row[7],
+    companyBusiness: row[8],
+    jobContent: row[9],
+    jobRequirements: row[10],
+    sourceSheet: 'latest/jobs.json',
+    source: 'GitHub latest',
+    businessDirection: row[4],
+    roleFitReason: '远程同步测试岗位',
+    matchLevel: index < 3 ? '高' : '中',
+    difficulty: '中',
+    isTodayNew: index === 0,
+    status: 'active',
+  }))
+  return {
+    manifest: {
+      schemaVersion: '1.0',
+      dataVersion: '2026-06-15-test',
+      updatedAt: '2026-06-15T00:00:00+08:00',
+      jobsCount: jobs.length,
+      newJobsCount: 1,
+      updatedJobsCount: 0,
+      removedJobsCount: 0,
+      jobsUrl: './jobs.json',
+      hash: 'fixture-hash-remote-sync',
+    },
+    jobs: {
+      schemaVersion: '1.0',
+      dataVersion: '2026-06-15-test',
+      updatedAt: '2026-06-15T00:00:00+08:00',
+      jobs,
+    },
+  }
 }
 
 test.beforeEach(async ({ page }) => {
@@ -286,10 +254,8 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnostics, backup', async ({ page }, testInfo) => {
-  const jobFixturePath = testInfo.outputPath('job.xlsx')
   const cvFixturePath = testInfo.outputPath('cv.md')
   const projectFixturePath = testInfo.outputPath('project.md')
-  await writeJobFixture(jobFixturePath)
   await fs.writeFile(cvFixturePath, '# CV\nAI product candidate with HCI and industrial design background.', 'utf8')
   await fs.writeFile(projectFixturePath, '# Miro project\nCross-cultural AI communication training project.', 'utf8')
 
@@ -297,7 +263,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await page.waitForFunction(() => {
     const remote = JSON.parse(localStorage.getItem('interview_os_remote_job_data') || '{}')
     const jobs = JSON.parse(localStorage.getItem('interview_os_job_pool') || '[]')
-    return remote.hash === 'fixture-hash-remote-sync' && jobs.length === 1
+    return remote.hash === 'fixture-hash-remote-sync' && jobs.length === 9
   })
   await expect(page.locator('.top-nav nav button')).toHaveCount(4)
   await expect(page.locator('.account-menu summary')).toContainText('我的')
@@ -312,10 +278,11 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.getByTestId('resume-material-module')).toBeVisible()
   await expect(page.getByTestId('project-material-module')).toBeVisible()
   await expect(page.getByTestId('job-material-module')).toBeVisible()
+  await expect(page.getByTestId('job-material-module')).toContainText('打开网站会自动读取 GitHub latest/jobs.json')
+  await expect(page.getByRole('button', { name: '上传 job.xlsx' })).toHaveCount(0)
   await expect(page.locator('.material-module')).toHaveCount(3)
   await page.getByTestId('resume-material-module').locator('input[type="file"]').first().setInputFiles(cvFixturePath)
   await page.getByTestId('project-material-module').locator('input[type="file"]').first().setInputFiles(projectFixturePath)
-  await page.getByTestId('job-material-module').locator('input[accept=".xlsx"]').setInputFiles(jobFixturePath)
   await expect(page.getByTestId('save-materials-and-continue')).toBeEnabled()
   await page.getByTestId('save-materials-and-continue').click()
   await page.waitForFunction(() => {

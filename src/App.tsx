@@ -528,8 +528,6 @@ function App() {
 
   const cvFile = getFileByCategory(state.uploadedFiles, 'cv')
   const projectFile = getFileByCategory(state.uploadedFiles, 'project')
-  const jobFile = getFileByCategory(state.uploadedFiles, 'job')
-  const jobMapFile = getFileByCategory(state.uploadedFiles, 'job-map')
   const todayRecords = state.history.filter((record) => isToday(record.savedAt))
   const todayMockCount = mockInterviews.filter((session) => isToday(session.startedAt || session.createdAt)).length
   const todayMockFeedbackCount = mockInterviews
@@ -887,7 +885,7 @@ function App() {
   }
 
   function saveMaterialsAndContinue() {
-    const hasMaterials = Boolean(cvFile || cvTextState.text || projectFile || jobFile || jobMapFile)
+    const hasMaterials = Boolean(cvFile || cvTextState.text || projectFile)
     if (!hasMaterials) {
       setMaterialsMessage('请先上传资料。')
       return
@@ -1956,12 +1954,12 @@ function App() {
                 <div>
                   <span>当前岗位</span>
                   <strong>{selectedJob ? selectedJob.jobTitle : '未选择'}</strong>
-                  <p>{selectedJob ? `${selectedJob.companyName} · ${selectedJob.city || '城市未写'}` : '岗位来自 job.xlsx，不手填。'}</p>
+                  <p>{selectedJob ? `${selectedJob.companyName} · ${selectedJob.city || '城市未写'}` : '岗位来自 GitHub 自动同步，不手填。'}</p>
                 </div>
                 <div>
                   <span>最近状态</span>
                   <strong>{getLatestActivityLabel(state.history, mockInterviews, realInterviews)}</strong>
-                  <p>{currentJobPack ? '面试资料已就绪' : selectedJob ? '面试资料准备中' : '等待岗位表'}</p>
+                  <p>{currentJobPack ? '面试资料已就绪' : selectedJob ? '面试资料准备中' : '等待选择岗位'}</p>
                 </div>
               </aside>
             </section>
@@ -1994,7 +1992,7 @@ function App() {
         )}
 
         {activeView === 'materials' && (
-          <Page title="资料与岗位" subtitle="上传资料，解析岗位表，选择本次面试岗位。">
+          <Page title="资料与岗位" subtitle="补充个人资料，从 GitHub 岗位库选择目标岗位。">
             <section className="section-block material-flow">
               <SectionHeading icon={<Upload size={20} />} title="资料" />
               <div className="material-modules">
@@ -2021,23 +2019,27 @@ function App() {
                 </article>
                 <article className="material-module" data-testid="job-material-module">
                   <div>
-                    <strong>岗位表 / 岗位地图</strong>
-                    <span>上传已筛岗位，用于选择目标岗位。</span>
+                    <strong>岗位库</strong>
+                    <span>打开网站会自动读取 GitHub latest/jobs.json。</span>
                   </div>
                   <div className="material-actions">
-                    <UploadRow title="job.xlsx" hint="推荐上传已筛岗位表" file={jobFile} button="上传 job.xlsx" accept=".xlsx" onChange={(event) => void handleUpload('job', event)} onRemove={() => removeFile('job')} />
-                    <details className="inline-details">
-                      <summary>补充岗位地图</summary>
-                      <UploadRow title="岗位地图 HTML" hint="当前保存 metadata，优先解析 job.xlsx" file={jobMapFile} button="上传 HTML" accept=".html,text/html" onChange={(event) => void handleUpload('job-map', event)} onRemove={() => removeFile('job-map')} />
-                    </details>
+                    <div className="remote-job-sync compact" data-testid="remote-job-sync-inline">
+                      <div>
+                        <strong>{remoteJobSyncing ? '正在同步' : jobPool.length ? '已同步' : '等待同步'}</strong>
+                        <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
+                      </div>
+                      <button type="button" onClick={() => void syncRemoteJobData()} disabled={remoteJobSyncing}>
+                        {remoteJobSyncing ? '同步中…' : '重新同步'}
+                      </button>
+                    </div>
                   </div>
                 </article>
               </div>
               <div className="material-continue">
-                <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvFile && !cvTextState.text && !projectFile && !jobFile && !jobMapFile}>
+                <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvFile && !cvTextState.text && !projectFile}>
                   保存并继续
                 </button>
-                <span>{materialsMessage || '上传后继续选择目标岗位。'}</span>
+                <span>{materialsMessage || '岗位库会自动从 GitHub 同步。'}</span>
               </div>
             </section>
 
@@ -2054,7 +2056,7 @@ function App() {
               </div>
               {remoteJobMessage && <p className={remoteJobMessage.includes('失败') ? 'error-line' : 'success-line'}>{remoteJobMessage}</p>}
               <div className="job-upload-line simple">
-                <div><strong>从已筛岗位中选一个今天准备</strong><span>{jobPool.length ? `${getJobPoolSourceLabel(jobFile, remoteJobData)} · ${jobPool.length} 个岗位` : '请同步远程岗位库，或在上方上传岗位表。'}</span></div>
+                <div><strong>从 GitHub 岗位库选一个今天准备</strong><span>{jobPool.length ? `${getJobPoolSourceLabel(remoteJobData)} · ${jobPool.length} 个岗位` : '正在读取 GitHub latest/jobs.json；失败时点“同步最新岗位库”。'}</span></div>
               </div>
               {jobMessage && <p className="success-line">{jobMessage}</p>}
               {jobError && <p className="error-line">{jobError}</p>}
@@ -2126,7 +2128,7 @@ function App() {
                     )})}
                   </div>
                 </>
-              ) : <p className="empty-state">上传 job.xlsx 后，岗位会显示在这里。</p>}
+              ) : <p className="empty-state">正在同步 GitHub 岗位库。同步失败时，请点“同步最新岗位库”。</p>}
               {legacyRole && <div className="legacy-notice"><span>检测到旧版岗位数据，仅作兼容提示。</span><button type="button" onClick={() => { localStorage.removeItem(LEGACY_TARGET_ROLE_KEY); setLegacyRole(null) }}>清理旧数据</button></div>}
             </section>
           </Page>
@@ -2922,7 +2924,7 @@ function RealInterviewCard({
 }
 
 function CompanySourcesList({ sources, onDelete }: { sources: CompanySourceInput[]; onDelete: (sourceId: string) => void }) {
-  if (!sources.length) return <p className="empty-state">还没有上传公司资料。可以先用 job.xlsx 生成，也可以补充公司官网、JD、公众号文章导出文本。</p>
+  if (!sources.length) return <p className="empty-state">还没有公司资料。系统会先使用 GitHub 岗位库，也可以补充公司官网、JD、公众号文章导出文本。</p>
   return (
     <section className="material-list">
       {sources.map((source) => (
@@ -3671,7 +3673,7 @@ function buildDailyAction(context: {
 }): { title: string; detail: string; cta: string; view: ViewId; icon: ReactNode } {
   const latestRealNeedsReview = context.realInterviews.find((item) => !item.reviewReport)
   const latestMock = context.mockInterviews[0]
-  if (!context.jobPool.length) return { title: '先上传岗位表', detail: '岗位库建立后，系统才能给出今天的面试路径。', cta: '上传岗位表', view: 'materials', icon: <Upload size={17} /> }
+  if (!context.jobPool.length) return { title: '同步岗位库', detail: '打开网站会自动读取 GitHub latest/jobs.json。', cta: '同步岗位库', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
   if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
   if (!context.currentJobPack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看准备状态', view: 'mockInterview', icon: <Sparkles size={17} /> }
   if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主要考察。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
@@ -3698,7 +3700,7 @@ function buildDataStatusText(context: {
 
 function formatRemoteJobStatus(remote: RemoteJobDataState, localCount: number) {
   const source = remote.source === 'api_proxy' ? '服务端代理' : 'GitHub Raw'
-  if (remote.status === 'failed') return `同步失败，保留本地 ${localCount} 个岗位。${remote.error || ''}`
+  if (remote.status === 'failed') return `GitHub 同步失败。${remote.error || ''}`
   if (!remote.hash && !localCount) return '打开网站会自动读取 GitHub latest/jobs.json；私有仓库时走 /api/job-data/latest。'
   const version = remote.dataVersion ? `版本 ${remote.dataVersion}` : '版本未记录'
   const count = `${remote.jobsCount || localCount} 个岗位`
@@ -3708,10 +3710,9 @@ function formatRemoteJobStatus(remote: RemoteJobDataState, localCount: number) {
   return [source, version, count, delta, hash, synced].filter(Boolean).join(' · ')
 }
 
-function getJobPoolSourceLabel(jobFile: UploadedFileMeta | undefined, remote: RemoteJobDataState) {
+function getJobPoolSourceLabel(remote: RemoteJobDataState) {
   if (remote.status === 'synced' || remote.status === 'unchanged') return remote.source === 'api_proxy' ? 'API 代理岗位库' : 'GitHub latest 岗位库'
-  if (jobFile) return jobFile.name
-  return '本地岗位库'
+  return 'GitHub 岗位库缓存'
 }
 
 function buildJobBattleBoard(
@@ -3760,7 +3761,7 @@ function buildAbilityTrend(records: TrainingRecord[], interviews: MockInterviewS
 }
 
 function generateNextActions(jobPool: JobRecord[], selectedJob: JobRecord | null, cv: CvTextState, records: TrainingRecord[], jobPack?: StoredJobPack, mockInterviews: MockInterviewSession[] = []) {
-  if (!jobPool.length) return ['上传 job.xlsx，建立岗位库。']
+  if (!jobPool.length) return ['同步 GitHub 最新岗位库。']
   if (!selectedJob) return ['从岗位库选择一个目标岗位。']
   if (!jobPack) return ['等待面试资料准备完成。']
   if (!mockInterviews.length) return ['开始一轮模拟面试。']
