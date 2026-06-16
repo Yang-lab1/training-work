@@ -29,6 +29,78 @@ function agnesChatPath() {
   return value.startsWith('/') ? value : `/${value}`
 }
 
+function agnesTimeoutMs() {
+  const value = Number(serverEnv.AGNES_TIMEOUT_MS || 40_000)
+  return Number.isFinite(value) && value >= 10_000 ? value : 40_000
+}
+
+function shortenText(value: unknown, max: number) {
+  if (typeof value !== 'string') return ''
+  return value.length > max ? `${value.slice(0, max)}…` : value
+}
+
+function compactCompanyKnowledgeInput(input: GenerateCompanyKnowledgePackRequest): GenerateCompanyKnowledgePackRequest {
+  return {
+    taskType: 'generate_company_knowledge_pack',
+    selectedJob: {
+      id: input.selectedJob?.id,
+      companyName: shortenText(input.selectedJob?.companyName, 120),
+      jobTitle: shortenText(input.selectedJob?.jobTitle, 120),
+      city: shortenText(input.selectedJob?.city, 60),
+      jobType: shortenText(input.selectedJob?.jobType, 60),
+      priority: shortenText(input.selectedJob?.priority, 60),
+      mainTrack: shortenText(input.selectedJob?.mainTrack, 120),
+      companyBusiness: shortenText(input.selectedJob?.companyBusiness, 800),
+      jobContent: shortenText(input.selectedJob?.jobContent, 1400),
+      jobRequirements: shortenText(input.selectedJob?.jobRequirements, 1400),
+      businessDirection: shortenText(input.selectedJob?.businessDirection, 500),
+    },
+    jobPack: input.jobPack ? {
+      companySummary: shortenText(input.jobPack.companySummary, 900),
+      productAndBusiness: shortenText(input.jobPack.productAndBusiness, 900),
+      jobRequirementBreakdown: (input.jobPack.jobRequirementBreakdown || []).slice(0, 6).map((item) => shortenText(item, 220)),
+      workContentPrediction: (input.jobPack.workContentPrediction || []).slice(0, 6).map((item) => shortenText(item, 220)),
+      candidateFit: (input.jobPack.candidateFit || []).slice(0, 6).map((item) => shortenText(item, 220)),
+      riskPoints: (input.jobPack.riskPoints || []).slice(0, 6).map((item) => shortenText(item, 220)),
+      selfIntroductionStrategy: shortenText(input.jobPack.selfIntroductionStrategy, 900),
+      miroProjectStrategy: shortenText(input.jobPack.miroProjectStrategy, 900),
+      likelyQuestions: (input.jobPack.likelyQuestions || []).slice(0, 6).map((item) => ({
+        question: shortenText(item.question, 220),
+        whyItMatters: shortenText(item.whyItMatters, 220),
+        framework: shortenText(item.framework, 120),
+      })),
+      fullScoreAnswerFrameworks: (input.jobPack.fullScoreAnswerFrameworks || []).slice(0, 4).map((item) => ({
+        question: shortenText(item.question, 220),
+        frameworkName: shortenText(item.frameworkName, 120),
+        answerStructure: (item.answerStructure || []).slice(0, 5).map((entry) => shortenText(entry, 180)),
+        candidateEvidence: (item.candidateEvidence || []).slice(0, 5).map((entry) => shortenText(entry, 180)),
+        pitfalls: (item.pitfalls || []).slice(0, 4).map((entry) => shortenText(entry, 180)),
+      })),
+      preparationTasks: (input.jobPack.preparationTasks || []).slice(0, 6).map((item) => shortenText(item, 180)),
+    } : undefined,
+    companySources: (input.companySources || []).slice(0, 6).map((source) => ({
+      ...source,
+      title: shortenText(source.title, 120),
+      sourceName: shortenText(source.sourceName, 120),
+      sourceUrl: source.sourceUrl ? shortenText(source.sourceUrl, 260) : undefined,
+      text: shortenText(source.text, 2800),
+      wordCount: source.wordCount,
+    })),
+    cvText: shortenText(input.cvText, 3200),
+    realInterviewReviews: (input.realInterviewReviews || []).slice(0, 3).map((review) => ({
+      overallSummary: shortenText(review.overallSummary, 360),
+      interviewerFocus: (review.interviewerFocus || []).slice(0, 5).map((item) => shortenText(item, 180)),
+      strongestAnswer: shortenText(review.strongestAnswer, 240),
+      weakestAnswer: shortenText(review.weakestAnswer, 240),
+      missedPreparation: (review.missedPreparation || []).slice(0, 5).map((item) => shortenText(item, 180)),
+      unexpectedQuestions: (review.unexpectedQuestions || []).slice(0, 5).map((item) => shortenText(item, 180)),
+      answerQuality: shortenText(review.answerQuality, 280),
+      roleFitAssessment: shortenText(review.roleFitAssessment, 280),
+      nextTrainingTasks: (review.nextTrainingTasks || []).slice(0, 5).map((item) => shortenText(item, 180)),
+    })),
+  }
+}
+
 function extractContent(payload: unknown): unknown {
   if (!payload || typeof payload !== 'object') return undefined
   const input = payload as Record<string, unknown>
@@ -70,7 +142,7 @@ export function getAgnesProviderStatus() {
     implemented: true,
     model: agnesModel(),
     note: configured
-      ? 'AGNES Provider 已配置，将用于公司资料增强和文本反馈。'
+      ? 'AGNES Provider 已配置，将用于公司资料增强和岗位面试知识包。'
       : '未配置 AGNES_API_KEY 或 AGNES_BASE_URL，会回退到 Mock。',
   }
 }
@@ -83,7 +155,7 @@ export function createAgnesProvider(apiKey: string): AnalyzeAnswerProvider {
   async function completeJson(systemPrompt: string, userPayload: unknown, maxTokens = 3200) {
     if (!baseUrl) throw new Error('AGNES_BASE_URL is required')
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 24_000)
+    const timeout = setTimeout(() => controller.abort(), agnesTimeoutMs())
     try {
       const response = await fetch(`${baseUrl}${chatPath}`, {
         method: 'POST',
@@ -119,7 +191,7 @@ export function createAgnesProvider(apiKey: string): AnalyzeAnswerProvider {
     async generateCompanyKnowledgePack(
       input: GenerateCompanyKnowledgePackRequest,
     ): Promise<GenerateCompanyKnowledgePackSuccess> {
-      return normalizeCompanyKnowledgePack(await completeJson(COMPANY_KNOWLEDGE_PROMPT, input, 3600), 'agnes', model)
+      return normalizeCompanyKnowledgePack(await completeJson(COMPANY_KNOWLEDGE_PROMPT, compactCompanyKnowledgeInput(input), 3200), 'agnes', model)
     },
   }
 }

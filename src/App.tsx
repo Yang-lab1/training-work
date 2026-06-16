@@ -81,7 +81,7 @@ const REMOTE_JOB_MANIFEST_URL = import.meta.env.VITE_JOB_DATA_MANIFEST_URL || DE
 const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
-type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup' | 'diagnostics'
+type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'mockInterview' | 'realInterview' | 'backup' | 'diagnostics'
 type UploadCategory = 'cv' | 'cv-zh' | 'cv-en' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
@@ -1692,20 +1692,85 @@ function App() {
     setCompanyKnowledgeLoading(true)
     if (!silent) setCompanyKnowledgeMessage('')
     try {
+      const requestBody = {
+        taskType: 'generate_company_knowledge_pack' as const,
+        selectedJob: {
+          id: selectedJob.id,
+          companyName: selectedJob.companyName,
+          jobTitle: selectedJob.jobTitle,
+          city: selectedJob.city,
+          jobType: selectedJob.jobType,
+          priority: selectedJob.priority,
+          mainTrack: selectedJob.mainTrack,
+          companyBusiness: truncateText(selectedJob.companyBusiness || '', 800),
+          jobContent: truncateText(selectedJob.jobContent || '', 1400),
+          jobRequirements: truncateText(selectedJob.jobRequirements || '', 1400),
+          businessDirection: truncateText(selectedJob.businessDirection || '', 600),
+        },
+        jobPack: currentJobPack?.jobPack ? {
+          companySummary: truncateText(currentJobPack.jobPack.companySummary, 900),
+          productAndBusiness: truncateText(currentJobPack.jobPack.productAndBusiness, 900),
+          jobRequirementBreakdown: currentJobPack.jobPack.jobRequirementBreakdown.slice(0, 6).map((item) => truncateText(item, 220)),
+          workContentPrediction: currentJobPack.jobPack.workContentPrediction.slice(0, 6).map((item) => truncateText(item, 220)),
+          candidateFit: currentJobPack.jobPack.candidateFit.slice(0, 6).map((item) => truncateText(item, 220)),
+          riskPoints: currentJobPack.jobPack.riskPoints.slice(0, 6).map((item) => truncateText(item, 220)),
+          selfIntroductionStrategy: truncateText(currentJobPack.jobPack.selfIntroductionStrategy, 900),
+          miroProjectStrategy: truncateText(currentJobPack.jobPack.miroProjectStrategy, 900),
+          likelyQuestions: currentJobPack.jobPack.likelyQuestions.slice(0, 6).map((item) => ({
+            question: truncateText(item.question, 220),
+            whyItMatters: truncateText(item.whyItMatters, 220),
+            framework: truncateText(item.framework, 120),
+          })),
+          fullScoreAnswerFrameworks: currentJobPack.jobPack.fullScoreAnswerFrameworks.slice(0, 4).map((item) => ({
+            question: truncateText(item.question, 220),
+            frameworkName: truncateText(item.frameworkName, 120),
+            answerStructure: item.answerStructure.slice(0, 5).map((entry) => truncateText(entry, 180)),
+            candidateEvidence: item.candidateEvidence.slice(0, 5).map((entry) => truncateText(entry, 180)),
+            pitfalls: item.pitfalls.slice(0, 4).map((entry) => truncateText(entry, 180)),
+          })),
+          preparationTasks: currentJobPack.jobPack.preparationTasks.slice(0, 6).map((item) => truncateText(item, 180)),
+        } : undefined,
+        companySources: currentCompanySources
+          .slice(0, 6)
+          .map((source) => ({
+            ...source,
+            title: truncateText(source.title, 120),
+            sourceName: truncateText(source.sourceName, 120),
+            sourceUrl: source.sourceUrl ? truncateText(source.sourceUrl, 260) : undefined,
+            text: truncateText(source.text, 2800),
+          })),
+        cvText: truncateText(cvTextState.text, 3200),
+        realInterviewReviews: realInterviews
+          .map((interview) => interview.reviewReport)
+          .filter((review): review is RealInterviewReviewReport => Boolean(review))
+          .slice(0, 3)
+          .map((review) => ({
+            overallSummary: truncateText(review.overallSummary, 360),
+            interviewerFocus: review.interviewerFocus.slice(0, 5).map((item) => truncateText(item, 180)),
+            strongestAnswer: truncateText(review.strongestAnswer, 240),
+            weakestAnswer: truncateText(review.weakestAnswer, 240),
+            missedPreparation: review.missedPreparation.slice(0, 5).map((item) => truncateText(item, 180)),
+            unexpectedQuestions: review.unexpectedQuestions.slice(0, 5).map((item) => truncateText(item, 180)),
+            answerQuality: truncateText(review.answerQuality, 280),
+            roleFitAssessment: truncateText(review.roleFitAssessment, 280),
+            nextTrainingTasks: review.nextTrainingTasks.slice(0, 5).map((item) => truncateText(item, 180)),
+          })),
+      }
       const response = await fetch('/api/generate-company-knowledge-pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskType: 'generate_company_knowledge_pack',
-          selectedJob,
-          jobPack: currentJobPack?.jobPack,
-          companySources: currentCompanySources,
-          cvText: cvTextState.text.slice(0, 8000),
-          realInterviewReviews: realInterviews.map((interview) => interview.reviewReport).filter(Boolean).slice(0, 8),
-        }),
+        body: JSON.stringify(requestBody),
       })
       const result = await response.json() as GenerateCompanyKnowledgePackResponse
       if (!response.ok || !result.success) throw new Error(result.success ? '公司知识包生成失败。' : result.error)
+      recordProviderCall({
+        type: 'text',
+        providerUsed: result.provider,
+        model: result.model,
+        isFallback: result.provider === 'mock_fallback',
+        fallbackReason: result.rawProviderNote,
+        success: true,
+      })
       const pack: StoredCompanyKnowledgePack = {
         id: `${selectedJob.id || selectedJob.companyName}-knowledge-${Date.now()}`,
         selectedJobId: selectedJob.id,
@@ -1719,7 +1784,13 @@ function App() {
       }
       setCompanyKnowledgePacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== selectedJob.id)].slice(0, 20))
       if (!silent) {
-        setCompanyKnowledgeMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟面试知识包。' : '面试知识包已生成。')
+        setCompanyKnowledgeMessage(
+          result.provider === 'mock_fallback'
+            ? `真实知识包暂时未成功，已先生成模拟知识包。${result.rawProviderNote ? ` ${result.rawProviderNote}` : ''}`
+            : result.provider === 'mock'
+              ? '已生成模拟面试知识包。'
+              : '面试知识包已生成。'
+        )
       }
     } catch (error) {
       if (silent) autoCompanyKnowledgeAttemptRef.current.delete(selectedJob.id)
@@ -1731,10 +1802,6 @@ function App() {
 
   function deleteCompanySource(sourceId: string) {
     setCompanySources((current) => current.filter((source) => source.id !== sourceId))
-  }
-
-  function deleteCompanyKnowledgePack(packId: string) {
-    setCompanyKnowledgePacks((current) => current.filter((pack) => pack.id !== packId))
   }
 
   async function resetTask(taskId: TaskId) {
@@ -2044,6 +2111,34 @@ function App() {
                   </div>
                   <UploadRow title="作品集 / 项目资料" hint="PDF / HTML / Markdown / TXT / URL 说明" file={projectFile} button="上传项目资料" accept=".pdf,.doc,.docx,.txt,.md,.html" onChange={(event) => void handleUpload('project', event)} onRemove={() => removeFile('project')} />
                 </article>
+                <article className="material-module">
+                  <div>
+                    <strong>公司资料补充</strong>
+                    <span>可选。官网文本、JD 文本、文章摘录会在后台并入面试知识包。</span>
+                  </div>
+                  <div className="material-actions">
+                    <details className="inline-details">
+                      <summary>高级补充资料</summary>
+                      <div className="inline-actions">
+                        <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('company_official', event)} /><Upload size={15} />公司资料</label>
+                        <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('job_description', event)} /><Upload size={15} />岗位 JD</label>
+                        <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('article', event)} /><Upload size={15} />文章文本</label>
+                        <label className="small-upload-button"><input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCompanySourceUpload('portfolio', event)} /><Upload size={15} />作品集文本</label>
+                      </div>
+                      {currentCompanySources.length > 0 && <CompanySourcesList sources={currentCompanySources} onDelete={deleteCompanySource} />}
+                    </details>
+                    <p className="quiet-status">
+                      {currentKnowledgePack
+                        ? `面试知识包已就绪 · ${currentKnowledgePack.provider}${currentKnowledgePack.provider === 'mock_fallback' ? ' fallback' : ''}`
+                        : companyKnowledgeLoading
+                          ? '正在后台整理公司知识包。'
+                          : currentCompanySources.length
+                            ? `${currentCompanySources.length} 份补充资料已加入后台准备。`
+                            : '没有补充资料也能先生成基础知识包。'}
+                    </p>
+                    {companyKnowledgeMessage && <p className={companyKnowledgeMessage.includes('失败') || companyKnowledgeMessage.includes('请先') ? 'error-line' : 'success-line'}>{companyKnowledgeMessage}</p>}
+                  </div>
+                </article>
                 <article className="material-module" data-testid="job-material-module">
                   <div>
                     <strong>岗位库</strong>
@@ -2340,52 +2435,6 @@ function App() {
                     />
                   )) : <p className="empty-state">还没有真实面试录音。上传后会保存到本地浏览器。</p>}
                 </div>
-              </>
-            )}
-          </Page>
-        )}
-
-        {activeView === 'companyKnowledge' && (
-          <Page title="公司资料增强" subtitle={selectedJob ? `${selectedJob.companyName} · ${selectedJob.jobTitle}` : '先选择目标岗位，再上传公司资料'}>
-            {!selectedJob ? (
-              <section className="primary-flow">
-                <div>
-                  <span className="eyebrow">需要目标岗位</span>
-                  <h2>先选择目标岗位</h2>
-                  <p>公司知识包会绑定当前岗位，无需补录岗位信息。</p>
-                </div>
-                <button className="primary-button" type="button" onClick={() => setActiveView('materials')}><BriefcaseBusiness size={17} />去选择岗位</button>
-              </section>
-            ) : (
-              <>
-                <section className="primary-flow">
-                  <div>
-                    <span className="eyebrow">资料来源</span>
-                    <h2>上传公司资料文本</h2>
-                    <p>支持 TXT / Markdown / HTML 文本。PDF / DOCX 暂只建议另存为文本后上传。</p>
-                  </div>
-                  <div className="inline-actions">
-                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('company_official', event)} /><Upload size={15} />公司资料</label>
-                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('job_description', event)} /><Upload size={15} />岗位 JD</label>
-                    <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('article', event)} /><Upload size={15} />文章文本</label>
-                    <label className="small-upload-button"><input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCompanySourceUpload('portfolio', event)} /><Upload size={15} />作品集文本</label>
-                  </div>
-                </section>
-                <section className="primary-flow">
-                  <div>
-                    <span className="eyebrow">{currentCompanySources.length} 个来源</span>
-                    <h2>生成公司知识包</h2>
-                    <p>{currentJobPack ? '会结合当前岗位资料和真实面试复盘。' : '系统会先在后台整理当前岗位资料。'}</p>
-                  </div>
-                  <button className="primary-button" type="button" onClick={() => void generateCompanyKnowledgePack()} disabled={companyKnowledgeLoading}>
-                    <Sparkles size={16} />{companyKnowledgeLoading ? '生成中…' : currentKnowledgePack ? '重新生成知识包' : '生成公司知识包'}
-                  </button>
-                </section>
-                {companyKnowledgeMessage && <p className={companyKnowledgeMessage.includes('失败') || companyKnowledgeMessage.includes('请先') ? 'error-line' : 'success-line'}>{companyKnowledgeMessage}</p>}
-                <CompanySourcesList sources={currentCompanySources} onDelete={deleteCompanySource} />
-                {currentKnowledgePack ? (
-                  <CompanyKnowledgeReport pack={currentKnowledgePack} onDelete={() => deleteCompanyKnowledgePack(currentKnowledgePack.id)} />
-                ) : <p className="empty-state">还没有公司资料摘要。生成后会在后台用于模拟面试。</p>}
               </>
             )}
           </Page>
@@ -2967,44 +3016,6 @@ function CompanySourcesList({ sources, onDelete }: { sources: CompanySourceInput
         </div>
       ))}
     </section>
-  )
-}
-
-function CompanyKnowledgeReport({ pack, onDelete }: { pack: StoredCompanyKnowledgePack; onDelete: () => void }) {
-  const isMock = pack.provider === 'mock' || pack.provider === 'mock_fallback'
-  return (
-    <article className="job-pack-report">
-      <header>
-        <div>
-          <span className="eyebrow">公司知识包</span>
-          <h2>{pack.selectedJob.companyName}</h2>
-          <p>{pack.provider} · {pack.model} · {formatDateTime(pack.generatedAt)}</p>
-        </div>
-        <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
-      </header>
-      {isMock && <p className="mock-notice">当前为模拟公司知识包，仅用于测试流程。</p>}
-      {pack.rawProviderNote && <p className="provider-note">{pack.rawProviderNote}</p>}
-      <section className="brief-section"><h3>来源摘要</h3><p>{pack.companyKnowledgePack.sourceSummary}</p></section>
-      <section className="brief-section"><h3>核心业务</h3><p>{pack.companyKnowledgePack.companyCoreBusiness}</p></section>
-      <div className="brief-grid">
-        <FeedbackList title="产品线" items={pack.companyKnowledgePack.productLines} />
-        <FeedbackList title="近期信号" items={pack.companyKnowledgePack.recentSignals} />
-        <FeedbackList title="面试重点预测" items={pack.companyKnowledgePack.interviewFocusPrediction} />
-        <FeedbackList title="风险与未知" items={pack.companyKnowledgePack.risksAndUnknowns} />
-      </div>
-      <section className="brief-section"><h3>岗位上下文</h3><p>{pack.companyKnowledgePack.roleContext}</p></section>
-      <FeedbackList title="推荐追问" items={pack.companyKnowledgePack.recommendedQuestions} />
-      <FeedbackList title="面试中怎么用" items={pack.companyKnowledgePack.howToUseInInterview} />
-      <section className="question-list">
-        <h3>证据地图</h3>
-        {pack.companyKnowledgePack.evidenceMap.map((item) => (
-          <details key={`${item.sourceId}-${item.claim}`}>
-            <summary>{item.claim}</summary>
-            <p>{item.sourceName} · {item.confidence}</p>
-          </details>
-        ))}
-      </section>
-    </article>
   )
 }
 
