@@ -147,6 +147,30 @@ test.beforeEach(async ({ page }) => {
     })
   })
 
+  await page.route('**/api/generate-company-knowledge-pack', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'agnes',
+        model: 'agnes-2.0-flash',
+        generatedAt: new Date().toISOString(),
+        companyKnowledgePack: {
+          sourceSummary: '已整合岗位表、公司业务和候选人经历，用于模拟面试官出题。',
+          companyCoreBusiness: '测试科技公司是一家企业 AI 应用平台公司，重点方向包括 AI Agent、RAG 知识库和业务流程自动化。',
+          productLines: ['企业 AI 工作流', 'RAG 知识库', '智能客服'],
+          recentSignals: ['AI Agent 方向增强', '业务流程自动化需求上升'],
+          roleContext: 'AI 产品实习生需要理解用户场景、拆解需求，并推动原型到落地协作。',
+          interviewFocusPrediction: ['AI 产品理解', 'Miro 项目迁移能力', '跨团队协作'],
+          risksAndUnknowns: ['机器人或硬件场景经验需要通过迁移能力补足'],
+          evidenceMap: [{ claim: '公司关注企业 AI 应用平台', sourceId: 'job', sourceName: '岗位表', confidence: 'high' }],
+          recommendedQuestions: ['如果公司业务转向机器人产品，你会如何把过往项目迁移过来？'],
+          howToUseInInterview: ['面试官会围绕公司业务、岗位日常和候选人迁移能力追问。'],
+        },
+      }),
+    })
+  })
+
   await page.route('**/api/transcribe', async (route) => {
     await route.fulfill({
       contentType: 'application/json',

@@ -281,6 +281,7 @@ interface ProviderStatusPayload {
   success: true
   ai: {
     provider: string
+    taskProviders?: Record<string, string>
     configured: boolean
     fallbackMode: boolean
     availableProviders: Record<string, ProviderAvailability>
@@ -439,7 +440,6 @@ const primaryNavigation: Array<{ id: ViewId; label: string; icon: ReactNode }> =
 
 const accountNavigation: Array<{ id: ViewId; label: string; helper: string; icon: ReactNode }> = [
   { id: 'realInterview', label: '真实面试复盘', helper: '真实录音转写与反补', icon: <FileAudio size={17} /> },
-  { id: 'companyKnowledge', label: '公司资料', helper: '官网、JD、文章资料', icon: <FileText size={17} /> },
   { id: 'history', label: '面试记录', helper: '录音、转写和反馈', icon: <History size={17} /> },
   { id: 'backup', label: '数据管理', helper: '导入、导出、本地存储', icon: <Archive size={17} /> },
   { id: 'diagnostics', label: '系统诊断', helper: '模型、ASR 和 fallback', icon: <BrainCircuit size={17} /> },
@@ -511,6 +511,7 @@ function App() {
   const startedAtRef = useRef(0)
   const jobSelectionRef = useRef<HTMLElement | null>(null)
   const autoJobPackAttemptRef = useRef<Set<string>>(new Set())
+  const autoCompanyKnowledgeAttemptRef = useRef<Set<string>>(new Set())
 
   const legacyCvFile = getFileByCategory(state.uploadedFiles, 'cv')
   const cvZhFile = getFileByCategory(state.uploadedFiles, 'cv-zh') || legacyCvFile
@@ -545,12 +546,13 @@ function App() {
       jobPool,
       selectedJob,
       currentJobPack,
+      currentKnowledgePack,
       mockInterviews,
       realInterviews,
       history: state.history,
       cvText: cvTextState,
     }),
-    [jobPool, selectedJob, currentJobPack, mockInterviews, realInterviews, state.history, cvTextState],
+    [jobPool, selectedJob, currentJobPack, currentKnowledgePack, mockInterviews, realInterviews, state.history, cvTextState],
   )
   const abilityTrend = useMemo(() => buildAbilityTrend(state.history, mockInterviews), [state.history, mockInterviews])
   const jobBattleBoard = useMemo(
@@ -605,6 +607,20 @@ function App() {
     // Generate the internal interview context once for a restored or newly selected job.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJob?.id, currentJobPack?.id])
+
+  useEffect(() => {
+    if (
+      !selectedJob ||
+      !currentJobPack ||
+      currentKnowledgePack ||
+      companyKnowledgeLoading ||
+      autoCompanyKnowledgeAttemptRef.current.has(selectedJob.id)
+    ) return
+    autoCompanyKnowledgeAttemptRef.current.add(selectedJob.id)
+    void generateCompanyKnowledgePack({ silent: true })
+    // Company knowledge is internal interview context, not a user-facing workflow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJob?.id, currentJobPack?.id, currentKnowledgePack?.id, companyKnowledgeLoading])
 
   function recordProviderCall(call: Omit<ProviderCallRecord, 'at'>) {
     const nextCall: ProviderCallRecord = { ...call, at: new Date().toISOString() }
@@ -1085,9 +1101,10 @@ function App() {
       setActiveView('materials')
       return
     }
-    if (!currentJobPack) {
-      setMockInterviewMessage(jobPackLoading ? '面试资料正在准备，请稍候。' : '面试资料尚未准备完成，请重试。')
-      if (!jobPackLoading) void generateJobPack(selectedJob)
+    if (!currentJobPack || !currentKnowledgePack) {
+      setMockInterviewMessage(jobPackLoading || companyKnowledgeLoading ? '面试资料正在后台准备，请稍候。' : '面试资料尚未准备完成，请重试。')
+      if (!currentJobPack && !jobPackLoading) void generateJobPack(selectedJob)
+      if (currentJobPack && !currentKnowledgePack && !companyKnowledgeLoading) void generateCompanyKnowledgePack({ silent: true })
       return
     }
     setMockInterviewLoading('start')
@@ -1651,14 +1668,17 @@ function App() {
     setCompanyKnowledgeMessage('公司资料已读取。下一步生成公司知识包。')
   }
 
-  async function generateCompanyKnowledgePack() {
+  async function generateCompanyKnowledgePack(options: { silent?: boolean } = {}) {
+    const silent = Boolean(options.silent)
     if (!selectedJob) {
-      setCompanyKnowledgeMessage('请先选择目标岗位。')
-      setActiveView('materials')
+      if (!silent) {
+        setCompanyKnowledgeMessage('请先选择目标岗位。')
+        setActiveView('materials')
+      }
       return
     }
     setCompanyKnowledgeLoading(true)
-    setCompanyKnowledgeMessage('')
+    if (!silent) setCompanyKnowledgeMessage('')
     try {
       const response = await fetch('/api/generate-company-knowledge-pack', {
         method: 'POST',
@@ -1686,9 +1706,12 @@ function App() {
         rawProviderNote: result.rawProviderNote,
       }
       setCompanyKnowledgePacks((current) => [pack, ...current.filter((item) => item.selectedJobId !== selectedJob.id)].slice(0, 20))
-      setCompanyKnowledgeMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟公司知识包。' : '公司知识包已生成。')
+      if (!silent) {
+        setCompanyKnowledgeMessage(result.provider === 'mock' || result.provider === 'mock_fallback' ? '已生成模拟面试知识包。' : '面试知识包已生成。')
+      }
     } catch (error) {
-      setCompanyKnowledgeMessage(error instanceof Error ? error.message : '公司知识包生成失败。')
+      if (silent) autoCompanyKnowledgeAttemptRef.current.delete(selectedJob.id)
+      if (!silent) setCompanyKnowledgeMessage(error instanceof Error ? error.message : '面试知识包生成失败。')
     } finally {
       setCompanyKnowledgeLoading(false)
     }
@@ -2226,15 +2249,15 @@ function App() {
                       ))}
                     </div>
                     <div className="interview-entry">
-                      <div className={`interview-prep-status ${currentJobPack ? 'ready' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? 'error' : 'loading'}`}>
-                        <span>{currentJobPack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') ? '面试资料准备失败' : '正在准备面试资料'}</span>
-                        {!currentJobPack && !jobPackMessage.includes('失败') && !jobPackMessage.includes('超时') && <i aria-hidden="true" />}
+                      <div className={`interview-prep-status ${currentJobPack && currentKnowledgePack ? 'ready' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? 'error' : 'loading'}`}>
+                        <span>{currentJobPack && currentKnowledgePack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? '面试资料准备失败' : '面试资料正在后台准备'}</span>
+                        {(!currentJobPack || !currentKnowledgePack) && !jobPackMessage.includes('失败') && !jobPackMessage.includes('超时') && !companyKnowledgeMessage.includes('失败') && <i aria-hidden="true" />}
                       </div>
-                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading) || jobPackLoading || !currentJobPack}>
+                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading) || jobPackLoading || companyKnowledgeLoading || !currentJobPack || !currentKnowledgePack}>
                         <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '正在进入…' : '进入面试舱'}
                       </button>
-                      {!currentJobPack && (jobPackMessage.includes('失败') || jobPackMessage.includes('超时')) && (
-                        <button type="button" onClick={() => void generateJobPack(selectedJob)} disabled={jobPackLoading}>重新准备</button>
+                      {(!currentJobPack || !currentKnowledgePack) && (jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败')) && (
+                        <button type="button" onClick={() => { if (selectedJob && !currentJobPack) void generateJobPack(selectedJob); if (selectedJob && currentJobPack && !currentKnowledgePack) void generateCompanyKnowledgePack({ silent: true }) }} disabled={jobPackLoading || companyKnowledgeLoading}>重新准备</button>
                       )}
                     </div>
                   </div>
@@ -2453,8 +2476,17 @@ function DiagnosticsView({
         <>
           <div className="diagnostic-summary-grid">
             <ProviderSummaryCard title="AI_PROVIDER" provider={status.ai.provider} configured={status.ai.configured} fallbackMode={status.ai.fallbackMode} />
+            <ProviderSummaryCard
+              title="公司知识包"
+              provider={status.ai.taskProviders?.companyKnowledge || status.ai.provider}
+              configured={Boolean(status.ai.availableProviders[status.ai.taskProviders?.companyKnowledge || status.ai.provider]?.configured)}
+              fallbackMode={Boolean(status.ai.availableProviders[status.ai.taskProviders?.companyKnowledge || status.ai.provider]?.fallbackMode)}
+            />
             <ProviderSummaryCard title="ASR_PROVIDER" provider={status.asr.provider} configured={status.asr.configured} fallbackMode={status.asr.fallbackMode} />
           </div>
+          {status.ai.taskProviders?.companyKnowledge && (
+            <p className="provider-note">任务分工：普通文本反馈走 {status.ai.provider}；公司/岗位面试知识包走 {status.ai.taskProviders.companyKnowledge}。</p>
+          )}
           <ProviderCallList providerState={providerState} />
           <ProviderMatrix title="文本 Provider" providers={status.ai.availableProviders} />
           <ProviderMatrix title="ASR Provider" providers={status.asr.availableProviders} />
@@ -3728,6 +3760,7 @@ function buildDailyAction(context: {
   jobPool: JobRecord[]
   selectedJob: JobRecord | null
   currentJobPack?: StoredJobPack
+  currentKnowledgePack?: StoredCompanyKnowledgePack
   mockInterviews: MockInterviewSession[]
   realInterviews: StoredRealInterview[]
   history: TrainingRecord[]
@@ -3737,7 +3770,7 @@ function buildDailyAction(context: {
   const latestMock = context.mockInterviews[0]
   if (!context.jobPool.length) return { title: '同步岗位库', detail: '打开网站会自动读取 GitHub latest/jobs.json。', cta: '同步岗位库', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
   if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
-  if (!context.currentJobPack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看准备状态', view: 'mockInterview', icon: <Sparkles size={17} /> }
+  if (!context.currentJobPack || !context.currentKnowledgePack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看准备状态', view: 'mockInterview', icon: <Sparkles size={17} /> }
   if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主要考察。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
   if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮准备任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
   if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
