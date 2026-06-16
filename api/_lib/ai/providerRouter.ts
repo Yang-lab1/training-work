@@ -19,7 +19,7 @@ import { serverEnv } from './env.js'
 import { createDeepSeekProvider } from './providers/deepseekProvider.js'
 import { getDoubaoProviderStatus } from './providers/doubaoProvider.js'
 import { getGeminiProviderStatus } from './providers/geminiProvider.js'
-import { getAgnesProviderStatus } from './providers/agnesProvider.js'
+import { createAgnesProvider, getAgnesProviderStatus } from './providers/agnesProvider.js'
 import { analyzeWithMock, generateCompanyKnowledgePackWithMock, generateFollowUpWithMock, generateInterviewReportWithMock, generateJobPackWithMock, generateMockInterviewWithMock, reviewRealInterviewWithMock } from './providers/mockProvider.js'
 import { getOpenAIProviderStatus } from './providers/openaiProvider.js'
 
@@ -27,6 +27,12 @@ function configuredProvider(): ConfiguredAIProvider {
   const value = serverEnv.AI_PROVIDER?.trim().toLowerCase()
   if (value === 'deepseek' || value === 'doubao' || value === 'openai' || value === 'gemini' || value === 'agnes') return value
   return 'mock'
+}
+
+function configuredCompanyKnowledgeProvider(): ConfiguredAIProvider {
+  const value = serverEnv.COMPANY_KNOWLEDGE_PROVIDER?.trim().toLowerCase()
+  if (value === 'deepseek' || value === 'doubao' || value === 'openai' || value === 'gemini' || value === 'agnes' || value === 'mock') return value
+  return configuredProvider()
 }
 
 function providerStatus(provider: ConfiguredAIProvider) {
@@ -66,7 +72,7 @@ function providerStatus(provider: ConfiguredAIProvider) {
         : provider === 'gemini'
           ? serverEnv.GEMINI_MODEL?.trim()
           : serverEnv.AGNES_MODEL?.trim(),
-    fallbackMode: true,
+    fallbackMode: !status.configured || !('implemented' in status ? status.implemented : false),
     note: status.note,
   }
 }
@@ -84,6 +90,9 @@ export function getAIProviderStatus() {
   const current = availableProviders[provider]
   return {
     provider,
+    taskProviders: {
+      companyKnowledge: configuredCompanyKnowledgeProvider(),
+    },
     configured: current.configured,
     fallbackMode: provider === 'mock' || !current.configured || !current.implemented,
     availableProviders,
@@ -103,6 +112,14 @@ export async function analyzeAnswerWithProvider(
         return analyzeWithMock(input, 'mock_fallback', '未配置 DEEPSEEK_API_KEY，已自动使用模拟反馈。')
       }
       return await createDeepSeekProvider(apiKey).analyzeAnswer(input)
+    }
+
+    if (provider === 'agnes') {
+      const apiKey = serverEnv.AGNES_API_KEY?.trim()
+      if (!apiKey || !serverEnv.AGNES_BASE_URL?.trim()) {
+        return analyzeWithMock(input, 'mock_fallback', '未配置 AGNES_API_KEY 或 AGNES_BASE_URL，已自动使用模拟反馈。')
+      }
+      return await createAgnesProvider(apiKey).analyzeAnswer(input)
     }
 
     const status = provider === 'doubao'
@@ -257,7 +274,7 @@ export async function reviewRealInterviewWithProvider(
 export async function generateCompanyKnowledgePackWithProvider(
   input: GenerateCompanyKnowledgePackRequest,
 ): Promise<GenerateCompanyKnowledgePackSuccess> {
-  const provider = configuredProvider()
+  const provider = configuredCompanyKnowledgeProvider()
   if (provider === 'mock') return generateCompanyKnowledgePackWithMock(input)
 
   try {
@@ -268,6 +285,17 @@ export async function generateCompanyKnowledgePackWithProvider(
       if (!deepseek.generateCompanyKnowledgePack) throw new Error('DeepSeek company knowledge pack generator is unavailable')
       return await deepseek.generateCompanyKnowledgePack(input)
     }
+
+    if (provider === 'agnes') {
+      const apiKey = serverEnv.AGNES_API_KEY?.trim()
+      if (!apiKey || !serverEnv.AGNES_BASE_URL?.trim()) {
+        return generateCompanyKnowledgePackWithMock(input, 'mock_fallback', '未配置 AGNES_API_KEY 或 AGNES_BASE_URL，已自动使用模拟公司知识包。')
+      }
+      const agnes = createAgnesProvider(apiKey)
+      if (!agnes.generateCompanyKnowledgePack) throw new Error('AGNES company knowledge pack generator is unavailable')
+      return await agnes.generateCompanyKnowledgePack(input)
+    }
+
     const status = provider === 'doubao'
       ? getDoubaoProviderStatus()
       : provider === 'openai'

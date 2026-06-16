@@ -246,6 +246,76 @@ await withFakeDeepSeekServer(async (baseUrl) => {
   assert.ok(realKnowledgePayload.companyKnowledgePack.evidenceMap.length >= 1)
 })
 
+process.env.AI_PROVIDER = 'agnes'
+await withFakeDeepSeekServer(async (baseUrl) => {
+  process.env.AGNES_API_KEY = 'test-agnes-key'
+  process.env.AGNES_BASE_URL = baseUrl
+  process.env.AGNES_MODEL = 'agnes-test-model'
+
+  const agnesAnalyzeResponse = await analyzeAnswerRoute.fetch(request('/api/analyze-answer', baseInput))
+  const agnesAnalyzePayload = await agnesAnalyzeResponse.json()
+  assert.equal(agnesAnalyzePayload.success, true)
+  assert.equal(agnesAnalyzePayload.provider, 'agnes')
+  assert.equal(agnesAnalyzePayload.model, 'agnes-test-model')
+  assert.equal(agnesAnalyzePayload.score, 88)
+
+  const agnesKnowledgeResponse = await generateCompanyKnowledgePackRoute.fetch(request('/api/generate-company-knowledge-pack', {
+    selectedJob: baseInput.selectedJob,
+    companySources: [{
+      id: 'source-agnes-1',
+      type: 'company_official',
+      title: 'agnes-company-source.txt',
+      sourceName: 'agnes-company-source.txt',
+      text: 'Enterprise AI workflow products and AI Agent platform.',
+      wordCount: 8,
+      uploadedAt: new Date().toISOString(),
+    }],
+    cvText: baseInput.cvText,
+  }))
+  const agnesKnowledgePayload = await agnesKnowledgeResponse.json()
+  assert.equal(agnesKnowledgePayload.success, true)
+  assert.equal(agnesKnowledgePayload.provider, 'agnes')
+  assert.equal(agnesKnowledgePayload.model, 'agnes-test-model')
+  assert.ok(agnesKnowledgePayload.companyKnowledgePack.evidenceMap.length >= 1)
+
+  const agnesStatusResponse = await providerStatusRoute.fetch(new Request('http://localhost/api/provider-status'))
+  const agnesStatusPayload = await agnesStatusResponse.json()
+  assert.equal(agnesStatusPayload.ai.provider, 'agnes')
+  assert.equal(agnesStatusPayload.ai.taskProviders.companyKnowledge, 'agnes')
+  assert.equal(agnesStatusPayload.ai.configured, true)
+  assert.equal(agnesStatusPayload.ai.fallbackMode, false)
+  assert.equal(agnesStatusPayload.ai.availableProviders.agnes.implemented, true)
+  assert.equal(JSON.stringify(agnesStatusPayload).includes('test-agnes-key'), false)
+})
+delete process.env.AGNES_API_KEY
+delete process.env.AGNES_BASE_URL
+delete process.env.AGNES_MODEL
+
+process.env.AI_PROVIDER = 'deepseek'
+process.env.COMPANY_KNOWLEDGE_PROVIDER = 'agnes'
+await withFakeDeepSeekServer(async (baseUrl) => {
+  process.env.AGNES_API_KEY = 'test-agnes-key'
+  process.env.AGNES_BASE_URL = baseUrl
+  const agnesOverrideResponse = await generateCompanyKnowledgePackRoute.fetch(request('/api/generate-company-knowledge-pack', {
+    selectedJob: baseInput.selectedJob,
+    companySources: [{
+      id: 'source-agnes-override',
+      type: 'company_official',
+      title: 'override-source.txt',
+      sourceName: 'override-source.txt',
+      text: 'Enterprise AI workflow products.',
+      wordCount: 4,
+      uploadedAt: new Date().toISOString(),
+    }],
+  }))
+  const agnesOverridePayload = await agnesOverrideResponse.json()
+  assert.equal(agnesOverridePayload.success, true)
+  assert.equal(agnesOverridePayload.provider, 'agnes')
+})
+delete process.env.COMPANY_KNOWLEDGE_PROVIDER
+delete process.env.AGNES_API_KEY
+delete process.env.AGNES_BASE_URL
+
 process.env.AI_PROVIDER = 'deepseek'
 delete process.env.DEEPSEEK_API_KEY
 delete process.env.DEEPSEEK_BASE_URL
