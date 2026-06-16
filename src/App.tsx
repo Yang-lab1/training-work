@@ -81,7 +81,7 @@ const RECORDING_DB_NAME = 'interview-os-recordings'
 const RECORDING_STORE = 'recordings'
 
 type ViewId = 'today' | 'materials' | 'training' | 'history' | 'feedback' | 'mockInterview' | 'realInterview' | 'companyKnowledge' | 'backup' | 'diagnostics'
-type UploadCategory = 'cv' | 'project' | 'job' | 'job-map'
+type UploadCategory = 'cv' | 'cv-zh' | 'cv-en' | 'project' | 'job' | 'job-map'
 type CvParseStatus = '未上传' | '已上传，未解析' | '已提取文本' | '需要文本版'
 type TaskId = 'cn-intro' | 'en-intro' | 'miro-project'
 type ScriptTemplateKey = 'chineseIntro' | 'englishIntro' | 'miroProject'
@@ -526,7 +526,9 @@ function App() {
   const jobSelectionRef = useRef<HTMLElement | null>(null)
   const autoJobPackAttemptRef = useRef<Set<string>>(new Set())
 
-  const cvFile = getFileByCategory(state.uploadedFiles, 'cv')
+  const legacyCvFile = getFileByCategory(state.uploadedFiles, 'cv')
+  const cvZhFile = getFileByCategory(state.uploadedFiles, 'cv-zh') || legacyCvFile
+  const cvEnFile = getFileByCategory(state.uploadedFiles, 'cv-en')
   const projectFile = getFileByCategory(state.uploadedFiles, 'project')
   const todayRecords = state.history.filter((record) => isToday(record.savedAt))
   const todayMockCount = mockInterviews.filter((session) => isToday(session.startedAt || session.createdAt)).length
@@ -730,7 +732,7 @@ function App() {
       return
     }
     let parseStatus: CvParseStatus | undefined
-    if (category === 'cv') {
+    if (category === 'cv' || category === 'cv-zh' || category === 'cv-en') {
       parseStatus = canExtractPlainText(file.name, file.type) ? '已提取文本' : '需要文本版'
       if (parseStatus === '已提取文本') saveCvText(await file.text(), file.name, 'upload')
     }
@@ -842,9 +844,10 @@ function App() {
       category,
       parseStatus,
     }
+    const replacedCategories = category === 'cv-zh' ? ['cv-zh', 'cv'] : [category]
     commitState((current) => ({
       ...current,
-      uploadedFiles: [...current.uploadedFiles.filter((item) => item.category !== category), meta],
+      uploadedFiles: [...current.uploadedFiles.filter((item) => !replacedCategories.includes(item.category)), meta],
     }))
   }
 
@@ -885,7 +888,7 @@ function App() {
   }
 
   function saveMaterialsAndContinue() {
-    const hasMaterials = Boolean(cvFile || cvTextState.text || projectFile)
+    const hasMaterials = Boolean(cvZhFile || cvEnFile || cvTextState.text || projectFile)
     if (!hasMaterials) {
       setMaterialsMessage('请先上传资料。')
       return
@@ -1999,15 +2002,18 @@ function App() {
                 <article className="material-module" data-testid="resume-material-module">
                   <div>
                     <strong>简历资料</strong>
-                    <span>上传 PDF 或文本版，用于生成自我介绍和岗位匹配。</span>
+                    <span>中文、英文简历分开保存，面试按场景调用。</span>
                   </div>
                   <div className="material-actions">
-                    <UploadRow title="简历文件" hint="PDF / DOCX / TXT / Markdown" file={cvFile} button="上传简历" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('cv', event)} onRemove={() => removeFile('cv')} />
+                    <div className="resume-upload-stack">
+                      <UploadRow title="中文简历" hint="PDF / DOCX / TXT / Markdown" file={cvZhFile} button="上传中文简历" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('cv-zh', event)} onRemove={() => removeFile(cvZhFile?.category || 'cv-zh')} />
+                      <UploadRow title="英文简历" hint="English CV / Resume" file={cvEnFile} button="上传英文简历" accept=".pdf,.doc,.docx,.txt,.md" onChange={(event) => void handleUpload('cv-en', event)} onRemove={() => removeFile('cv-en')} />
+                    </div>
                     <details className="inline-details">
                       <summary>补充可解析文本</summary>
-                      <UploadRow title="TXT / Markdown 文本版" hint="PDF / DOCX 暂未自动解析时再补充" file={cvTextState.fileName ? toCvTextMeta(cvTextState) : undefined} button="上传文本版" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCvTextUpload(event)} onRemove={() => setCvTextState({ text: '', source: 'upload' })} />
+                      <UploadRow title="TXT / Markdown 文本版" hint="PDF / DOCX 暂未自动解析时再补充，可放中英合并版" file={cvTextState.fileName ? toCvTextMeta(cvTextState) : undefined} button="上传文本版" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleCvTextUpload(event)} onRemove={() => setCvTextState({ text: '', source: 'upload' })} />
                     </details>
-                    <p className="quiet-status">{getCvStatusText(cvFile, cvTextState)}</p>
+                    <p className="quiet-status">{getResumeStatusText(cvZhFile, cvEnFile, cvTextState)}</p>
                   </div>
                 </article>
                 <article className="material-module" data-testid="project-material-module">
@@ -2036,7 +2042,7 @@ function App() {
                 </article>
               </div>
               <div className="material-continue">
-                <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvFile && !cvTextState.text && !projectFile}>
+                <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvZhFile && !cvEnFile && !cvTextState.text && !projectFile}>
                   保存并继续
                 </button>
                 <span>{materialsMessage || '岗位库会自动从 GitHub 同步。'}</span>
@@ -2045,18 +2051,12 @@ function App() {
 
             <section className="section-block" ref={jobSelectionRef}>
               <SectionHeading icon={<BriefcaseBusiness size={20} />} title="选择目标岗位" />
-              <div className="remote-job-sync" data-testid="remote-job-sync">
-                <div>
-                  <strong>远程岗位库</strong>
-                  <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
-                </div>
-                <button type="button" onClick={() => void syncRemoteJobData()} disabled={remoteJobSyncing}>
-                  {remoteJobSyncing ? '同步中…' : '同步最新岗位库'}
-                </button>
-              </div>
               {remoteJobMessage && <p className={remoteJobMessage.includes('失败') ? 'error-line' : 'success-line'}>{remoteJobMessage}</p>}
               <div className="job-upload-line simple">
                 <div><strong>从 GitHub 岗位库选一个今天准备</strong><span>{jobPool.length ? `${getJobPoolSourceLabel(remoteJobData)} · ${jobPool.length} 个岗位` : '正在读取 GitHub latest/jobs.json；失败时点“同步最新岗位库”。'}</span></div>
+                <button type="button" onClick={() => void syncRemoteJobData()} disabled={remoteJobSyncing}>
+                  {remoteJobSyncing ? '同步中…' : '同步最新岗位库'}
+                </button>
               </div>
               {jobMessage && <p className="success-line">{jobMessage}</p>}
               {jobError && <p className="error-line">{jobError}</p>}
@@ -2065,13 +2065,15 @@ function App() {
                 <>
                   <div className="job-simple-filters" data-testid="job-simple-filters">
                     <label className="job-search"><span>搜索</span><input value={filters.search} placeholder="公司、岗位、JD、城市、主线" onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
-                    <button type="button" className={filters.userStatus === '' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: '', sort: 'match' })}>推荐</button>
-                    <button type="button" className={filters.userStatus === 'shortlisted' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'shortlisted' })}>我想投</button>
-                    <button type="button" className={filters.userStatus === 'preparing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'preparing' })}>准备中</button>
-                    <button type="button" className={filters.userStatus === 'applied' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'applied' })}>已投递</button>
-                    <button type="button" className={filters.userStatus === 'interviewing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'interviewing' })}>面试中</button>
-                    <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
-                    <button type="button" onClick={() => setShowAdvancedJobFilters((value) => !value)}>{showAdvancedJobFilters ? '收起高级筛选' : '高级筛选'}</button>
+                    <div className="job-filter-pills">
+                      <button type="button" className={filters.userStatus === '' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: '', sort: 'match' })}>推荐</button>
+                      <button type="button" className={filters.userStatus === 'shortlisted' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'shortlisted' })}>我想投</button>
+                      <button type="button" className={filters.userStatus === 'preparing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'preparing' })}>准备中</button>
+                      <button type="button" className={filters.userStatus === 'applied' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'applied' })}>已投递</button>
+                      <button type="button" className={filters.userStatus === 'interviewing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'interviewing' })}>面试中</button>
+                      <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
+                      <button type="button" onClick={() => setShowAdvancedJobFilters((value) => !value)}>{showAdvancedJobFilters ? '收起高级筛选' : '高级筛选'}</button>
+                    </div>
                   </div>
                   {showAdvancedJobFilters && <div className="job-smart-filters" data-testid="advanced-job-filters">
                     <FilterSelect label="岗位族群" value={filters.roleFamily} options={filterOptions.roleFamily} onChange={(value) => setFilters({ ...filters, roleFamily: value })} />
@@ -3558,7 +3560,13 @@ function getDefaultTask(id: TaskId) { return defaultTasks.find((task) => task.id
 function isTaskId(value: unknown): value is TaskId { return value === 'cn-intro' || value === 'en-intro' || value === 'miro-project' }
 function canExtractPlainText(name: string, type: string) { const ext = getFileExtension(name).toLowerCase(); return ext === '.txt' || ext === '.md' || type.startsWith('text/') }
 function toCvTextMeta(cv: CvTextState): UploadedFileMeta { return { id: 'cv-text', name: cv.fileName || 'CV 文本', size: new Blob([cv.text]).size, type: 'text/plain', uploadedAt: cv.updatedAt || new Date().toISOString(), status: '已解析', category: 'cv', parseStatus: '已提取文本' } }
-function getCvStatusText(file: UploadedFileMeta | undefined, cv: CvTextState) { if (cv.text) return `已读取 CV 文本：${cv.fileName || '文本版'}。`; if (!file) return '尚未上传 CV。'; if (file.parseStatus === '需要文本版') return 'CV 已上传，但当前格式暂未解析。请补充 TXT / Markdown 文本版。'; return 'CV 已上传，但暂未解析内容。' }
+function getResumeStatusText(zhFile: UploadedFileMeta | undefined, enFile: UploadedFileMeta | undefined, cv: CvTextState) {
+  const missing = [zhFile ? '' : '中文简历', enFile ? '' : '英文简历'].filter(Boolean)
+  if (cv.text) return `已读取简历文本：${cv.fileName || '文本版'}。${missing.length ? `还可补充：${missing.join('、')}。` : '中英文简历已就位。'}`
+  if (!zhFile && !enFile) return '尚未上传简历。建议先放中文简历，英文面试再补英文版。'
+  if (zhFile?.parseStatus === '需要文本版' || enFile?.parseStatus === '需要文本版') return '简历文件已保存；PDF / DOCX 暂未自动解析，可补充 TXT / Markdown 文本版。'
+  return missing.length ? `已保存简历。还可补充：${missing.join('、')}。` : '中英文简历已保存。'
+}
 
 function ensureNormalizedJob(job: JobRecord): JobRecord {
   return job.normalized ? job : { ...job, normalized: normalizeJobRecord(job) }
