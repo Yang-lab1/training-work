@@ -298,6 +298,15 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   })
   await expect(page.getByTestId('job-simple-filters')).toBeVisible()
   await expect(page.getByTestId('advanced-job-filters')).toHaveCount(0)
+  await expect(page.getByTestId('job-simple-filters')).toContainText('岗位性质')
+  await expect(page.getByTestId('job-simple-filters')).toContainText('处理状态')
+  const natureSelect = page.getByTestId('job-simple-filters').locator('label').filter({ hasText: '岗位性质' }).locator('select')
+  await natureSelect.selectOption('实习')
+  await expect(page.locator('.job-row')).toHaveCount(1)
+  await expect(page.locator('.job-row').filter({ hasText: '用户研究实习生' })).toBeVisible()
+  await natureSelect.selectOption('正式')
+  await expect(page.locator('.job-row').filter({ hasText: 'AI Product Manager' })).toBeVisible()
+  await natureSelect.selectOption('')
   await page.getByTestId('job-simple-filters').getByRole('button', { name: '高级筛选' }).click()
   await expect(page.getByTestId('advanced-job-filters')).toBeVisible()
 
@@ -310,7 +319,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   const aiPmRow = page.locator('.job-row').filter({ hasText: 'AI Product Manager' })
   await aiPmRow.locator('.job-row-actions button').nth(0).click()
-  await page.getByTestId('job-simple-filters').getByRole('button', { name: '我想投' }).click()
+  await page.getByTestId('job-simple-filters').locator('label').filter({ hasText: '处理状态' }).locator('select').selectOption('shortlisted')
   await expect(page.locator('.job-row')).toHaveCount(1)
   await expect(aiPmRow).toBeVisible()
   await aiPmRow.locator('.job-row-actions button').nth(1).click()
@@ -321,7 +330,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   })
   await page.reload()
   await page.locator('.top-nav nav button').nth(1).click()
-  await page.getByTestId('job-simple-filters').getByRole('button', { name: '准备中' }).click()
+  await page.getByTestId('job-simple-filters').locator('label').filter({ hasText: '处理状态' }).locator('select').selectOption('preparing')
   await expect(page.locator('.job-row').filter({ hasText: 'AI Product Manager' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('materials-and-jobs.png'), fullPage: true })
 

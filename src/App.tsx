@@ -90,9 +90,11 @@ type InterviewPhase = 'asking' | 'answering' | 'transcribing' | 'analyzing' | 'f
 type JobSortMode = 'match' | 'priority' | 'today' | 'city' | 'family'
 type JobUserStatus = 'not_started' | 'shortlisted' | 'preparing' | 'applied' | 'interviewing' | 'interviewed' | 'paused' | 'rejected'
 type JobUserStatusMap = Record<string, JobUserStatus>
+type RiskPreset = 'recommended' | 'all' | 'no-code' | 'no-sales-delivery' | 'custom'
 
 interface JobFilters {
   search: string
+  jobNature: string
   roleFamily: string
   roleTrack: string
   cityGroup: string
@@ -485,23 +487,7 @@ function App() {
   const [recordingTaskId, setRecordingTaskId] = useState<TaskId | null>(null)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [audioPreviews, setAudioPreviews] = useState<Record<string, AudioPreview>>({})
-  const [filters, setFilters] = useState<JobFilters>({
-    search: '',
-    roleFamily: '',
-    roleTrack: '',
-    cityGroup: '',
-    priorityBucket: '',
-    hideStrongCode: false,
-    hideAlgorithm: false,
-    hideSales: false,
-    hideOnsite: false,
-    hideTravel: false,
-    hideLowSalary: false,
-    hideHighExperience: false,
-    userStatus: '',
-    hideRejected: true,
-    sort: 'match',
-  })
+  const [filters, setFilters] = useState<JobFilters>(() => defaultJobFilters())
   const [showAdvancedJobFilters, setShowAdvancedJobFilters] = useState(false)
   const [jobPackMessage, setJobPackMessage] = useState('')
   const [jobPackLoading, setJobPackLoading] = useState(false)
@@ -2065,22 +2051,23 @@ function App() {
                 <>
                   <div className="job-simple-filters" data-testid="job-simple-filters">
                     <label className="job-search"><span>搜索</span><input value={filters.search} placeholder="公司、岗位、JD、城市、主线" onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
-                    <div className="job-filter-pills">
-                      <button type="button" className={filters.userStatus === '' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: '', sort: 'match' })}>推荐</button>
-                      <button type="button" className={filters.userStatus === 'shortlisted' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'shortlisted' })}>我想投</button>
-                      <button type="button" className={filters.userStatus === 'preparing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'preparing' })}>准备中</button>
-                      <button type="button" className={filters.userStatus === 'applied' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'applied' })}>已投递</button>
-                      <button type="button" className={filters.userStatus === 'interviewing' ? 'active' : ''} onClick={() => setFilters({ ...filters, userStatus: 'interviewing' })}>面试中</button>
-                      <RiskToggle label="隐藏不适合" checked={filters.hideRejected} onChange={(checked) => setFilters({ ...filters, hideRejected: checked })} />
+                    <div className="job-filter-grid">
+                      <FilterSelect label="岗位性质" value={filters.jobNature} options={filterOptions.jobNature} getLabel={(value) => `${value} · ${filterOptions.counts.jobNature[value] || 0}`} onChange={(value) => setFilters({ ...filters, jobNature: value })} />
+                      <FilterSelect label="城市" value={filters.cityGroup} options={filterOptions.cityGroup} getLabel={(value) => `${value} · ${filterOptions.counts.cityGroup[value] || 0}`} onChange={(value) => setFilters({ ...filters, cityGroup: value })} />
+                      <FilterSelect label="求职主线" value={filters.roleTrack} options={filterOptions.roleTrack} getLabel={(value) => `${shortTrackLabel(value)} · ${filterOptions.counts.roleTrack[value] || 0}`} onChange={(value) => setFilters({ ...filters, roleTrack: value })} />
+                      <FilterSelect label="处理状态" value={filters.userStatus} options={JOB_USER_STATUS_OPTIONS.map((item) => item.value)} getLabel={(value) => jobUserStatusLabel(value)} onChange={(value) => setFilters({ ...filters, userStatus: value as JobUserStatus | '' })} />
+                      <label><span>风险</span><select value={getRiskPreset(filters)} onChange={(event) => setFilters({ ...filters, ...riskPresetToFilterPatch(event.target.value as RiskPreset) })}><option value="recommended">推荐池</option><option value="all">全部岗位</option><option value="no-code">避开强技术</option><option value="no-sales-delivery">避开销售交付</option><option value="custom">自定义风险</option></select></label>
+                      <label><span>排序</span><select value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as JobSortMode })}><option value="match">匹配度最高</option><option value="priority">优先级最高</option><option value="today">今日新增优先</option><option value="city">城市优先</option><option value="family">岗位族群</option></select></label>
+                    </div>
+                    <div className="job-filter-summary">
+                      <span>已筛出 <strong>{filteredJobs.length}</strong> / {jobPool.length} 个岗位</span>
+                      <button type="button" onClick={() => setFilters(defaultJobFilters())}>清空筛选</button>
                       <button type="button" onClick={() => setShowAdvancedJobFilters((value) => !value)}>{showAdvancedJobFilters ? '收起高级筛选' : '高级筛选'}</button>
                     </div>
                   </div>
                   {showAdvancedJobFilters && <div className="job-smart-filters" data-testid="advanced-job-filters">
                     <FilterSelect label="岗位族群" value={filters.roleFamily} options={filterOptions.roleFamily} onChange={(value) => setFilters({ ...filters, roleFamily: value })} />
-                    <FilterSelect label="求职主线" value={filters.roleTrack} options={filterOptions.roleTrack} onChange={(value) => setFilters({ ...filters, roleTrack: value })} />
-                    <FilterSelect label="城市组" value={filters.cityGroup} options={filterOptions.cityGroup} onChange={(value) => setFilters({ ...filters, cityGroup: value })} />
                     <FilterSelect label="优先级" value={filters.priorityBucket} options={filterOptions.priorityBucket} onChange={(value) => setFilters({ ...filters, priorityBucket: value })} />
-                    <label><span>排序</span><select value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as JobSortMode })}><option value="match">匹配度最高</option><option value="priority">优先级最高</option><option value="today">今日新增优先</option><option value="city">城市优先</option><option value="family">岗位族群</option></select></label>
                   </div>}
                   {showAdvancedJobFilters && <div className="risk-filter-bar">
                     <RiskToggle label="隐藏强代码" checked={filters.hideStrongCode} onChange={(checked) => setFilters({ ...filters, hideStrongCode: checked })} />
@@ -3572,6 +3559,27 @@ function ensureNormalizedJob(job: JobRecord): JobRecord {
   return job.normalized ? job : { ...job, normalized: normalizeJobRecord(job) }
 }
 
+function defaultJobFilters(): JobFilters {
+  return {
+    search: '',
+    jobNature: '',
+    roleFamily: '',
+    roleTrack: '',
+    cityGroup: '',
+    priorityBucket: '',
+    hideStrongCode: false,
+    hideAlgorithm: false,
+    hideSales: false,
+    hideOnsite: false,
+    hideTravel: false,
+    hideLowSalary: false,
+    hideHighExperience: false,
+    userStatus: '',
+    hideRejected: true,
+    sort: 'match',
+  }
+}
+
 function filterJobs(jobs: JobRecord[], filters: JobFilters, statusMap: JobUserStatusMap) {
   const normalizedJobs = jobs.map(ensureNormalizedJob)
   const search = filters.search.trim().toLowerCase()
@@ -3588,6 +3596,7 @@ function filterJobs(jobs: JobRecord[], filters: JobFilters, statusMap: JobUserSt
     const normalized = job.normalized
     const status = getJobUserStatus(statusMap, job.id)
     return (!search || normalized.searchableText.toLowerCase().includes(search))
+      && (!filters.jobNature || matchesJobNature(job, filters.jobNature))
       && (!filters.roleFamily || normalized.roleFamily === filters.roleFamily)
       && (!filters.roleTrack || normalized.roleTrack === filters.roleTrack)
       && (!filters.cityGroup || normalized.cityGroup === filters.cityGroup)
@@ -3609,12 +3618,57 @@ function filterJobs(jobs: JobRecord[], filters: JobFilters, statusMap: JobUserSt
 function buildFilterOptions(jobs: JobRecord[]) {
   const normalizedJobs = jobs.map(ensureNormalizedJob)
   const values = (selector: (job: JobRecord) => string) => [...new Set(normalizedJobs.map(selector).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  const countValues = (options: string[], matcher: (job: JobRecord, option: string) => boolean) => Object.fromEntries(options.map((option) => [option, normalizedJobs.filter((job) => matcher(job, option)).length]))
+  const countedValues = (selector: (job: JobRecord) => string) => {
+    const counts: Record<string, number> = {}
+    for (const job of normalizedJobs) {
+      const value = selector(job)
+      if (value) counts[value] = (counts[value] || 0) + 1
+    }
+    return counts
+  }
+  const jobNature = ['实习', '正式', '校招', '社招'].filter((option) => normalizedJobs.some((job) => matchesJobNature(job, option)))
   return {
+    jobNature,
     roleFamily: values((job) => job.normalized.roleFamily),
     roleTrack: values((job) => job.normalized.roleTrack),
     cityGroup: values((job) => job.normalized.cityGroup),
     priorityBucket: values((job) => job.normalized.priorityBucket),
+    counts: {
+      jobNature: countValues(jobNature, matchesJobNature),
+      roleTrack: countedValues((job) => job.normalized.roleTrack),
+      cityGroup: countedValues((job) => job.normalized.cityGroup),
+    },
   }
+}
+
+function matchesJobNature(job: JobRecord, value: string): boolean {
+  const text = `${job.normalized.jobNature} ${job.normalized.roleLevel} ${job.jobType} ${job.sourceSheet} ${job.jobTitle}`.toLowerCase()
+  if (value === '实习') return text.includes('实习') || text.includes('intern')
+  if (value === '校招') return text.includes('校招') || text.includes('应届') || job.sourceSheet.includes('校招')
+  if (value === '社招') return text.includes('社招')
+  if (value === '正式') return !matchesJobNature(job, '实习') && (text.includes('正式') || text.includes('全职') || text.includes('校招') || text.includes('社招') || job.sourceSheet.includes('正式'))
+  return false
+}
+
+function shortTrackLabel(value: string) {
+  return value.replace(/^主线[A-Z]：/, '').replace(/^备线[A-Z]：/, '').replace(/^次选[A-Z]：/, '').replace(/^排除[A-Z]：/, '')
+}
+
+function getRiskPreset(filters: JobFilters): RiskPreset {
+  if (!filters.hideRejected && !filters.hideStrongCode && !filters.hideAlgorithm && !filters.hideSales && !filters.hideOnsite && !filters.hideTravel && !filters.hideLowSalary && !filters.hideHighExperience) return 'all'
+  if (filters.hideRejected && filters.hideStrongCode && filters.hideAlgorithm && !filters.hideSales && !filters.hideOnsite && !filters.hideTravel) return 'no-code'
+  if (filters.hideRejected && filters.hideSales && filters.hideOnsite && filters.hideTravel && !filters.hideStrongCode && !filters.hideAlgorithm) return 'no-sales-delivery'
+  if (filters.hideRejected && !filters.hideStrongCode && !filters.hideAlgorithm && !filters.hideSales && !filters.hideOnsite && !filters.hideTravel && !filters.hideLowSalary && !filters.hideHighExperience) return 'recommended'
+  return 'custom'
+}
+
+function riskPresetToFilterPatch(preset: RiskPreset): Partial<JobFilters> {
+  if (preset === 'all') return { hideRejected: false, hideStrongCode: false, hideAlgorithm: false, hideSales: false, hideOnsite: false, hideTravel: false, hideLowSalary: false, hideHighExperience: false }
+  if (preset === 'no-code') return { hideRejected: true, hideStrongCode: true, hideAlgorithm: true, hideSales: false, hideOnsite: false, hideTravel: false, hideLowSalary: false, hideHighExperience: false }
+  if (preset === 'no-sales-delivery') return { hideRejected: true, hideStrongCode: false, hideAlgorithm: false, hideSales: true, hideOnsite: true, hideTravel: true, hideLowSalary: false, hideHighExperience: false }
+  if (preset === 'recommended') return { hideRejected: true, hideStrongCode: false, hideAlgorithm: false, hideSales: false, hideOnsite: false, hideTravel: false, hideLowSalary: false, hideHighExperience: false }
+  return {}
 }
 
 function priorityRank(value: string) {

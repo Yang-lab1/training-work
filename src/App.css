@@ -638,22 +638,50 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   background: #fff;
 }
 
-.job-filter-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.job-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
-.job-filter-pills > button,
-.job-filter-pills .risk-toggle {
-  min-height: 38px;
+.job-filter-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
 }
 
-.job-filter-pills > button.active {
-  border-color: #111;
-  background: #111;
-  color: #fff;
+.job-filter-grid span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.job-filter-grid select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .84);
+}
+
+.job-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.job-filter-summary strong {
+  color: var(--text);
+}
+
+.job-filter-summary button {
+  min-height: 34px;
 }
 
 .job-smart-filters label {
@@ -1930,7 +1958,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .top-nav nav { width: 100%; }
   .top-nav nav button { padding: 0 10px; }
   .material-module { grid-template-columns: 1fr; gap: 12px; }
-  .job-filters, .job-smart-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .job-filters, .job-smart-filters, .job-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .daily-workbench { grid-template-columns: 1fr; }
   .daily-driver-grid,
   .battle-columns { grid-template-columns: 1fr; }
@@ -1969,9 +1997,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .material-continue { align-items: stretch; flex-direction: column; }
   .material-continue .primary-button { width: 100%; }
   .job-simple-filters { align-items: stretch; }
-  .job-filter-pills { align-items: stretch; }
-  .job-filter-pills > button,
-  .job-filter-pills .risk-toggle { flex: 1 1 calc(50% - 6px); justify-content: center; }
+  .job-filter-grid { grid-template-columns: 1fr; }
+  .job-filter-summary { align-items: stretch; flex-direction: column; }
+  .job-filter-summary button { width: 100%; }
   .upload-row .small-upload-button, .job-row button, .job-row-actions select { width: 100%; max-width: none; }
   .job-row-actions { max-width: none; justify-content: stretch; }
   .upload-row .icon-button { width: 100%; }
