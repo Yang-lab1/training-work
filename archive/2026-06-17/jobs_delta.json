@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "dataVersion": "2026-06-17",
-  "updatedAt": "2026-06-17T10:59:09+08:00",
+  "updatedAt": "2026-06-17T12:19:20+08:00",
   "newJobs": [
     {
       "id": "job_fe50485270d05cda24e9bc9104198cb6",
@@ -19,10 +19,10 @@
       "companyBusiness": "做iPhone、iPad、Mac、AirPods、Apple Watch、Vision Pro及软硬件生态。",
       "jobContent": "硬件工程项目管理实习，预计围绕跨职能协作、项目节奏、工程问题跟进、样机/量产节点沟通和供应链协同。",
       "jobRequirements": "Apple官网显示Intern岗位；完整JD为JS页面，需投前二次确认每周到岗、实习周期和技术要求",
-      "roleFitReason": "B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、中高，扩源入口需后置核验。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。",
+      "roleFitReason": "B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、高，入池岗位。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。",
       "status": "active",
-      "firstSeenAt": "2026-06-18",
-      "lastSeenAt": "2026-06-18",
+      "firstSeenAt": "2026-06-17",
+      "lastSeenAt": "2026-06-17",
       "isTodayNew": true,
       "isUpdatedToday": false,
       "isRemoved": false,
@@ -55,11 +55,11 @@
         "数据可信度": "高",
         "招聘链接": "https://jobs.apple.com/en-us/details/200494847-3435/engineering-project-manager-intern-shanghai-shenzhen?team=HRDWR",
         "排序": 47,
-        "核验备注": "2026-06-17 Apple miss correction: official Jobs link grade fixed; promoted from expanded to internship.",
+        "核验备注": "2026-06-17 Apple miss correction: official Jobs link grade fixed; promoted from expanded to internship.；首次入库日期=2026-06-17",
         "ABC投递档位": "B",
         "ABC优先分": 79,
-        "档位理由": "B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、中高，扩源入口需后置核验。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。",
-        "下一步动作": "作为主投池，持续监控",
+        "档位理由": "B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、高，入池岗位。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。",
+        "下一步动作": "二次核验后投",
         "关键风险": "薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳",
         "推荐简历版本": "Apple智能硬件/TPM版：突出工业设计、硬件产品、CMF、AI硕士、跨团队项目协作、英文沟通和软硬件结合项目。"
       },
@@ -82,7 +82,7 @@
           "可进入岗位定向训练",
           "风险：english_heavy、unclear_jd"
         ],
-        "searchableText": "Apple Engineering Project Manager Intern-Shanghai/ Shenzhen 深圳/上海 Apple官网未公开 实习/硬件项目管理/EPM/外企 P2今日可投 主线A-AI终端/智能硬件/TPM/软硬件协同项目 做iPhone、iPad、Mac、AirPods、Apple Watch、Vision Pro及软硬件生态。 硬件工程项目管理实习，预计围绕跨职能协作、项目节奏、工程问题跟进、样机/量产节点沟通和供应链协同。 Apple官网显示Intern岗位；完整JD为JS页面，需投前二次确认每周到岗、实习周期和技术要求 B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、中高，扩源入口需后置核验。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。 外企英文沟通与硬件工程语境；可能偏EPM/执行协同而非产品定义；完整JD需二次确认。 2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态 实习岗"
+        "searchableText": "Apple Engineering Project Manager Intern-Shanghai/ Shenzhen 深圳/上海 Apple官网未公开 实习/硬件项目管理/EPM/外企 P2今日可投 主线A-AI终端/智能硬件/TPM/软硬件协同项目 做iPhone、iPad、Mac、AirPods、Apple Watch、Vision Pro及软硬件生态。 硬件工程项目管理实习，预计围绕跨职能协作、项目节奏、工程问题跟进、样机/量产节点沟通和供应链协同。 Apple官网显示Intern岗位；完整JD为JS页面，需投前二次确认每周到岗、实习周期和技术要求 B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/软硬件协同项目，匹配度高，原申请优先级P2今日可投。城市/薪资为深圳/上海、Apple官网未公开，薪资匹配为实习薪资未公开；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，AI终端、硬件工程、供应链和产品体验平台价值极高；JD与可信度为Apple官方搜索页可核验标题、发…、高，入池岗位。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。 外企英文沟通与硬件工程语境；可能偏EPM/执行协同而非产品定义；完整JD需二次确认。 2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态 实习岗"
       }
     },
     {
@@ -103,8 +103,8 @@
       "jobRequirements": "",
       "roleFitReason": "B档，79分；字段显示主线为主线A-AI终端/智能硬件/TPM/NPI，匹配度中高，原申请优先级P3二次确认后投递。城市/薪资为深圳、Apple官网未公开，薪资匹配为薪资未知；Apple平台价值高，对当前香港/深圳双线与现金流目标的支撑不同。公司/岗位价值：全球消费电子与软硬件一体化顶级外企，iPad硬件与供应链平台价值高；JD与可信度为Apple官方搜索页可核验标题、发…、中高，次选表但仍按平台和方向重新排序。关键风险：薪资待确认；JD不精确；英文/粤语/IANG；招聘状态不稳。",
       "status": "secondary",
-      "firstSeenAt": "2026-06-18",
-      "lastSeenAt": "2026-06-18",
+      "firstSeenAt": "2026-06-17",
+      "lastSeenAt": "2026-06-17",
       "isTodayNew": true,
       "isUpdatedToday": false,
       "isRemoved": false,

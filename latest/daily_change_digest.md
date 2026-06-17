@@ -5,7 +5,8 @@
 - 报告目录：C:\Users\Yang\Desktop\job\reports
 
 ## 今日新增
-- 无适合新增
+- Apple｜Engineering Project Manager Intern-Shanghai/ Shenzhen｜深圳/上海｜Apple官网未公开｜ABC B/79｜来源A/官网/公司招聘页
+- Apple｜Technical Program Manager, iPad｜深圳｜Apple官网未公开｜ABC B/79｜来源A/官网/公司招聘页
 
 ## 下架/疑似下架
 - 无下架/疑似下架变化
@@ -39,10 +40,14 @@
 ## 待复核清单
 - source_coverage_20260617.csv
 - source_candidates_20260617.csv
+- source_recall_audit_20260617.csv
 - low_confidence_review_20260617.csv
 - unmapped_priority_20260617.csv
 - today_action_plan_20260617.xlsx
 - link_revalidation_20260617.csv
+
+## 召回覆盖审计
+- 覆盖矩阵无弱覆盖/阻断项
 
 ## 当天覆盖来源
 - 外企｜Microsoft｜Product Manager / AI / Copilot / Hardware / Solution
@@ -102,7 +107,7 @@
 - 外企/工业自动化｜Yokogawa｜Product / AI / Industrial Automation / Digital
 - 外企/工业自动化｜Omron｜Product / AI / IoT / Automation / Healthcare
 - 外企/工业自动化｜GE Vernova｜Product / AI / Digital / Energy / IoT
-- 外企/消费电子硬件｜Apple｜Product Manager / Hardware / AI / Operations / NPI
+- 外企/消费电子硬件｜Apple｜Engineering Project Manager Intern / Technical Program Manager / Automation AI/ML / Machine Learning & AI / Manufacturing Design Engineer Intern AIML / Product Design Engineer / Hardware / Operations / NPI
 - 外企/消费电子硬件｜Sony｜Product / AI / Imaging / Hardware / IoT
 - 外企/消费电子硬件｜Samsung｜Product / AI / IoT / Mobile / Hardware
 - 外企/消费电子硬件｜LG Electronics｜Product / AI / IoT / Smart Home
@@ -154,6 +159,52 @@
 - 香港/大湾区平台｜AIA 友邦｜Product / AI / Digital / InsurTech
 - 香港/大湾区平台｜HSBC 汇丰｜Product / AI / Digital / FinTech
 - 香港/大湾区平台｜Standard Chartered 渣打｜Product / AI / Digital / FinTech
+- 大厂集团/硬件终端｜TCL｜AI产品 / 智能终端 / 产品体验设计 / 用户研究 / NPI / 产品经理
+- 大厂集团/AI平台｜科大讯飞｜AI产品 / 大模型应用 / AI应用 / 用户研究 / 产品体验 / 解决方案
+- 外企/企业软件云｜Amazon｜AI Product / Product Manager / Technical Product Manager / Solutions / Operations / AI
+- 外企/智能硬件与汽车｜Tesla｜AI / Product Manager / Factory Design / Automation / Robotics / Technical Program Manager
+- 央国企/电子信息｜中国电科 CETC｜AI产品 / 智能硬件 / 数字化产品 / 技术项目经理 / 解决方案 / 校招
+- 央国企/国资创投｜深创投｜人工智能产业 / 机器人产业 / 产业研究 / 科技项目管理 / 产品规划 / 创新业务
+- 香港/大湾区平台｜香港科技园 HKSTP｜AI / Product / Project Manager / Technology / Robotics / Talent Pool
+- 香港/大湾区平台｜数码港 Cyberport｜AI / Product / Project Manager / Technology / Career Fair / Startups
+- 招聘平台/综合｜BOSS直聘｜AI产品经理 / AI应用工程师 / 智能硬件产品 / 用户研究 / TPM / NPI
+- 招聘平台/综合｜猎聘｜AI产品经理 / Agent产品 / AI解决方案 / 产品体验 / TPM / NPI
+- 招聘平台/综合｜LinkedIn Jobs｜AI Product Manager / AI Product Engineer / Solutions Engineer / User Research / Technical Program Manager
+- 招聘平台/综合｜JobsDB｜AI Product / Product Manager / Solutions Engineer / User Research / Project Manager
+- 国聘/央国企渠道｜国聘｜AI产品 / 数字化产品 / 智能制造 / 技术项目经理 / 解决方案 / 央企
+- 高校就业/校招｜国家大学生就业服务平台｜AI产品 / 人工智能 / 用户研究 / 产品体验设计 / 智能硬件 / 校招 / 实习
+- 招聘平台/综合｜鱼泡直聘｜AI产品经理 / 机器人产品经理 / 智能硬件产品 / 技术项目经理 / 解决方案
+- 招聘平台/综合｜智联招聘｜AI产品经理 / AI应用 / 智能硬件 / 解决方案 / 用户研究 / TPM
+- 招聘平台/综合｜51Job 前程无忧｜AI产品经理 / AI应用 / 智能硬件 / 解决方案 / 用户研究 / TPM
+- 高校就业/校招｜应届生求职网｜AI产品 / 人工智能 / 用户研究 / 产品体验设计 / 智能硬件 / 校招 / 实习
+- 高校就业/校招｜实习僧｜AI产品 / AI应用 / 用户研究 / 产品体验设计 / 智能硬件 / 实习
+- 高校就业/校招｜牛客｜AI产品 / AI应用开发 / 用户研究 / 产品体验设计 / 智能硬件 / 校招 / 实习
+- 高校就业/校招｜OfferShow｜AI产品 / AI应用 / 用户研究 / 产品体验设计 / 智能硬件 / 校招 / 实习
+- 高校就业/校招｜海投网｜AI产品 / AI应用 / 用户研究 / 产品体验设计 / 智能硬件 / 校招 / 实习
+- 招聘平台/综合｜拉勾｜AI产品经理 / AI应用 / 智能硬件 / 解决方案 / 用户研究
+- 招聘平台/综合｜脉脉｜AI产品经理 / AI应用 / 智能硬件 / 解决方案 / 用户研究
+- 公共就业/人社｜中国公共招聘网｜AI产品 / 数字化产品 / 智能制造 / 技术项目经理 / 解决方案
+- 公共就业/人社｜广东公共就业服务｜AI产品 / 数字化产品 / 智能制造 / 技术项目经理 / 解决方案
+- 公共就业/人社｜就业在线｜AI产品 / 数字化产品 / 智能制造 / 技术项目经理 / 解决方案 / 高校毕业生
+- 公共就业/人社｜深圳公共就业服务平台｜AI产品 / 数字化产品 / 智能制造 / 技术项目经理 / 解决方案 / 高校毕业生
+- 招聘平台/综合｜大街网｜AI产品 / AI应用 / 智能硬件 / 用户研究 / 校招 / 实习
+- 招聘平台/综合｜看准网招聘入口｜AI产品 / AI应用 / 智能硬件 / 用户研究 / 校招 / 实习
+- 风投/公司池｜36氪｜AI Agent / 具身智能 / 机器人 / AI硬件 / 融资 / 深圳
+- 行业媒体/公司池｜机器之心｜AI Agent / 大模型应用 / 具身智能 / 机器人 / 招聘 / 融资
+- 行业媒体/公司池｜量子位｜AI Agent / 大模型应用 / 具身智能 / 机器人 / 融资 / 招聘
+- 行业媒体/公司池｜雷峰网｜AI Agent / 机器人 / 智能硬件 / 融资 / 招聘
+- 行业媒体/公司池｜智东西｜AI硬件 / 机器人 / 智能终端 / 融资 / 招聘
+- 行业媒体/公司池｜高工机器人｜机器人 / 具身智能 / 智能制造 / 融资 / 招聘
+- 风投/公司池｜红杉中国｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜高瓴创投｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜IDG资本｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜源码资本｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜经纬创投｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜顺为资本｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜真格基金｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜五源资本｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜启明创投｜AI / 机器人 / 智能硬件 / portfolio / 招聘
+- 风投/公司池｜北极光创投｜AI / 机器人 / 智能硬件 / portfolio / 招聘
 - FDE/AI部署｜OpenAI FDE｜Forward Deployed Engineer / Applied AI / Solutions Engineer / LLM deployment / Agent
 - FDE/AI部署｜Anthropic FDE / Applied AI｜Forward Deployed Engineer / Applied AI / Claude / MCP / Agent / AI deployment
 - FDE/AI部署｜Google Cloud FDE-adjacent｜Forward Deployed Engineer / Customer Engineer AI / AI Solutions Architect / Applied AI Engineer / Generative AI deployment / RAG / MCP
@@ -245,7 +296,7 @@
 - newJobsCount: 2
 - updatedJobsCount: 0
 - removedJobsCount: 0
-- hash: `cea75509e0d8a3fc15c425d226f204e681ab2b14cf10ae46dd060792dc1333b1`
+- hash: `590224d39f5cc9112afc53f8ef65fb53c623e8867486e03d35c0b51f4db61f21`
 - GitHub upload: pending git commit/push from automation workspace
 - GitHub raw:
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json
