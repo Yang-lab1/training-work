@@ -285,6 +285,19 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await fs.writeFile(cvEnFixturePath, '# English CV\nAI product candidate with HCI and industrial design background.', 'utf8')
   await fs.writeFile(projectFixturePath, '# Miro project\nCross-cultural AI communication training project.', 'utf8')
 
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speak: (utterance: SpeechSynthesisUtterance) => {
+          window.setTimeout(() => utterance.onend?.(new Event('end') as SpeechSynthesisEvent), 0)
+        },
+        cancel: () => undefined,
+        getVoices: () => [],
+      },
+    })
+  })
+
   await page.goto('/')
   await page.waitForFunction(() => {
     const remote = JSON.parse(localStorage.getItem('interview_os_remote_job_data') || '{}')
@@ -299,17 +312,15 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.getByTestId('ability-trend')).toBeVisible()
 
   await page.locator('.top-nav nav button').nth(1).click()
-  await expect(page.getByTestId('remote-job-sync-inline')).toContainText('2026-06-15-test')
-  await expect(page.getByTestId('remote-job-sync')).toHaveCount(0)
   await expect(page.getByTestId('resume-material-module')).toBeVisible()
   await expect(page.getByTestId('resume-material-module')).toContainText('中文简历')
   await expect(page.getByTestId('resume-material-module')).toContainText('英文简历')
   await expect(page.getByTestId('project-material-module')).toBeVisible()
-  await expect(page.getByTestId('job-material-module')).toBeVisible()
-  await expect(page.getByTestId('job-material-module')).toContainText('打开网站会自动读取 GitHub latest/jobs.json')
   await expect(page.getByRole('button', { name: '上传 job.xlsx' })).toHaveCount(0)
-  await expect(page.locator('.material-module')).toHaveCount(4)
-  await expect(page.locator('.material-module').filter({ hasText: '公司资料补充' })).toBeVisible()
+  await expect(page.locator('.material-module')).toHaveCount(3)
+  await expect(page.locator('.material-module').filter({ hasText: '额外参考资料' })).toBeVisible()
+  await expect(page.locator('.job-upload-line.simple')).toContainText('GitHub latest 岗位库')
+  await expect(page.locator('.job-upload-line.simple')).toContainText('9 个岗位')
   await page.getByTestId('resume-material-module').locator('input[type="file"]').nth(0).setInputFiles(cvZhFixturePath)
   await page.getByTestId('resume-material-module').locator('input[type="file"]').nth(1).setInputFiles(cvEnFixturePath)
   await expect(page.getByTestId('resume-material-module')).toContainText('cv-zh.md')
@@ -381,15 +392,23 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   await expect(page.locator('.interview-quick-start')).toBeVisible()
   await expect(page.locator('.interview-prep-status')).toContainText('面试资料已就绪')
   await page.screenshot({ path: testInfo.outputPath('interview-lobby.png'), fullPage: true })
-  await page.getByRole('button', { name: '进入面试舱' }).click()
+  await page.getByRole('button', { name: '开始模拟面试' }).click()
   await expect(page.getByTestId('interview-waiting-room')).toBeVisible()
+  await expect(page.getByTestId('interview-prep-brief')).toContainText('大概率会追问')
+  await page.getByRole('button', { name: /看完了/ }).click()
+  await expect(page.getByTestId('call-prejoin')).toBeVisible()
+  await expect(page.getByTestId('call-prejoin')).toContainText('点击开始面试后，面试官会开始提问')
+  await page.getByRole('button', { name: '先看面试要点' }).click()
+  await expect(page.getByTestId('interview-waiting-room')).toBeVisible()
+  await page.getByRole('button', { name: /看完了/ }).click()
+  await expect(page.getByTestId('call-prejoin')).toBeVisible()
   await page.getByRole('button', { name: '开始面试' }).click()
   await expect(page.getByTestId('interview-dialogue')).toBeVisible()
   await expect(page.locator('.meeting-control-bar')).toBeVisible()
   await expect(page.getByTestId('meeting-side-panel')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('interview-room.png'), fullPage: true })
 
-  await page.getByRole('button', { name: '全屏面试' }).click()
+  await page.getByRole('button', { name: '全屏' }).click()
   await expect(page.getByTestId('interview-room')).toHaveClass(/meeting-room--fullscreen/)
   await expect(page.getByTestId('virtual-interviewer').locator('img')).toBeVisible()
   const viewport = page.viewportSize()
@@ -398,28 +417,25 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   expect(fullscreenStageBox?.height).toBeGreaterThan((viewport?.height || 720) * 0.48)
   const fullscreenControlBox = await page.locator('.meeting-control-bar').boundingBox()
   expect(fullscreenControlBox?.height).toBeLessThan(96)
-  const fullscreenMainButtonBox = await page.locator('.meeting-control-bar .call-control-main').boundingBox()
-  expect(fullscreenMainButtonBox?.width).toBeGreaterThan(fullscreenMainButtonBox?.height || 0)
   await page.getByRole('button', { name: '退出全屏' }).click()
   await expect(page.getByTestId('interview-room')).not.toHaveClass(/meeting-room--fullscreen/)
 
   for (let index = 0; index < 3; index += 1) {
-    await page.getByRole('button', { name: '打开麦克风' }).click()
-    await expect(page.getByRole('button', { name: '关闭麦克风' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '静音' })).toBeEnabled()
     await page.waitForTimeout(450)
-    await page.getByRole('button', { name: '关闭麦克风' }).click()
+    await page.getByRole('button', { name: '静音' }).click()
     await page.waitForFunction(() => {
       const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
       return sessions.some((session) => session.answers?.some((answer) => answer.aiFeedbackStatus === 'completed' && answer.aiFeedback))
     }, null, { timeout: 10000 })
-    await page.getByRole('button', { name: '打开资料面板' }).click()
+    await page.getByTestId('interview-room').getByRole('button', { name: '资料' }).click()
     await page.locator('.meeting-side-tabs button').nth(1).click()
     await expect(page.getByTestId('meeting-side-panel')).toBeVisible()
     await expect(page.getByTestId('interview-feedback-summary')).toBeVisible()
     await expect(page.getByTestId('meeting-short-feedback')).toBeVisible()
     const detailOpen = await page.locator('.ai-report-detail').last().evaluate((node) => (node as HTMLDetailsElement).open)
     expect(detailOpen).toBe(false)
-    await page.getByRole('button', { name: '收起资料面板' }).click()
+    await page.getByTestId('interview-room').getByRole('button', { name: '收起资料' }).click()
     await expect(page.getByRole('button', { name: /下一题|继续追问|完成本轮/ })).toHaveCount(0)
     if (index < 2) {
       await page.waitForFunction((minimumIndex) => {

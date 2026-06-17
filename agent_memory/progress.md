@@ -1,17 +1,20 @@
 # 当前进度
 
-- 已完成 AGNES 公司/岗位面试知识包 provider 配置与线上验证。
-- 当前线上分工：普通文本反馈走 DeepSeek；公司/岗位面试知识包走 AGNES。
-- 已把“公司资料”从用户前台导航中移除，不再作为独立用户流程暴露。
-- 选中岗位后，系统会先在后台生成岗位面试资料，再自动生成公司/岗位面试知识包。
-- 模拟面试入口现在要求岗位资料和公司知识包都准备好；未就绪时只显示“面试资料正在后台准备”。
-- 系统诊断页已显示任务级 provider 分工，避免误以为所有文本任务都走 DeepSeek。
-- Playwright 已补充公司知识包 mock，覆盖后台知识包准备链路。
-- `npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers`、`npx playwright test` 均已通过。
-- 已提交并推送 `dbe09d0 training work`，已部署到 `https://interview-os-pi.vercel.app`。
+- 已把模拟面试主控继续收敛为视频通话语义：主流程是“开始面试 / 通话控制 / 挂断”，不再把转写和反馈暴露为主按钮。
+- 本轮修正：右下角“我的窗口”默认不渲染；用户点击摄像头按钮后才显示；窗口右上角可关闭，关闭后停止摄像头流并移除小窗。
+- 本轮修正：面试官问题与候选人转写改为会议画面上的气泡式对话流，不再使用大题目卡片。
+- 已修正候选人小窗层级问题，关闭按钮不再被面试官大画面遮挡。
+- 本轮补齐：新建模拟面试后必须先进入候场知识包；旧的未回答面试房间会在刷新后自动回到候场材料；面试房间未接入前新增“先看面试要点”兜底。
+- 本轮补齐：面试官问题接入浏览器 `speechSynthesis` 语音播放；点击“开始面试”后先由面试官发声，结束后自动进入候选人回答采集。
+- 本轮补齐：复盘室新增“再来一轮模拟面试”主按钮，会重新生成 session 并先进入候场知识包。
+- 本地验证：`npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers`、`npx playwright test` 均通过。
+- 生产验证：`PLAYWRIGHT_BASE_URL=https://interview-os-pi.vercel.app npx playwright test` 通过；生产 API smoke 通过。
+- 生产部署已完成并 alias 到 `https://interview-os-pi.vercel.app`。
+- 生产 smoke 通过，新资源：`/assets/index-DXrWlDma.js`、`/assets/index-D-MSrU4E.css`。
+- 生产 provider 状态：文本 provider 为 `deepseek` 且 analyze/jobPack/mockInterview smoke 成功；ASR provider 为 `doubao` 且凭证已配置，但真实流式转写实现仍是 `implemented:false`，当前转写 smoke 返回 `mock_fallback`。
 
 ## 下一步
 
-- 已把模拟面试主控改成更接近通话语义：主按钮改为麦克风/静音/挂断，自动转写与自动分析继续在后台执行，不再作为主流程按钮暴露。
-- 已允许“尚未回答时直接挂断”，避免面试舱像必须先录一段才能退出的训练页。
-- 当前待继续项：把岗位筛选进一步收束成更精准的“岗位性质/主线/城市/状态”筛选；把真实实时语音能力接到正式 provider 后再升级为真正的实时通话。
+- P0：完成豆包真实流式 ASR provider，让 `/api/transcribe` 对真实音频 Blob 不再 fallback mock。
+- P1：继续把模拟面试底层从“分段录制 + 自动转写/分析”升级为真正的连续语音通话能力，需要接入实时语音或流式 ASR/对话 provider。
+- 面试舱视觉仍需继续按真实会议软件打磨：更少状态文案、更自然的等待/接入/通话中状态、摄像头预览与通话控制更贴近 Zoom / 腾讯会议。

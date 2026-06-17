@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, ReactNode } from 'react'
 import {
   Archive,
   BrainCircuit,
   BriefcaseBusiness,
+  Camera,
+  CameraOff,
   Check,
   ChevronDown,
   Download,
@@ -16,7 +18,9 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  MoreHorizontal,
   PanelRightOpen,
+  Phone,
   PhoneOff,
   RotateCcw,
   Save,
@@ -25,6 +29,8 @@ import {
   Trash2,
   Upload,
   UserCircle,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { normalizeJobRecord, parseJobWorkbook } from './jobParser'
@@ -504,7 +510,6 @@ function App() {
   const [providerStatusMessage, setProviderStatusMessage] = useState('')
   const [recordingInterviewQuestionId, setRecordingInterviewQuestionId] = useState<string | null>(null)
   useRecordingGuard(recordingTaskId, recordingInterviewQuestionId)
-  const [interviewAudioPreviews, setInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const [realInterviewAudioPreviews, setRealInterviewAudioPreviews] = useState<Record<string, AudioPreview>>({})
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -541,6 +546,20 @@ function App() {
   const activeMockInterview = useMemo(
     () => mockInterviews.find((session) => session.status === 'in_progress') || mockInterviews[0],
     [mockInterviews],
+  )
+  const activeMockInterviewJobPack = useMemo(
+    () => activeMockInterview
+      ? jobPacks.find((pack) => pack.id === activeMockInterview.jobPackId)
+        || jobPacks.find((pack) => pack.selectedJobId === activeMockInterview.selectedJob.id)
+      : undefined,
+    [activeMockInterview, jobPacks],
+  )
+  const activeMockInterviewKnowledgePack = useMemo(
+    () => activeMockInterview
+      ? companyKnowledgePacks.find((pack) => pack.id === activeMockInterview.companyKnowledgePackId)
+        || companyKnowledgePacks.find((pack) => pack.selectedJobId === activeMockInterview.selectedJob.id)
+      : undefined,
+    [activeMockInterview, companyKnowledgePacks],
   )
   const dailyAction = useMemo(
     () => buildDailyAction({
@@ -654,23 +673,6 @@ function App() {
     void loadAudio()
     return () => { disposed = true }
   }, [state.tasks])
-
-  useEffect(() => {
-    let disposed = false
-    async function loadInterviewAudio() {
-      const previews: Record<string, AudioPreview> = {}
-      for (const session of mockInterviews) {
-        for (const answer of session.answers) {
-          if (!answer.recordingId) continue
-          const blob = await readRecordingBlob(answer.recordingId)
-          if (blob && !disposed) previews[answer.questionId] = createPreview(blob)
-        }
-      }
-      if (!disposed) setInterviewAudioPreviews(previews)
-    }
-    void loadInterviewAudio()
-    return () => { disposed = true }
-  }, [mockInterviews])
 
   useEffect(() => {
     let disposed = false
@@ -1159,7 +1161,6 @@ function App() {
     const recordingId = `mock-answer-${questionId}-${Date.now()}`
     const recordingName = `模拟面试-${questionId}-${formatDateForFile(new Date())}.webm`
     await saveRecordingBlob(recordingId, blob)
-    setInterviewAudioPreviews((current) => ({ ...current, [questionId]: createPreview(blob) }))
     const answer: MockInterviewAnswer = {
       id: `answer-${questionId}-${Date.now()}`,
       questionId,
@@ -1432,6 +1433,9 @@ function App() {
     }
   }
 
+  void generateInterviewAnswerTranscript
+  void generateInterviewAnswerFeedback
+
   async function generateFollowUpQuestion(sessionId: string, questionId: string) {
     const session = mockInterviews.find((item) => item.id === sessionId)
     const question = session?.questions.find((item) => item.id === questionId)
@@ -1463,6 +1467,14 @@ function App() {
       ...session,
       uiState: 'interview_room',
       startedAt: session.startedAt || new Date().toISOString(),
+      currentPhase: 'asking',
+    } : session))
+  }
+
+  function returnMockInterviewToBriefing(sessionId: string) {
+    setMockInterviews((current) => current.map((session) => session.id === sessionId ? {
+      ...session,
+      uiState: 'waiting_room',
       currentPhase: 'asking',
     } : session))
   }
@@ -1762,7 +1774,7 @@ function App() {
         body: JSON.stringify(requestBody),
       })
       const result = await response.json() as GenerateCompanyKnowledgePackResponse
-      if (!response.ok || !result.success) throw new Error(result.success ? '公司知识包生成失败。' : result.error)
+      if (!response.ok || !result.success) throw new Error(result.success ? '公司资料整理失败。' : result.error)
       recordProviderCall({
         type: 'text',
         providerUsed: result.provider,
@@ -1786,15 +1798,15 @@ function App() {
       if (!silent) {
         setCompanyKnowledgeMessage(
           result.provider === 'mock_fallback'
-            ? `真实知识包暂时未成功，已先生成模拟知识包。${result.rawProviderNote ? ` ${result.rawProviderNote}` : ''}`
+            ? `真实资料暂时未成功，已先生成模拟资料。${result.rawProviderNote ? ` ${result.rawProviderNote}` : ''}`
             : result.provider === 'mock'
-              ? '已生成模拟面试知识包。'
-              : '面试知识包已生成。'
+              ? '已生成模拟面试资料。'
+              : '面试资料已生成。'
         )
       }
     } catch (error) {
       if (silent) autoCompanyKnowledgeAttemptRef.current.delete(selectedJob.id)
-      if (!silent) setCompanyKnowledgeMessage(error instanceof Error ? error.message : '面试知识包生成失败。')
+      if (!silent) setCompanyKnowledgeMessage(error instanceof Error ? error.message : '面试资料生成失败。')
     } finally {
       setCompanyKnowledgeLoading(false)
     }
@@ -2113,12 +2125,12 @@ function App() {
                 </article>
                 <article className="material-module">
                   <div>
-                    <strong>公司资料补充</strong>
-                    <span>可选。官网文本、JD 文本、文章摘录会在后台并入面试知识包。</span>
+                    <strong>额外参考资料</strong>
+                    <span>可选。你有官网文本、JD 或文章摘录时再补充，系统会在后台吸收这些信息。</span>
                   </div>
                   <div className="material-actions">
                     <details className="inline-details">
-                      <summary>高级补充资料</summary>
+                      <summary>可选补充资料</summary>
                       <div className="inline-actions">
                         <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('company_official', event)} /><Upload size={15} />公司资料</label>
                         <label className="small-upload-button"><input type="file" accept=".txt,.md,.html,text/plain,text/markdown,text/html" onChange={(event) => void handleCompanySourceUpload('job_description', event)} /><Upload size={15} />岗位 JD</label>
@@ -2129,31 +2141,14 @@ function App() {
                     </details>
                     <p className="quiet-status">
                       {currentKnowledgePack
-                        ? `面试知识包已就绪 · ${currentKnowledgePack.provider}${currentKnowledgePack.provider === 'mock_fallback' ? ' fallback' : ''}`
+                        ? '面试资料已补齐'
                         : companyKnowledgeLoading
-                          ? '正在后台整理公司知识包。'
+                          ? '补充资料正在后台吸收。'
                           : currentCompanySources.length
-                            ? `${currentCompanySources.length} 份补充资料已加入后台准备。`
-                            : '没有补充资料也能先生成基础知识包。'}
+                            ? `${currentCompanySources.length} 份补充资料待吸收。`
+                            : '没有额外资料也能先开始准备。'}
                     </p>
                     {companyKnowledgeMessage && <p className={companyKnowledgeMessage.includes('失败') || companyKnowledgeMessage.includes('请先') ? 'error-line' : 'success-line'}>{companyKnowledgeMessage}</p>}
-                  </div>
-                </article>
-                <article className="material-module" data-testid="job-material-module">
-                  <div>
-                    <strong>岗位库</strong>
-                    <span>打开网站会自动读取 GitHub latest/jobs.json。</span>
-                  </div>
-                  <div className="material-actions">
-                    <div className="remote-job-sync compact" data-testid="remote-job-sync-inline">
-                      <div>
-                        <strong>{remoteJobSyncing ? '正在同步' : jobPool.length ? '已同步' : '等待同步'}</strong>
-                        <span>{formatRemoteJobStatus(remoteJobData, jobPool.length)}</span>
-                      </div>
-                      <button type="button" onClick={() => void syncRemoteJobData()} disabled={remoteJobSyncing}>
-                        {remoteJobSyncing ? '同步中…' : '重新同步'}
-                      </button>
-                    </div>
                   </div>
                 </article>
               </div>
@@ -2161,7 +2156,7 @@ function App() {
                 <button className="primary-button" data-testid="save-materials-and-continue" type="button" onClick={saveMaterialsAndContinue} disabled={!cvZhFile && !cvEnFile && !cvTextState.text && !projectFile}>
                   保存并继续
                 </button>
-                <span>{materialsMessage || '岗位库会自动从 GitHub 同步。'}</span>
+                <span>{materialsMessage || '岗位会自动从 GitHub 同步。'}</span>
               </div>
             </section>
 
@@ -2318,9 +2313,10 @@ function App() {
               <>
                 {!activeMockInterview && <section className="interview-quick-start" data-testid="interview-room">
                   <div className="interview-ready-heading">
-                    <div>
-                      <h2>准备就绪，进入你的面试舱</h2>
-                      <p>{selectedJob.companyName} · {selectedJob.jobTitle}</p>
+                    <div className="interview-ready-copy">
+                      <span>模拟面试</span>
+                      <strong>{selectedJob.companyName}</strong>
+                      <p>{selectedJob.jobTitle}</p>
                     </div>
                     <button type="button" onClick={() => setActiveView('materials')}>更换岗位</button>
                   </div>
@@ -2357,11 +2353,11 @@ function App() {
                     </div>
                     <div className="interview-entry">
                       <div className={`interview-prep-status ${currentJobPack && currentKnowledgePack ? 'ready' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? 'error' : 'loading'}`}>
-                        <span>{currentJobPack && currentKnowledgePack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? '面试资料准备失败' : '面试资料正在后台准备'}</span>
+                        <span>{currentJobPack && currentKnowledgePack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? '面试资料暂时没准备好' : '面试资料正在后台准备'}</span>
                         {(!currentJobPack || !currentKnowledgePack) && !jobPackMessage.includes('失败') && !jobPackMessage.includes('超时') && !companyKnowledgeMessage.includes('失败') && <i aria-hidden="true" />}
                       </div>
                       <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading) || jobPackLoading || companyKnowledgeLoading || !currentJobPack || !currentKnowledgePack}>
-                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '正在进入…' : '进入面试舱'}
+                        <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '正在载入面试…' : '开始模拟面试'}
                       </button>
                       {(!currentJobPack || !currentKnowledgePack) && (jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败')) && (
                         <button type="button" onClick={() => { if (selectedJob && !currentJobPack) void generateJobPack(selectedJob); if (selectedJob && currentJobPack && !currentKnowledgePack) void generateCompanyKnowledgePack({ silent: true }) }} disabled={jobPackLoading || companyKnowledgeLoading}>重新准备</button>
@@ -2376,19 +2372,20 @@ function App() {
                 {activeMockInterview ? (
                   <MockInterviewPanel
                     session={activeMockInterview}
+                    jobPack={activeMockInterviewJobPack}
+                    knowledgePack={activeMockInterviewKnowledgePack}
                     currentQuestion={activeMockInterview.questions[activeMockInterview.currentQuestionIndex]}
                     currentAnswer={activeMockInterview.answers.find((answer) => answer.questionId === activeMockInterview.questions[activeMockInterview.currentQuestionIndex]?.id)}
-                    preview={interviewAudioPreviews[activeMockInterview.questions[activeMockInterview.currentQuestionIndex]?.id]}
                     loading={mockInterviewLoading}
                     recordingQuestionId={recordingInterviewQuestionId}
                     recordingSeconds={recordingSeconds}
                     onStartRecording={(questionId) => void startInterviewAnswerRecording(questionId)}
                     onStopRecording={stopRecording}
-                    onTranscript={(questionId) => void generateInterviewAnswerTranscript(activeMockInterview.id, questionId)}
-                    onFeedback={(questionId) => void generateInterviewAnswerFeedback(activeMockInterview.id, questionId)}
                     onFollowUp={(questionId) => void generateFollowUpQuestion(activeMockInterview.id, questionId)}
                     onEnterRoom={() => enterMockInterviewRoom(activeMockInterview.id)}
+                    onReturnToBriefing={() => returnMockInterviewToBriefing(activeMockInterview.id)}
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
+                    onRestart={() => void startMockInterview(activeMockInterview.interviewType)}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
                   />
                 ) : null}
@@ -2631,41 +2628,54 @@ function RiskToggle({ label, checked, onChange }: { label: string; checked: bool
 
 function MockInterviewPanel({
   session,
+  jobPack,
+  knowledgePack,
   currentQuestion,
   currentAnswer,
-  preview,
   loading,
   recordingQuestionId,
   recordingSeconds,
   onStartRecording,
   onStopRecording,
-  onTranscript,
-  onFeedback,
   onFollowUp,
   onEnterRoom,
+  onReturnToBriefing,
   onFinish,
+  onRestart,
   onDelete,
 }: {
   session: MockInterviewSession
+  jobPack?: StoredJobPack
+  knowledgePack?: StoredCompanyKnowledgePack
   currentQuestion?: MockInterviewQuestion
   currentAnswer?: MockInterviewAnswer
-  preview?: AudioPreview
   loading: string
   recordingQuestionId: string | null
   recordingSeconds: number
   onStartRecording: (questionId: string) => void
   onStopRecording: () => void
-  onTranscript: (questionId: string) => void
-  onFeedback: (questionId: string) => void
   onFollowUp: (questionId: string) => void
   onEnterRoom: () => void
+  onReturnToBriefing: () => void
   onFinish: () => void
+  onRestart: () => void
   onDelete: () => void
 }) {
   const roomRef = useRef<HTMLElement | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const lastSpokenQuestionIdRef = useRef('')
+  const callActiveRef = useRef(false)
+  const startRecordingRef = useRef(onStartRecording)
+  const recordingQuestionIdRef = useRef(recordingQuestionId)
+  const currentAnswerRef = useRef(currentAnswer)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [sidePanelTab, setSidePanelTab] = useState<'dialogue' | 'feedback' | 'materials' | 'questions'>('dialogue')
+  const [callStarted, setCallStarted] = useState(session.answers.length > 0 || session.currentPhase !== 'asking')
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
   const isRecording = currentQuestion ? recordingQuestionId === currentQuestion.id : false
   const typeLabel = session.interviewType === 'pressure_mock' ? '英文压力面试' : session.interviewType === 'quick_mock' ? '快速摸底面试' : 'AI 产品岗位面试'
   const phaseLabel: Record<InterviewPhase, string> = {
@@ -2679,6 +2689,33 @@ function MockInterviewPanel({
   }
   const displayedQuestion = session.currentPhase === 'follow_up' && session.followUps.length ? session.followUps[session.followUps.length - 1] : currentQuestion
   const questionTimer = isRecording ? recordingSeconds : currentAnswer?.durationSeconds || 0
+  const briefingJobPack = jobPack?.jobPack
+  const briefingKnowledge = knowledgePack?.companyKnowledgePack
+  const companyAndRolePoints = compactBriefItems([
+    briefingKnowledge?.companyCoreBusiness,
+    briefingKnowledge?.roleContext,
+    briefingJobPack?.companySummary,
+    briefingJobPack?.productAndBusiness,
+  ], 4, 140)
+  const candidateTalkingPoints = compactBriefItems([
+    ...(briefingJobPack?.candidateFit || []),
+    briefingJobPack?.selfIntroductionStrategy,
+  ], 4, 140)
+  const projectBridgePoints = compactBriefItems([
+    briefingJobPack?.miroProjectStrategy,
+    ...(briefingJobPack?.workContentPrediction || []),
+  ], 4, 140)
+  const likelyFollowUps = compactBriefItems([
+    ...(briefingJobPack?.likelyQuestions.map((item) => item.question) || []),
+    ...(briefingKnowledge?.recommendedQuestions || []),
+  ], 5, 120)
+  const riskPoints = compactBriefItems([
+    ...(briefingJobPack?.riskPoints || []),
+    ...(briefingKnowledge?.risksAndUnknowns || []),
+  ], 4, 110)
+  const preparationTasks = compactBriefItems(briefingJobPack?.preparationTasks || [], 5, 120)
+  const recentSignals = compactBriefItems(briefingKnowledge?.recentSignals || [], 4, 100)
+  const interviewUseHints = compactBriefItems(briefingKnowledge?.howToUseInInterview || [], 4, 120)
   const visiblePhase = session.currentPhase === 'asking' && !currentAnswer ? '待回答' : phaseLabel[session.currentPhase]
   const panelAnswer = currentAnswer?.aiFeedback
     ? currentAnswer
@@ -2686,6 +2723,52 @@ function MockInterviewPanel({
   const feedbackSummary = panelAnswer?.aiFeedback
     ? truncateText(`${panelAnswer.aiFeedback.score} 分 · ${panelAnswer.aiFeedback.summary}`, 96)
     : ''
+  const isBusy = session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing' || loading.startsWith('auto-')
+  const callConnected = callStarted && session.currentPhase !== 'completed'
+  const showQuestion = callConnected && Boolean(displayedQuestion)
+  const callStatusLabel = !callStarted
+    ? '等待接入'
+    : isRecording
+      ? '通话中'
+      : isBusy
+        ? '后台整理'
+        : session.currentPhase === 'feedback_ready'
+          ? '继续沟通'
+          : visiblePhase
+  const showCandidateWindow = cameraEnabled || Boolean(cameraStream) || Boolean(cameraError)
+  const dialogueBubbles: Array<{ id: string; speaker: 'interviewer' | 'candidate' | 'system'; label: string; text: string }> = []
+  if (callConnected) {
+    dialogueBubbles.push({
+      id: `question-${displayedQuestion?.id || 'pending'}`,
+      speaker: 'interviewer',
+      label: session.currentPhase === 'follow_up' ? '追问' : '面试官',
+      text: showQuestion ? displayedQuestion?.question || '' : '面试官正在接入...',
+    })
+    if (currentAnswer?.transcript?.text) {
+      dialogueBubbles.push({
+        id: `answer-${currentAnswer.id}`,
+        speaker: 'candidate',
+        label: '你',
+        text: currentAnswer.transcript.text,
+      })
+    }
+    if (isBusy) {
+      dialogueBubbles.push({
+        id: 'system-processing',
+        speaker: 'system',
+        label: '系统',
+        text: session.currentPhase === 'transcribing' ? '正在整理你的回答...' : '正在分析并准备继续追问...',
+      })
+    }
+    if (currentAnswer?.aiFeedback?.summary && !isBusy) {
+      dialogueBubbles.push({
+        id: `feedback-${currentAnswer.id}`,
+        speaker: 'system',
+        label: '反馈',
+        text: truncateText(currentAnswer.aiFeedback.summary, 120),
+      })
+    }
+  }
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -2723,27 +2806,196 @@ function MockInterviewPanel({
     }
   }
 
+  useEffect(() => {
+    if (videoRef.current && cameraStream) {
+      videoRef.current.srcObject = cameraStream
+    }
+  }, [cameraStream])
+
+  useEffect(() => () => {
+    cameraStream?.getTracks().forEach((track) => track.stop())
+  }, [cameraStream])
+
+  useEffect(() => {
+    callActiveRef.current = callConnected
+  }, [callConnected])
+
+  useEffect(() => {
+    startRecordingRef.current = onStartRecording
+  }, [onStartRecording])
+
+  useEffect(() => {
+    recordingQuestionIdRef.current = recordingQuestionId
+  }, [recordingQuestionId])
+
+  useEffect(() => {
+    currentAnswerRef.current = currentAnswer
+  }, [currentAnswer])
+
+  const stopInterviewerVoice = useCallback(() => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  }, [])
+
+  const speakInterviewerQuestion = useCallback((text: string, onDone?: () => void) => {
+    if (!voiceEnabled || !('speechSynthesis' in window)) {
+      onDone?.()
+      return
+    }
+    stopInterviewerVoice()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = /[a-zA-Z]/.test(text) && !/[\u4e00-\u9fff]/.test(text) ? 'en-US' : 'zh-CN'
+    utterance.rate = 0.92
+    utterance.pitch = 0.96
+    utterance.volume = 1
+    utterance.onend = () => onDone?.()
+    utterance.onerror = () => onDone?.()
+    window.speechSynthesis.speak(utterance)
+  }, [stopInterviewerVoice, voiceEnabled])
+
+  useEffect(() => {
+    if (!callConnected || !displayedQuestion?.id || !displayedQuestion.question) return
+    if (lastSpokenQuestionIdRef.current === displayedQuestion.id) return
+    lastSpokenQuestionIdRef.current = displayedQuestion.id
+    speakInterviewerQuestion(displayedQuestion.question, () => {
+      if (!callActiveRef.current) return
+      if (recordingQuestionIdRef.current || currentAnswerRef.current) return
+      startRecordingRef.current(displayedQuestion.id)
+    })
+    return () => stopInterviewerVoice()
+  }, [callConnected, displayedQuestion?.id, displayedQuestion?.question, speakInterviewerQuestion, voiceEnabled, stopInterviewerVoice])
+
+  useEffect(() => () => stopInterviewerVoice(), [stopInterviewerVoice])
+
+  function closeCameraWindow() {
+    cameraStream?.getTracks().forEach((track) => track.stop())
+    setCameraStream(null)
+    setCameraEnabled(false)
+    setCameraError('')
+  }
+
+  async function toggleCamera() {
+    if (cameraEnabled || cameraStream) {
+      closeCameraWindow()
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      setCameraStream(stream)
+      setCameraEnabled(true)
+      setCameraError('')
+    } catch {
+      setCameraError('摄像头未授权')
+      setCameraEnabled(false)
+    }
+  }
+
+  function startCall() {
+    if (!currentQuestion || isBusy) return
+    setCallStarted(true)
+  }
+
+  function hangUpCall() {
+    setCallStarted(false)
+    stopInterviewerVoice()
+    if (isRecording) {
+      onStopRecording()
+      return
+    }
+    onFinish()
+  }
+
   if (session.uiState === 'waiting_room') {
     return (
-      <section className="interview-waiting-room" data-testid="interview-waiting-room">
-        <div>
-          <span className="eyebrow">面试等待室</span>
-          <h2>{session.selectedJob.companyName}</h2>
-          <p>{session.selectedJob.jobTitle} · {typeLabel}</p>
-        </div>
-        <div className="waiting-room-grid">
-          <div><span>预计题数</span><strong>{session.questions.length}</strong></div>
+      <section className="interview-waiting-room interview-briefing-room" data-testid="interview-waiting-room">
+        <header className="interview-briefing-hero">
+          <div>
+            <span className="eyebrow">面试前 60 秒</span>
+            <h2>先过一遍这场面试重点</h2>
+            <p>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</p>
+          </div>
+          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />取消这轮</button>
+        </header>
+
+        <div className="interview-briefing-meta">
+          <div><span>面试类型</span><strong>{typeLabel}</strong></div>
+          <div><span>预计题数</span><strong>{session.questions.length} 题</strong></div>
           <div><span>预计时长</span><strong>{session.questions.length * 3} 分钟</strong></div>
-          <div><span>麦克风</span><strong>待命</strong></div>
-          <div><span>模式</span><strong>{typeLabel}</strong></div>
+          <div><span>资料状态</span><strong>{jobPack && knowledgePack ? '已就绪' : '准备中'}</strong></div>
         </div>
-        <details className="waiting-materials">
-          <summary>查看本场面试设定</summary>
-          <p>岗位信息、公司知识和你过往的训练记录都会在后台参与出题。</p>
+
+        <div className="interview-briefing-grid" data-testid="interview-prep-brief">
+          <article className="briefing-card">
+              <span>公司与岗位</span>
+              <ul>
+                {(companyAndRolePoints.length ? companyAndRolePoints : ['系统已按当前岗位整理公司业务、岗位职责和面试关注点。']).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+          </article>
+          <article className="briefing-card">
+            <span>你要重点讲</span>
+            <ul>
+              {(candidateTalkingPoints.length ? candidateTalkingPoints : ['先讲清你的背景，再落到 AI 学习、项目证据和岗位匹配。']).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </article>
+          <article className="briefing-card">
+            <span>项目怎么贴岗</span>
+            <ul>
+              {(projectBridgePoints.length ? projectBridgePoints : ['围绕用户、场景、AI 作用和你的实际贡献来讲项目。']).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </article>
+          <article className="briefing-card">
+              <span>大概率会追问</span>
+              <ul>
+                {(likelyFollowUps.length ? likelyFollowUps : ['系统会围绕岗位理解、项目细节和岗位匹配继续追问。']).map((item) => <li key={item}>{item}</li>)}
+              </ul>
+          </article>
+        </div>
+
+        {!!riskPoints.length && (
+          <section className="interview-briefing-risk">
+            <span>这轮要小心</span>
+            <div>
+              {riskPoints.map((item) => <em key={item}>{item}</em>)}
+            </div>
+          </section>
+        )}
+
+        <details className="interview-briefing-detail">
+          <summary>展开完整准备</summary>
+          <div className="interview-briefing-detail-grid">
+            <article>
+              <span>自我介绍策略</span>
+              <p>{briefingJobPack?.selfIntroductionStrategy || '系统会根据岗位和你的经历，优先强化开场定位、项目证据和岗位收束。'}</p>
+            </article>
+            <article>
+              <span>Miro 项目讲法</span>
+              <p>{briefingJobPack?.miroProjectStrategy || '优先讲用户问题、跨文化训练场景、AI 作用和 MVP 取舍。'}</p>
+            </article>
+            {!!preparationTasks.length && (
+              <article>
+                <span>开始前再看一眼</span>
+                <ul>{preparationTasks.map((item) => <li key={item}>{item}</li>)}</ul>
+              </article>
+            )}
+            {!!recentSignals.length && (
+              <article>
+                <span>公司近期信号</span>
+                <ul>{recentSignals.map((item) => <li key={item}>{item}</li>)}</ul>
+              </article>
+            )}
+            {!!interviewUseHints.length && (
+              <article>
+                <span>面试官会怎么追问</span>
+                <ul>{interviewUseHints.map((item) => <li key={item}>{item}</li>)}</ul>
+              </article>
+            )}
+          </div>
         </details>
-        <div className="inline-actions">
-          <button className="primary-button" type="button" onClick={onEnterRoom}><Mic size={16} />开始面试</button>
-          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
+
+        <div className="interview-briefing-actions">
+          <div className={`interview-prep-status ${jobPack && knowledgePack ? 'ready' : 'loading'}`}>
+            <span>{jobPack && knowledgePack ? '这场面试资料已就绪，会直接按公司、岗位和你的经历来追问。' : '面试资料还在后台整理，请稍候。'}</span>
+          </div>
+          <button className="primary-button" type="button" onClick={onEnterRoom}><Phone size={16} />看完了，进入面试</button>
         </div>
       </section>
     )
@@ -2758,7 +3010,10 @@ function MockInterviewPanel({
             <h2>{session.selectedJob.companyName} · {session.selectedJob.jobTitle}</h2>
             <p>{session.answers.length} 个回答 · {session.finalReport ? '整场复盘已生成' : '等待生成整场复盘'}</p>
           </div>
-          <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
+          <div className="review-room-actions">
+            <button className="primary-button" type="button" onClick={onRestart} disabled={loading === 'start'}><MessagesSquare size={16} />{loading === 'start' ? '正在准备下一轮' : '再来一轮模拟面试'}</button>
+            <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
+          </div>
         </header>
         {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} answers={session.answers} questions={session.questions} /> : (
           <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '生成整场复盘'}</button>
@@ -2774,17 +3029,17 @@ function MockInterviewPanel({
           <strong>{session.selectedJob.companyName}</strong>
           <span>{session.selectedJob.jobTitle}</span>
         </div>
-        <div><span>题目</span><strong>第 {session.currentQuestionIndex + 1} / {session.questions.length}</strong></div>
-        <div><span>计时</span><strong>{formatDuration(questionTimer)}</strong></div>
-        <div><span>状态</span><strong>{visiblePhase}</strong></div>
+        <div><span>进度</span><strong>{callStarted ? `${session.currentQuestionIndex + 1} / ${session.questions.length}` : '待接入'}</strong></div>
+        <div><span>通话</span><strong>{formatDuration(questionTimer)}</strong></div>
+        <div><span>状态</span><strong>{callStatusLabel}</strong></div>
         <div className="meeting-status-actions">
           <button type="button" onClick={() => isFullscreen ? void exitFullscreen() : void enterFullscreen()}>
-            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{isFullscreen ? '退出全屏' : '全屏面试'}
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}{isFullscreen ? '退出全屏' : '全屏'}
           </button>
           <button
             type="button"
-            aria-label={sidePanelOpen ? '收起资料面板' : '打开资料面板'}
-            title={sidePanelOpen ? '收起资料面板' : '打开资料面板'}
+            aria-label={sidePanelOpen ? '收起资料' : '资料'}
+            title={sidePanelOpen ? '收起资料' : '资料'}
             onClick={() => setSidePanelOpen((value) => !value)}
           >
             {sidePanelOpen ? <X size={18} /> : <PanelRightOpen size={18} />}
@@ -2793,46 +3048,88 @@ function MockInterviewPanel({
       </header>
 
       <div className={`meeting-stage ${sidePanelOpen ? 'has-side-panel' : ''}`}>
-        <article className="interviewer-panel" data-testid="virtual-interviewer">
+        <article className={`interviewer-panel ${callConnected ? 'is-live' : 'is-waiting'}`} data-testid="virtual-interviewer">
           <img src="/virtual-interviewer.png" alt="虚拟 AI 面试官 Helen" />
           <div className="interviewer-screen-badge">
             <Sparkles size={15} />
-            <span>AI 面试官 · 语音通话中</span>
+            <span>{callConnected ? 'AI 面试官 · 通话中' : 'AI 面试官 · 等待接入'}</span>
           </div>
-          <div className="interviewer-question" data-testid="interview-dialogue">
-            <span>{session.currentPhase === 'follow_up' ? '面试官追问' : '面试官'}</span>
-            <p>{displayedQuestion?.question || '面试问题生成中…'}</p>
-          </div>
+          {!callConnected ? (
+            <div className="interview-call-prompt" data-testid="call-prejoin">
+              <strong>准备接入面试</strong>
+              <p>点击开始面试后，面试官会开始提问。</p>
+              <button type="button" onClick={onReturnToBriefing}>先看面试要点</button>
+            </div>
+          ) : (
+            <div className="meeting-dialogue-stream" data-testid="interview-dialogue">
+              {dialogueBubbles.map((bubble) => (
+                <div className={`meeting-bubble meeting-bubble--${bubble.speaker}`} key={bubble.id}>
+                  <span>{bubble.label}</span>
+                  <p>{bubble.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </article>
-        <aside className="candidate-window" data-testid="candidate-window">
-          <span>我的窗口</span>
-          <strong>{isRecording ? '通话中' : currentAnswer ? '已回应' : '等待回答'}</strong>
-          <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
-          <p>{isRecording ? formatDuration(recordingSeconds) : '麦克风待命'}</p>
-        </aside>
+        <div className="meeting-participant-rail" aria-hidden="true">
+          <span className="participant-pill is-active">AI</span>
+          <span className="participant-pill">你</span>
+        </div>
+        {showCandidateWindow && (
+          <aside className={`candidate-window ${cameraEnabled ? 'camera-on' : ''}`} data-testid="candidate-window">
+            <button className="candidate-window-close" type="button" aria-label="关闭我的窗口" onClick={closeCameraWindow}><X size={14} /></button>
+            {cameraStream ? (
+              <video ref={videoRef} autoPlay muted playsInline />
+            ) : (
+              <div className="candidate-avatar">
+                <UserCircle size={36} />
+                <span>{cameraError || '摄像头未开启'}</span>
+              </div>
+            )}
+            <div className="candidate-meta">
+              <strong>{callConnected ? '你' : '候选人'}</strong>
+              <span>{cameraEnabled ? '摄像头已开' : cameraError || '已关闭'}</span>
+            </div>
+            <div className={`wave-bars ${isRecording ? 'active' : ''}`} aria-hidden="true"><i /><i /><i /><i /></div>
+          </aside>
+        )}
       </div>
 
       {currentQuestion && (
         <div className="meeting-control-bar" aria-label="bottom-controls">
-          {isRecording ? (
-            <button className="primary-button recording-control call-control-main icon-call-button" type="button" aria-label="关闭麦克风" title="关闭麦克风" onClick={onStopRecording}><MicOff size={18} /><span>静音</span></button>
+          {!callStarted ? (
+            <button className="call-start-button" type="button" onClick={startCall} disabled={!currentQuestion || Boolean(recordingQuestionId) || isBusy}>
+              <Phone size={18} /><span className="call-start-label">开始面试</span>
+            </button>
           ) : (
-            <button className="primary-button call-control-main icon-call-button" type="button" aria-label="打开麦克风" title="打开麦克风" onClick={() => onStartRecording(currentQuestion.id)} disabled={Boolean(recordingQuestionId) || session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing'}>
-              <Mic size={19} /><span>麦克风</span>
-            </button>
+            <>
+              <button className="icon-call-button" type="button" aria-label={cameraEnabled ? '关闭摄像头' : '开启摄像头'} title={cameraEnabled ? '关闭摄像头' : '开启摄像头'} onClick={() => void toggleCamera()}>
+                {cameraEnabled ? <CameraOff size={18} /> : <Camera size={18} />}
+              </button>
+              <button className="icon-call-button" type="button" aria-label={isRecording ? '静音' : '继续通话'} title={isRecording ? '静音' : '继续通话'} onClick={() => isRecording ? onStopRecording() : currentQuestion && onStartRecording(currentQuestion.id)} disabled={isBusy}>
+                {isRecording ? <Mic size={18} /> : <MicOff size={18} />}
+              </button>
+              <button
+                className={`icon-call-button ${voiceEnabled ? 'is-active' : ''}`}
+                type="button"
+                aria-label={voiceEnabled ? '关闭面试官声音' : '开启面试官声音'}
+                title={voiceEnabled ? '关闭面试官声音' : '开启面试官声音'}
+                onClick={() => {
+                  const next = !voiceEnabled
+                  setVoiceEnabled(next)
+                  if (!next) stopInterviewerVoice()
+                  if (next) lastSpokenQuestionIdRef.current = ''
+                }}
+              >
+                {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
+              <button className="icon-call-button" type="button" aria-label="更多" title="更多" onClick={() => setSidePanelOpen((value) => !value)}>
+                <MoreHorizontal size={18} />
+              </button>
+              {isBusy && <span className="meeting-status-chip">{callStatusLabel}</span>}
+              <button className="call-hangup-button icon-call-button" type="button" aria-label="挂断" title="挂断" onClick={hangUpCall} disabled={loading === 'report'}><PhoneOff size={20} /></button>
+            </>
           )}
-          {(session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing') && <span className="meeting-status-chip">{visiblePhase}</span>}
-          <button className="end-interview-button call-hangup-button icon-call-button" type="button" aria-label="挂断" title="挂断" onClick={onFinish} disabled={loading === 'report'}><PhoneOff size={18} /><span>挂断</span></button>
-          <details className="meeting-backup-actions" aria-label="开发备用操作">
-            <summary>{'\u5907\u7528'}</summary>
-            {preview && <button type="button" onClick={() => { if (preview.url) void new Audio(preview.url).play() }}><FileAudio size={15} />回放刚才回答</button>}
-            <button type="button" onClick={() => onTranscript(currentQuestion.id)} disabled={!currentAnswer || loading === `transcript-${currentQuestion.id}`}>
-              <FileText size={15} />{loading === `transcript-${currentQuestion.id}` ? '\u8f6c\u5199\u4e2d' : '\u624b\u52a8\u8f6c\u5199'}
-            </button>
-            <button type="button" onClick={() => onFeedback(currentQuestion.id)} disabled={!currentAnswer?.transcript || loading === `feedback-${currentQuestion.id}`}>
-              <BrainCircuit size={15} />{loading === `feedback-${currentQuestion.id}` ? '\u5206\u6790\u4e2d' : '\u624b\u52a8\u53cd\u9988'}
-            </button>
-          </details>
         </div>
       )}
 
@@ -3006,7 +3303,7 @@ function RealInterviewCard({
 }
 
 function CompanySourcesList({ sources, onDelete }: { sources: CompanySourceInput[]; onDelete: (sourceId: string) => void }) {
-  if (!sources.length) return <p className="empty-state">还没有公司资料。系统会先使用 GitHub 岗位库，也可以补充公司官网、JD、公众号文章导出文本。</p>
+  if (!sources.length) return <p className="empty-state">还没有额外参考资料。系统会先使用当前岗位和 GitHub 岗位库。</p>
   return (
     <section className="material-list">
       {sources.map((source) => (
@@ -3458,27 +3755,36 @@ function normalizeJobPacks(packs?: StoredJobPack[]) {
   }))
 }
 function normalizeMockInterviews(sessions?: MockInterviewSession[]) {
-  return (Array.isArray(sessions) ? sessions : []).filter((session) => session?.selectedJob && Array.isArray(session.questions)).map((session) => ({
-    ...session,
-    id: session.id || `mock-interview-${Date.now()}`,
-    status: session.status || 'in_progress',
-    uiState: session.uiState || (session.status === 'completed' ? 'review_room' : 'waiting_room'),
-    currentPhase: session.currentPhase || (session.status === 'completed' ? 'completed' : 'asking'),
-    createdAt: session.createdAt || new Date().toISOString(),
-    startedAt: session.startedAt,
-    interviewType: session.interviewType || 'job_pack_mock',
-    companyKnowledgePackId: session.companyKnowledgePackId,
-    currentQuestionIndex: Math.max(0, Math.min(session.currentQuestionIndex || 0, Math.max(0, session.questions.length - 1))),
-    questions: session.questions,
-    followUps: Array.isArray(session.followUps) ? session.followUps : [],
-    answers: Array.isArray(session.answers) ? session.answers.map((answer) => ({
+  return (Array.isArray(sessions) ? sessions : []).filter((session) => session?.selectedJob && Array.isArray(session.questions)).map((session) => {
+    const answers = Array.isArray(session.answers) ? session.answers.map((answer) => ({
       ...answer,
       transcriptStatus: answer.transcriptStatus || (answer.transcript ? answer.transcript.source === 'mock' ? 'mock_ready' : 'completed' : 'not_started'),
       aiFeedbackStatus: answer.aiFeedbackStatus || (answer.aiFeedback ? 'completed' : answer.transcript ? 'ready_to_analyze' : 'transcript_needed'),
       durationSeconds: answer.durationSeconds || answer.audioMetadata?.durationSeconds || 0,
       createdAt: answer.createdAt || new Date().toISOString(),
-    })) : [],
-  })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    })) : []
+    const status = session.status || 'in_progress'
+    const currentPhase = session.currentPhase || (status === 'completed' ? 'completed' : 'asking')
+    const shouldReturnToBriefing = status === 'in_progress'
+      && session.uiState === 'interview_room'
+      && answers.length === 0
+      && currentPhase === 'asking'
+    return {
+      ...session,
+      id: session.id || `mock-interview-${Date.now()}`,
+      status,
+      uiState: shouldReturnToBriefing ? 'waiting_room' : session.uiState || (status === 'completed' ? 'review_room' : 'waiting_room'),
+      currentPhase,
+      createdAt: session.createdAt || new Date().toISOString(),
+      startedAt: session.startedAt,
+      interviewType: session.interviewType || 'job_pack_mock',
+      companyKnowledgePackId: session.companyKnowledgePackId,
+      currentQuestionIndex: Math.max(0, Math.min(session.currentQuestionIndex || 0, Math.max(0, session.questions.length - 1))),
+      questions: session.questions,
+      followUps: Array.isArray(session.followUps) ? session.followUps : [],
+      answers,
+    }
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
 function normalizeRealInterviews(interviews?: StoredRealInterview[]) {
@@ -3793,7 +4099,7 @@ function buildDailyAction(context: {
   const latestMock = context.mockInterviews[0]
   if (!context.jobPool.length) return { title: '同步岗位库', detail: '打开网站会自动读取 GitHub latest/jobs.json。', cta: '同步岗位库', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
   if (!context.selectedJob) return { title: '选择一个目标岗位', detail: '从岗位库里选一个今天要准备的岗位。', cta: '选择目标岗位', view: 'materials', icon: <BriefcaseBusiness size={17} /> }
-  if (!context.currentJobPack || !context.currentKnowledgePack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看准备状态', view: 'mockInterview', icon: <Sparkles size={17} /> }
+  if (!context.currentJobPack || !context.currentKnowledgePack) return { title: '面试资料准备中', detail: '系统正在整理公司、岗位和你的匹配信息。', cta: '查看面试要点', view: 'mockInterview', icon: <Sparkles size={17} /> }
   if (!latestMock) return { title: '开始一轮模拟面试', detail: '进入面试舱，按一问一答完成今天的主要考察。', cta: '开始模拟面试', view: 'mockInterview', icon: <MessagesSquare size={17} /> }
   if (latestMock.status !== 'completed' || !latestMock.finalReport) return { title: '完成模拟面试复盘', detail: '把进行中的面试收尾，拿到下一轮准备任务。', cta: '查看复盘', view: 'mockInterview', icon: <BrainCircuit size={17} /> }
   if (latestRealNeedsReview) return { title: '生成真实面试复盘', detail: '真实面试录音已转写，下一步提取问题并反补题库。', cta: '生成真实复盘', view: 'realInterview', icon: <FileAudio size={17} /> }
@@ -3936,6 +4242,18 @@ function getSupportedAudioMimeType() { return ['audio/webm;codecs=opus', 'audio/
 function getFileExtension(name: string) { const index = name.lastIndexOf('.'); return index >= 0 ? name.slice(index) : '' }
 function isToday(value: string) { const date = new Date(value); const now = new Date(); return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate() }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) }
+function compactBriefItems(items: Array<string | undefined>, limit = 4, maxLength = 120) {
+  const deduped: string[] = []
+  for (const item of items) {
+    const compact = item?.replace(/\s+/g, ' ').trim()
+    if (!compact) continue
+    if (deduped.some((entry) => entry === compact)) continue
+    deduped.push(truncateText(compact, maxLength))
+    if (deduped.length >= limit) break
+  }
+  return deduped
+}
+
 function truncateText(text: string, maxLength: number) { const compact = text.replace(/\s+/g, ' ').trim(); return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact }
 function formatDuration(seconds: number) { const minutes = Math.floor(seconds / 60); const rest = seconds % 60; return `${minutes}:${String(rest).padStart(2, '0')}` }
 function formatFileSize(bytes: number) { return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB` }
