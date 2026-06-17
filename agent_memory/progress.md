@@ -7,10 +7,12 @@
 - 本轮补齐：新建模拟面试后必须先进入候场知识包；旧的未回答面试房间会在刷新后自动回到候场材料；面试房间未接入前新增“先看面试要点”兜底。
 - 本轮补齐：面试官问题接入浏览器 `speechSynthesis` 语音播放；点击“开始面试”后先由面试官发声，结束后自动进入候选人回答采集。
 - 本轮补齐：复盘室新增“再来一轮模拟面试”主按钮，会重新生成 session 并先进入候场知识包。
+- 紧急修复：TTS 不再因进入旧面试/复盘页自动触发；只有当前 session 在面试房间且用户本次点击“开始面试”后才允许面试官发声。
+- 紧急修复：复盘页“再来一轮”按钮缩短文案并禁止换行，避免窄卡片内错行。
 - 本地验证：`npm run lint`、`npm run build`、`npm run test:ai`、`npm run test:providers`、`npx playwright test` 均通过。
 - 生产验证：`PLAYWRIGHT_BASE_URL=https://interview-os-pi.vercel.app npx playwright test` 通过；生产 API smoke 通过。
 - 生产部署已完成并 alias 到 `https://interview-os-pi.vercel.app`。
-- 生产 smoke 通过，新资源：`/assets/index-DXrWlDma.js`、`/assets/index-D-MSrU4E.css`。
+- 生产 smoke 通过，新资源：`/assets/index-FhDZsySF.js`、`/assets/index-DVTBNUqo.css`。
 - 生产 provider 状态：文本 provider 为 `deepseek` 且 analyze/jobPack/mockInterview smoke 成功；ASR provider 为 `doubao` 且凭证已配置，但真实流式转写实现仍是 `implemented:false`，当前转写 smoke 返回 `mock_fallback`。
 
 ## 下一步

@@ -1627,6 +1627,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 
 .review-room-actions .primary-button {
   min-height: 42px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .advanced-details textarea,
 .script-editor textarea {

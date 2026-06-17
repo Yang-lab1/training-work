@@ -2671,7 +2671,7 @@ function MockInterviewPanel({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [sidePanelTab, setSidePanelTab] = useState<'dialogue' | 'feedback' | 'materials' | 'questions'>('dialogue')
-  const [callStarted, setCallStarted] = useState(session.answers.length > 0 || session.currentPhase !== 'asking')
+  const [activeCallSessionId, setActiveCallSessionId] = useState<string | null>(null)
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [cameraError, setCameraError] = useState('')
@@ -2724,7 +2724,8 @@ function MockInterviewPanel({
     ? truncateText(`${panelAnswer.aiFeedback.score} 分 · ${panelAnswer.aiFeedback.summary}`, 96)
     : ''
   const isBusy = session.currentPhase === 'transcribing' || session.currentPhase === 'analyzing' || loading.startsWith('auto-')
-  const callConnected = callStarted && session.currentPhase !== 'completed'
+  const callStarted = activeCallSessionId === session.id && session.uiState === 'interview_room' && session.currentPhase !== 'completed'
+  const callConnected = callStarted
   const showQuestion = callConnected && Boolean(displayedQuestion)
   const callStatusLabel = !callStarted
     ? '等待接入'
@@ -2836,6 +2837,13 @@ function MockInterviewPanel({
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }, [])
 
+  useEffect(() => {
+    if (session.uiState !== 'interview_room' || session.currentPhase === 'completed') {
+      lastSpokenQuestionIdRef.current = ''
+      stopInterviewerVoice()
+    }
+  }, [session.id, session.uiState, session.currentPhase, stopInterviewerVoice])
+
   const speakInterviewerQuestion = useCallback((text: string, onDone?: () => void) => {
     if (!voiceEnabled || !('speechSynthesis' in window)) {
       onDone?.()
@@ -2844,8 +2852,12 @@ function MockInterviewPanel({
     stopInterviewerVoice()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = /[a-zA-Z]/.test(text) && !/[\u4e00-\u9fff]/.test(text) ? 'en-US' : 'zh-CN'
-    utterance.rate = 0.92
-    utterance.pitch = 0.96
+    const voices = window.speechSynthesis.getVoices()
+    const preferredVoice = voices.find((voice) => /natural|xiaoxiao|yunxi|xiaoyi|xiaobei|xiaohan|zh-cn|chinese/i.test(`${voice.name} ${voice.lang}`))
+      || voices.find((voice) => voice.lang.toLowerCase().startsWith(utterance.lang.toLowerCase().slice(0, 2)))
+    if (preferredVoice) utterance.voice = preferredVoice
+    utterance.rate = 0.88
+    utterance.pitch = 0.92
     utterance.volume = 1
     utterance.onend = () => onDone?.()
     utterance.onerror = () => onDone?.()
@@ -2891,11 +2903,11 @@ function MockInterviewPanel({
 
   function startCall() {
     if (!currentQuestion || isBusy) return
-    setCallStarted(true)
+    setActiveCallSessionId(session.id)
   }
 
   function hangUpCall() {
-    setCallStarted(false)
+    setActiveCallSessionId(null)
     stopInterviewerVoice()
     if (isRecording) {
       onStopRecording()
@@ -3011,7 +3023,7 @@ function MockInterviewPanel({
             <p>{session.answers.length} 个回答 · {session.finalReport ? '整场复盘已生成' : '等待生成整场复盘'}</p>
           </div>
           <div className="review-room-actions">
-            <button className="primary-button" type="button" onClick={onRestart} disabled={loading === 'start'}><MessagesSquare size={16} />{loading === 'start' ? '正在准备下一轮' : '再来一轮模拟面试'}</button>
+            <button className="primary-button" type="button" onClick={onRestart} disabled={loading === 'start'} aria-label="再来一轮模拟面试" title="再来一轮模拟面试"><MessagesSquare size={16} />{loading === 'start' ? '准备中' : '再来一轮'}</button>
             <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
           </div>
         </header>
