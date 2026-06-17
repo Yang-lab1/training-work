@@ -1,5 +1,6 @@
 import { getAIProviderStatus } from './_lib/ai/providerRouter.js'
 import { getASRProviderStatus } from './_lib/asr/providerRouter.js'
+import { getTTSProviderStatus } from './_lib/tts/providerRouter.js'
 
 function json(payload: unknown, status = 200) {
   return Response.json(payload, {
@@ -16,6 +17,7 @@ const routes = {
   providerStatus: { path: '/api/provider-status', method: 'GET', available: true, mockSafe: true },
   analyzeAnswer: { path: '/api/analyze-answer', method: 'POST', available: true, mockSafe: true },
   transcribe: { path: '/api/transcribe', method: 'POST', available: true, mockSafe: true },
+  synthesizeSpeech: { path: '/api/synthesize-speech', method: 'POST', available: true, mockSafe: true },
   generateJobPack: { path: '/api/generate-job-pack', method: 'POST', available: true, mockSafe: true },
   generateMockInterview: { path: '/api/generate-mock-interview', method: 'POST', available: true, mockSafe: true },
   reviewRealInterview: { path: '/api/review-real-interview', method: 'POST', available: true, mockSafe: true },
@@ -32,6 +34,7 @@ export default {
       success: true,
       ai: getAIProviderStatus(),
       asr: getASRProviderStatus(),
+      tts: getTTSProviderStatus(),
       routes,
     })
   },

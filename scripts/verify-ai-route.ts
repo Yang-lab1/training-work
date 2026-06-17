@@ -8,6 +8,7 @@ import generateJobPackRoute from '../api/generate-job-pack.ts'
 import generateMockInterviewRoute from '../api/generate-mock-interview.ts'
 import providerStatusRoute from '../api/provider-status.ts'
 import reviewRealInterviewRoute from '../api/review-real-interview.ts'
+import synthesizeSpeechRoute from '../api/synthesize-speech.ts'
 import transcribeRoute from '../api/transcribe.ts'
 
 function request(path: string, body: unknown) {
@@ -388,6 +389,21 @@ const asrFallbackPayload = await asrFallbackResponse.json()
 assert.equal(asrFallbackPayload.provider, 'mock_fallback')
 assert.equal(asrFallbackPayload.language, 'en')
 
+process.env.TTS_PROVIDER = 'doubao'
+delete process.env.DOUBAO_TTS_API_KEY
+delete process.env.DOUBAO_TTS_APP_ID
+delete process.env.DOUBAO_TTS_ACCESS_TOKEN
+delete process.env.DOUBAO_TTS_VOICE_TYPE
+const ttsFallbackResponse = await synthesizeSpeechRoute.fetch(request('/api/synthesize-speech', {
+  text: '你好，我是今天的 AI 面试官。',
+  selectedJob: baseInput.selectedJob,
+  voiceStyle: 'interviewer',
+}))
+const ttsFallbackPayload = await ttsFallbackResponse.json()
+assert.equal(ttsFallbackPayload.success, true)
+assert.equal(ttsFallbackPayload.provider, 'mock_fallback')
+assert.equal(JSON.stringify(ttsFallbackPayload).includes('test-tts-access-token'), false)
+
 process.env.AI_PROVIDER = 'mock'
 const jobPackResponse = await generateJobPackRoute.fetch(request('/api/generate-job-pack', {
   selectedJob: baseInput.selectedJob,
@@ -509,7 +525,11 @@ assert.equal(providerStatusPayload.ai.availableProviders.deepseek.implemented, t
 assert.equal(providerStatusPayload.asr.provider, 'openai')
 assert.equal(providerStatusPayload.asr.configured, false)
 assert.equal(providerStatusPayload.asr.availableProviders.openai.implemented, true)
+assert.equal(providerStatusPayload.tts.provider, 'doubao')
+assert.equal(providerStatusPayload.tts.configured, false)
+assert.equal(providerStatusPayload.tts.availableProviders.doubao.implemented, true)
 assert.equal(providerStatusPayload.routes.analyzeAnswer.path, '/api/analyze-answer')
+assert.equal(providerStatusPayload.routes.synthesizeSpeech.path, '/api/synthesize-speech')
 assert.equal(JSON.stringify(providerStatusPayload).includes('test-key'), false)
 
 console.log('AI, ASR, job pack and mock interview routes: mock, configurable provider fallback, validation passed')

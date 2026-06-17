@@ -7,6 +7,10 @@ process.env.ASR_PROVIDER = 'openai'
 delete process.env.OPENAI_API_KEY
 delete process.env.DOUBAO_ASR_APP_ID
 delete process.env.DOUBAO_ASR_ACCESS_TOKEN
+delete process.env.DOUBAO_TTS_API_KEY
+delete process.env.DOUBAO_TTS_APP_ID
+delete process.env.DOUBAO_TTS_ACCESS_TOKEN
+delete process.env.DOUBAO_TTS_VOICE_TYPE
 
 const response = await providerStatusRoute.fetch(new Request('http://localhost/api/provider-status'))
 assert.equal(response.status, 200)
@@ -24,7 +28,12 @@ assert.equal(payload.asr.provider, 'openai')
 assert.equal(payload.asr.configured, false)
 assert.equal(payload.asr.fallbackMode, true)
 assert.equal(payload.asr.availableProviders.openai.implemented, true)
+assert.equal(payload.tts.provider, 'mock')
+assert.equal(payload.tts.configured, true)
+assert.equal(payload.tts.fallbackMode, true)
+assert.equal(payload.tts.availableProviders.doubao.implemented, true)
 assert.equal(payload.routes.transcribe.path, '/api/transcribe')
+assert.equal(payload.routes.synthesizeSpeech.path, '/api/synthesize-speech')
 assert.equal(JSON.stringify(payload).includes('sk-'), false)
 
 console.log('Provider status route: no-key fallback and redaction checks passed')
@@ -49,3 +58,23 @@ assert.equal(doubaoPayload.asr.availableProviders.doubao.model, 'doubao-streamin
 assert.equal(JSON.stringify(doubaoPayload).includes('test-access-token'), false)
 
 console.log('Provider status route: doubao env compatibility checks passed')
+
+process.env.TTS_PROVIDER = 'doubao'
+process.env.DOUBAO_TTS_APP_ID = 'test-tts-app-id'
+process.env.DOUBAO_TTS_ACCESS_TOKEN = 'test-tts-access-token'
+process.env.DOUBAO_TTS_VOICE_TYPE = 'S_3HoF2R202'
+process.env.DOUBAO_TTS_RESOURCE_ID = 'seed-tts-2.0'
+process.env.DOUBAO_TTS_MODEL = 'seed-tts-2.0'
+
+const ttsResponse = await providerStatusRoute.fetch(new Request('http://localhost/api/provider-status'))
+assert.equal(ttsResponse.status, 200)
+const ttsPayload = await ttsResponse.json()
+
+assert.equal(ttsPayload.success, true)
+assert.equal(ttsPayload.tts.provider, 'doubao')
+assert.equal(ttsPayload.tts.configured, true)
+assert.equal(ttsPayload.tts.fallbackMode, false)
+assert.equal(ttsPayload.tts.availableProviders.doubao.model, 'seed-tts-2.0')
+assert.equal(JSON.stringify(ttsPayload).includes('test-tts-access-token'), false)
+
+console.log('Provider status route: doubao TTS env compatibility checks passed')

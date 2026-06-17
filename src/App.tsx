@@ -61,6 +61,7 @@ import type {
   TranscriptStatus,
 } from './lib/ai/types'
 import type { TranscribeResponse } from './lib/asr/types'
+import type { SynthesizeSpeechResponse } from './lib/tts/types'
 import './App.css'
 import { useRecordingGuard } from './useRecordingGuard'
 
@@ -259,7 +260,7 @@ interface RemoteJobDataState {
 }
 
 interface ProviderCallRecord {
-  type: 'text' | 'asr'
+  type: 'text' | 'asr' | 'tts'
   providerUsed?: string
   model?: string
   isFallback?: boolean
@@ -273,6 +274,7 @@ interface ProviderCallRecord {
 interface ProviderState {
   lastTextCall?: ProviderCallRecord
   lastAsrCall?: ProviderCallRecord
+  lastTtsCall?: ProviderCallRecord
   providerHistory: ProviderCallRecord[]
 }
 
@@ -294,6 +296,12 @@ interface ProviderStatusPayload {
     availableProviders: Record<string, ProviderAvailability>
   }
   asr: {
+    provider: string
+    configured: boolean
+    fallbackMode: boolean
+    availableProviders: Record<string, ProviderAvailability>
+  }
+  tts?: {
     provider: string
     configured: boolean
     fallbackMode: boolean
@@ -647,6 +655,7 @@ function App() {
     setProviderState((current) => ({
       lastTextCall: call.type === 'text' ? nextCall : current.lastTextCall,
       lastAsrCall: call.type === 'asr' ? nextCall : current.lastAsrCall,
+      lastTtsCall: call.type === 'tts' ? nextCall : current.lastTtsCall,
       providerHistory: [nextCall, ...(current.providerHistory || [])].slice(0, 20),
     }))
   }
@@ -970,6 +979,45 @@ function App() {
       setProviderStatusMessage(`语音转写测试完成：${result.provider}${result.provider === 'mock' || result.provider === 'mock_fallback' ? '（模拟或 fallback）' : '（真实 ASR）'}`)
     } catch (error) {
       setProviderStatusMessage(error instanceof Error ? error.message : '语音转写测试失败。')
+    } finally {
+      setProviderStatusLoading(false)
+    }
+  }
+
+  async function testTtsProvider() {
+    setProviderStatusLoading(true)
+    setProviderStatusMessage('')
+    try {
+      const response = await fetch('/api/synthesize-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: '你好，我是今天的 AI 面试官。我们会像真实线上面试一样进行对话。',
+          selectedJob,
+          voiceStyle: 'interviewer',
+        }),
+      })
+      const result = await response.json() as SynthesizeSpeechResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? '面试官声音测试失败。' : result.error)
+      recordProviderCall({
+        type: 'tts',
+        providerUsed: result.providerUsed || result.provider,
+        model: result.model,
+        isFallback: result.isFallback || result.provider === 'mock_fallback',
+        fallbackReason: result.fallbackReason || result.rawProviderNote,
+        latencyMs: result.latencyMs,
+        success: true,
+      })
+      setProviderStatusMessage(`面试官声音测试完成：${result.provider} / ${result.model || '默认模型'}${result.provider === 'mock' || result.provider === 'mock_fallback' ? '（模拟或 fallback）' : '（真实 TTS）'}`)
+    } catch (error) {
+      recordProviderCall({
+        type: 'tts',
+        providerUsed: 'mock',
+        isFallback: false,
+        success: false,
+        error: error instanceof Error ? error.message : '面试官声音测试失败。',
+      })
+      setProviderStatusMessage(error instanceof Error ? error.message : '面试官声音测试失败。')
     } finally {
       setProviderStatusLoading(false)
     }
@@ -2387,6 +2435,7 @@ function App() {
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
                     onRestart={() => void startMockInterview(activeMockInterview.interviewType)}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
+                    onProviderCall={recordProviderCall}
                   />
                 ) : null}
               </>
@@ -2473,6 +2522,7 @@ function App() {
               onRefresh={() => void refreshProviderStatus()}
               onTestText={() => void testTextProvider()}
               onTestAsr={() => void testAsrProvider()}
+              onTestTts={() => void testTtsProvider()}
             />
           </Page>
         )}
@@ -2501,6 +2551,7 @@ function DiagnosticsView({
   onRefresh,
   onTestText,
   onTestAsr,
+  onTestTts,
 }: {
   status: ProviderStatusPayload | null
   providerState: ProviderState
@@ -2509,9 +2560,10 @@ function DiagnosticsView({
   onRefresh: () => void
   onTestText: () => void
   onTestAsr: () => void
+  onTestTts: () => void
 }) {
   const mode = status
-    ? status.ai.fallbackMode || status.asr.fallbackMode
+    ? status.ai.fallbackMode || status.asr.fallbackMode || Boolean(status.tts?.fallbackMode)
       ? 'Mock / fallback 模式'
       : '真实模型模式'
     : '未检测'
@@ -2521,12 +2573,13 @@ function DiagnosticsView({
         <div>
           <span className="eyebrow">当前模式</span>
           <h2>{mode}</h2>
-          {status && <p>{status.ai.configured ? '文本模型已配置。' : '文本模型未配置，当前可用模拟反馈。'}{status.asr.configured ? '语音转写已配置。' : '语音转写未配置，当前可用模拟转写。'}</p>}
+          {status && <p>{status.ai.configured ? '文本模型已配置。' : '文本模型未配置，当前可用模拟反馈。'}{status.asr.configured ? '语音转写已配置。' : '语音转写未配置，当前可用模拟转写。'}{status.tts?.configured ? '面试官声音已配置。' : '面试官声音未配置，当前可用临时语音。'}</p>}
         </div>
         <div className="inline-actions">
           <button type="button" onClick={onRefresh} disabled={loading}><RotateCcw size={16} />刷新状态</button>
           <button className="primary-button" type="button" onClick={onTestText} disabled={loading}><BrainCircuit size={16} />测试文本模型</button>
           <button type="button" onClick={onTestAsr} disabled={loading}><FileAudio size={16} />测试语音转写</button>
+          <button type="button" onClick={onTestTts} disabled={loading}><Volume2 size={16} />测试面试官声音</button>
         </div>
       </header>
       {message && <p className={message.includes('失败') ? 'error-line' : 'success-line'}>{message}</p>}
@@ -2541,6 +2594,7 @@ function DiagnosticsView({
               fallbackMode={Boolean(status.ai.availableProviders[status.ai.taskProviders?.companyKnowledge || status.ai.provider]?.fallbackMode)}
             />
             <ProviderSummaryCard title="ASR_PROVIDER" provider={status.asr.provider} configured={status.asr.configured} fallbackMode={status.asr.fallbackMode} />
+            {status.tts && <ProviderSummaryCard title="TTS_PROVIDER" provider={status.tts.provider} configured={status.tts.configured} fallbackMode={status.tts.fallbackMode} />}
           </div>
           {status.ai.taskProviders?.companyKnowledge && (
             <p className="provider-note">任务分工：普通文本反馈走 {status.ai.provider}；公司/岗位面试知识包走 {status.ai.taskProviders.companyKnowledge}。</p>
@@ -2548,6 +2602,7 @@ function DiagnosticsView({
           <ProviderCallList providerState={providerState} />
           <ProviderMatrix title="文本 Provider" providers={status.ai.availableProviders} />
           <ProviderMatrix title="ASR Provider" providers={status.asr.availableProviders} />
+          {status.tts && <ProviderMatrix title="TTS Provider" providers={status.tts.availableProviders} />}
           <section className="route-status-grid" aria-label="API route 状态">
             <h3>API routes</h3>
             {Object.entries(status.routes).map(([name, route]) => (
@@ -2564,18 +2619,23 @@ function DiagnosticsView({
 }
 
 function ProviderCallList({ providerState }: { providerState: ProviderState }) {
-  const calls = [providerState.lastTextCall, providerState.lastAsrCall].filter(Boolean) as ProviderCallRecord[]
+  const calls = [providerState.lastTextCall, providerState.lastAsrCall, providerState.lastTtsCall].filter(Boolean) as ProviderCallRecord[]
+  const callLabels: Record<ProviderCallRecord['type'], string> = {
+    text: '文本模型',
+    asr: '语音转写',
+    tts: '面试官声音',
+  }
   return (
     <section className="provider-call-list" data-testid="provider-call-list">
       <h3>最近调用</h3>
       {calls.length ? calls.map((call) => (
         <div className="provider-call-row" key={`${call.type}-${call.at}`}>
-          <strong>{call.type === 'text' ? '文本模型' : '语音转写'}</strong>
+          <strong>{callLabels[call.type]}</strong>
           <span>{call.providerUsed || 'mock'} · {call.model || '默认模型'} · {call.isFallback ? 'fallback' : 'direct'}</span>
           <em>{call.success ? '成功' : '失败'}{call.latencyMs ? ` · ${call.latencyMs}ms` : ''}</em>
           {call.fallbackReason && <p>{call.fallbackReason}</p>}
         </div>
-      )) : <p className="empty-state compact">还没有真实调用记录。完成一次转写或反馈后会显示 provider、模型和 fallback 原因。</p>}
+      )) : <p className="empty-state compact">还没有真实调用记录。完成一次转写、反馈或声音测试后会显示 provider、模型和 fallback 原因。</p>}
     </section>
   )
 }
@@ -2643,6 +2703,7 @@ function MockInterviewPanel({
   onFinish,
   onRestart,
   onDelete,
+  onProviderCall,
 }: {
   session: MockInterviewSession
   jobPack?: StoredJobPack
@@ -2660,9 +2721,11 @@ function MockInterviewPanel({
   onFinish: () => void
   onRestart: () => void
   onDelete: () => void
+  onProviderCall?: (call: Omit<ProviderCallRecord, 'at'>) => void
 }) {
   const roomRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const interviewerAudioRef = useRef<HTMLAudioElement | null>(null)
   const lastSpokenQuestionIdRef = useRef('')
   const callActiveRef = useRef(false)
   const startRecordingRef = useRef(onStartRecording)
@@ -2834,6 +2897,11 @@ function MockInterviewPanel({
   }, [currentAnswer])
 
   const stopInterviewerVoice = useCallback(() => {
+    if (interviewerAudioRef.current) {
+      interviewerAudioRef.current.pause()
+      interviewerAudioRef.current.src = ''
+      interviewerAudioRef.current = null
+    }
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }, [])
 
@@ -2844,12 +2912,11 @@ function MockInterviewPanel({
     }
   }, [session.id, session.uiState, session.currentPhase, stopInterviewerVoice])
 
-  const speakInterviewerQuestion = useCallback((text: string, onDone?: () => void) => {
-    if (!voiceEnabled || !('speechSynthesis' in window)) {
+  const speakWithBrowserVoice = useCallback((text: string, onDone?: () => void) => {
+    if (!('speechSynthesis' in window)) {
       onDone?.()
       return
     }
-    stopInterviewerVoice()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = /[a-zA-Z]/.test(text) && !/[\u4e00-\u9fff]/.test(text) ? 'en-US' : 'zh-CN'
     const voices = window.speechSynthesis.getVoices()
@@ -2862,13 +2929,70 @@ function MockInterviewPanel({
     utterance.onend = () => onDone?.()
     utterance.onerror = () => onDone?.()
     window.speechSynthesis.speak(utterance)
-  }, [stopInterviewerVoice, voiceEnabled])
+  }, [])
+
+  const speakInterviewerQuestion = useCallback(async (text: string, questionId: string, onDone?: () => void) => {
+    if (!voiceEnabled) {
+      onDone?.()
+      return
+    }
+    stopInterviewerVoice()
+    let doneCalled = false
+    const finish = () => {
+      if (doneCalled) return
+      doneCalled = true
+      onDone?.()
+    }
+
+    try {
+      const response = await fetch('/api/synthesize-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          selectedJob: session.selectedJob,
+          questionId,
+          voiceStyle: 'interviewer',
+        }),
+      })
+      const result = await response.json() as SynthesizeSpeechResponse
+      if (!response.ok || !result.success) throw new Error(result.success ? 'Speech synthesis failed.' : result.error)
+      onProviderCall?.({
+        type: 'tts',
+        providerUsed: result.providerUsed || result.provider,
+        model: result.model,
+        isFallback: result.isFallback || result.provider === 'mock_fallback',
+        fallbackReason: result.fallbackReason || result.rawProviderNote,
+        latencyMs: result.latencyMs,
+        success: true,
+      })
+
+      if (!result.audioBase64) {
+        speakWithBrowserVoice(text, finish)
+        return
+      }
+      const audio = new Audio(`data:${result.mimeType || 'audio/mpeg'};base64,${result.audioBase64}`)
+      interviewerAudioRef.current = audio
+      audio.onended = finish
+      audio.onerror = () => speakWithBrowserVoice(text, finish)
+      await audio.play()
+    } catch (error) {
+      onProviderCall?.({
+        type: 'tts',
+        providerUsed: 'mock',
+        isFallback: true,
+        fallbackReason: error instanceof Error ? error.message : 'TTS failed and fell back to browser voice.',
+        success: false,
+      })
+      speakWithBrowserVoice(text, finish)
+    }
+  }, [onProviderCall, session.selectedJob, speakWithBrowserVoice, stopInterviewerVoice, voiceEnabled])
 
   useEffect(() => {
     if (!callConnected || !displayedQuestion?.id || !displayedQuestion.question) return
     if (lastSpokenQuestionIdRef.current === displayedQuestion.id) return
     lastSpokenQuestionIdRef.current = displayedQuestion.id
-    speakInterviewerQuestion(displayedQuestion.question, () => {
+    speakInterviewerQuestion(displayedQuestion.question, displayedQuestion.id, () => {
       if (!callActiveRef.current) return
       if (recordingQuestionIdRef.current || currentAnswerRef.current) return
       startRecordingRef.current(displayedQuestion.id)
@@ -3855,7 +3979,7 @@ function normalizeJobUserStatus(input?: Partial<JobUserStatusMap>): JobUserStatu
 function normalizeProviderCall(input: unknown): ProviderCallRecord | undefined {
   if (!input || typeof input !== 'object') return undefined
   const call = input as Partial<ProviderCallRecord>
-  const type = call.type === 'asr' ? 'asr' : call.type === 'text' ? 'text' : undefined
+  const type = call.type === 'asr' ? 'asr' : call.type === 'text' ? 'text' : call.type === 'tts' ? 'tts' : undefined
   if (!type) return undefined
   return {
     type,
@@ -3879,6 +4003,7 @@ function normalizeProviderState(input: unknown): ProviderState {
   return {
     lastTextCall: normalizeProviderCall(state.lastTextCall),
     lastAsrCall: normalizeProviderCall(state.lastAsrCall),
+    lastTtsCall: normalizeProviderCall(state.lastTtsCall),
     providerHistory: history,
   }
 }

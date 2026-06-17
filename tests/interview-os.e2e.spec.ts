@@ -109,10 +109,21 @@ test.beforeEach(async ({ page }) => {
             openai: { configured: false, implemented: true, fallbackMode: true, model: 'whisper-1', note: '缺少 OPENAI_API_KEY，已回退到 Mock ASR。' },
           },
         },
+        tts: {
+          provider: 'doubao',
+          configured: false,
+          fallbackMode: true,
+          availableProviders: {
+            mock: { configured: true, implemented: true, fallbackMode: true, model: 'mock-tts-v1', note: 'Mock TTS 始终可用。' },
+            doubao: { configured: false, implemented: true, fallbackMode: true, model: 'seed-tts-2.0', note: '未配置豆包 TTS，已回退临时语音。' },
+            openai: { configured: false, implemented: false, fallbackMode: true, note: '预留 OpenAI TTS。' },
+          },
+        },
         routes: {
           providerStatus: { path: '/api/provider-status', method: 'GET', available: true, mockSafe: true },
           analyzeAnswer: { path: '/api/analyze-answer', method: 'POST', available: true, mockSafe: true },
           transcribe: { path: '/api/transcribe', method: 'POST', available: true, mockSafe: true },
+          synthesizeSpeech: { path: '/api/synthesize-speech', method: 'POST', available: true, mockSafe: true },
           generateJobPack: { path: '/api/generate-job-pack', method: 'POST', available: true, mockSafe: true },
           generateMockInterview: { path: '/api/generate-mock-interview', method: 'POST', available: true, mockSafe: true },
           reviewRealInterview: { path: '/api/review-real-interview', method: 'POST', available: true, mockSafe: true },
@@ -295,6 +306,19 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
         cancel: () => undefined,
         getVoices: () => [],
       },
+    })
+  })
+
+  await page.route('**/api/synthesize-speech', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        provider: 'mock',
+        model: 'mock-tts-v1',
+        generatedAt: new Date().toISOString(),
+        rawProviderNote: '测试环境使用浏览器临时语音。',
+      }),
     })
   })
 
