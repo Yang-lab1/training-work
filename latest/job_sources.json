@@ -3,6 +3,18 @@
   "dataVersion": "2026-06-17",
   "sources": [
     {
+      "jobStableId": "job_fe50485270d05cda24e9bc9104198cb6",
+      "companyName": "Apple",
+      "jobTitle": "Engineering Project Manager Intern-Shanghai/ Shenzhen",
+      "sourceSheet": "实习岗",
+      "sourceUrl": "https://jobs.apple.com/en-us/details/200494847-3435/engineering-project-manager-intern-shanghai-shenzhen?team=HRDWR",
+      "sourcePlatform": "Apple Jobs",
+      "capturedAt": "2026-06-18",
+      "verifiedAt": "2026-06-18",
+      "confidence": "high",
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
+    },
+    {
       "jobStableId": "job_bad52357a5dbe06e57ee579cb07eaa47",
       "companyName": "CVTE 视源股份",
       "jobTitle": "AI应用工程师（校招/实习线索）",
@@ -324,7 +336,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_b0bd257fccc5cc75a23100dae1ce0f95",
@@ -336,7 +348,7 @@
       "capturedAt": "2026-06-30",
       "verifiedAt": "2026-06-30",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_6465d38451e3b9897da421af91a82a2a",
@@ -372,7 +384,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_4567d48fef02758d4deac4068fb91471",
@@ -540,7 +552,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（403），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_7736401c456fd5a5496a12681700e330",
@@ -576,7 +588,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_9e89c4b0633f5e20693cc9c3c03bdc3a",
@@ -636,7 +648,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（429），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_89fddf90aa79e574e0e6db60ab5d9872",
@@ -648,7 +660,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（403），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_e1c43c4fe0369680b6f4e19274187986",
@@ -660,7 +672,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接无法精确确认（403），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_73ff9d5666a710f9c3e0a5bc6e012554",
@@ -708,7 +720,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接无法精确确认（403），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_6afbb3e7dc224cfd178b1e8b5eff78ad",
@@ -831,6 +843,30 @@
       "notes": "excluded"
     },
     {
+      "jobStableId": "job_93d602d67d0469187f85ef3a6e6bec62",
+      "companyName": "Apple",
+      "jobTitle": "Machine Learning & AI Engineer",
+      "sourceSheet": "排除_不建议投递",
+      "sourceUrl": "",
+      "sourcePlatform": "未标注",
+      "capturedAt": "2026-06-17",
+      "verifiedAt": "2026-06-17",
+      "confidence": "medium",
+      "notes": "excluded"
+    },
+    {
+      "jobStableId": "job_56408b535ea5139174386d38ff356e07",
+      "companyName": "Apple",
+      "jobTitle": "Subject Matter Expert - Automation & AI/ML",
+      "sourceSheet": "排除_不建议投递",
+      "sourceUrl": "",
+      "sourcePlatform": "未标注",
+      "capturedAt": "2026-06-17",
+      "verifiedAt": "2026-06-17",
+      "confidence": "medium",
+      "notes": "excluded"
+    },
+    {
       "jobStableId": "job_1fa6b155aa4a7b6080a089be1aff9e58",
       "companyName": "Bank of China Hong Kong",
       "jobTitle": "Assistant Product Development Manager Innovation and Payment",
@@ -946,6 +982,18 @@
       "sourceUrl": "",
       "sourcePlatform": "未标注",
       "capturedAt": "2026-06-15",
+      "verifiedAt": "2026-06-17",
+      "confidence": "medium",
+      "notes": "excluded"
+    },
+    {
+      "jobStableId": "job_b7e1051279d75c0e8713157940af0973",
+      "companyName": "Reap",
+      "jobTitle": "Technical Product Manager, AI Platform",
+      "sourceSheet": "排除_不建议投递",
+      "sourceUrl": "",
+      "sourcePlatform": "未标注",
+      "capturedAt": "2026-06-17",
       "verifiedAt": "2026-06-17",
       "confidence": "medium",
       "notes": "excluded"
@@ -2031,6 +2079,18 @@
       "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
     },
     {
+      "jobStableId": "job_1769ea420fb853151ae6c067fd61073b",
+      "companyName": "Apple",
+      "jobTitle": "Technical Program Manager, iPad",
+      "sourceSheet": "次选_条件不完全符合",
+      "sourceUrl": "https://jobs.apple.com/en-us/details/200666248-3435/technical-program-manager-ipad?team=OPMFG",
+      "sourcePlatform": "Apple Jobs 官方",
+      "capturedAt": "2026-06-18",
+      "verifiedAt": "2026-06-18",
+      "confidence": "high",
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
+    },
+    {
       "jobStableId": "job_54141db1e829d9ef47259da91f952468",
       "companyName": "Boehringer Ingelheim",
       "jobTitle": "(Associate) Product Manager",
@@ -2040,7 +2100,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（429），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_682caa9159cd3a870086630190068353",
@@ -2052,7 +2112,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（429），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_13c29587e74269a5a2ea622ae5713157",
@@ -2088,7 +2148,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（429），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_a6ebd616a74741281a6974900d26452c",
@@ -2340,7 +2400,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接无法精确确认（429），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_f7b0c197a774cb3701ef521f22a34fae",
@@ -2496,7 +2556,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "medium",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；非招聘软件或页面未公开HR活跃状态"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
     },
     {
       "jobStableId": "job_d8cd2468d57523a061629d20a91dd651",
@@ -2604,7 +2664,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "medium",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_169ae2ab3d2529cd84557d4f86c3d3af",
@@ -2868,7 +2928,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "medium",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_fa26e13af64da05c426c663137b0606f",
@@ -3024,7 +3084,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_cacffc2c941f81005031a9d29aec88c9",
@@ -3036,7 +3096,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接无法精确确认（403），需二次确认；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_ffb0a1c36cc4bee3ab6fb34f52d9ccc1",
@@ -3048,7 +3108,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_9988a964f71fd99c557cf50b2a976716",
@@ -3108,7 +3168,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "low",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
     },
     {
       "jobStableId": "job_a58f56a0c77f3c290b51cb26cdfc8530",
@@ -3156,7 +3216,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；页面未公开HR活跃/登录状态；不绕过登录或反爬抓取"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；公开可见HR活跃状态：刚刚在线"
     },
     {
       "jobStableId": "job_5ff36832708d5135316e9863e62b4f25",
@@ -3192,7 +3252,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；非招聘软件或页面未公开HR活跃状态"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
     },
     {
       "jobStableId": "job_36c12cdff6384693e9577748a3b55604",
@@ -3204,7 +3264,7 @@
       "capturedAt": "2026-06-18",
       "verifiedAt": "2026-06-18",
       "confidence": "high",
-      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；页面内容较上次有变化；非招聘软件或页面未公开HR活跃状态"
+      "notes": "2026-06-17 自动复核：链接可打开，未识别下架关键词；非招聘软件或页面未公开HR活跃状态"
     },
     {
       "jobStableId": "job_2785c40c3c1ab2f0571b5872a51ea4a0",

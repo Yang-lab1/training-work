@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0",
   "dataVersion": "2026-06-17",
-  "updatedAt": "2026-06-17T09:31:59+08:00",
+  "updatedAt": "2026-06-17T10:59:09+08:00",
   "timezone": "Asia/Shanghai",
   "source": "daily_job_refresh",
-  "jobsCount": 271,
-  "newJobsCount": 0,
-  "updatedJobsCount": 1,
+  "jobsCount": 276,
+  "newJobsCount": 2,
+  "updatedJobsCount": 0,
   "removedJobsCount": 0,
   "jobsUrl": "./jobs.json",
   "deltaUrl": "./jobs_delta.json",
@@ -14,7 +14,7 @@
   "excelUrl": "./job.xlsx",
   "mapUrl": "./prd_job_map_interactive.html",
   "digestUrl": "./daily_change_digest.md",
-  "hash": "b1c8f6371a4580186c89d0bd5f5c5ea27c882cbc1d2d9918ab1195b340f5be77",
+  "hash": "cea75509e0d8a3fc15c425d226f204e681ab2b14cf10ae46dd060792dc1333b1",
   "notes": [
     "Generated for Interview OS. Browser clients should read JSON instead of parsing Excel or HTML.",
     "Private repository fallback: use /api/job-data/latest with server-side GitHub credentials."

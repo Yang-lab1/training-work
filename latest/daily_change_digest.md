@@ -1,20 +1,11 @@
 # 每日岗位库变更日报 20260617
 
-- 工作簿：C:\Users\Yang\Documents\New project\daily_refresh_out\20260617\run_20260617_090826\jobroot\job.xlsx
-- 地图：C:\Users\Yang\Documents\New project\daily_refresh_out\20260617\run_20260617_090826\jobroot\maps\prd_job_map_interactive.html
-- 报告目录：C:\Users\Yang\Documents\New project\daily_refresh_out\20260617\run_20260617_090826\jobroot\reports
+- 工作簿：C:\Users\Yang\Desktop\job\job.xlsx
+- 地图：C:\Users\Yang\Desktop\job\maps\prd_job_map_interactive.html
+- 报告目录：C:\Users\Yang\Desktop\job\reports
 
 ## 今日新增
 - 无适合新增
-
-## Codex补充筛选
-- 正式岗/主投新增：0；实习主表新增：0；今日无足够明确且城市/阶段完全匹配的主表岗位。
-- 扩源新增：1；千寻智能（Spirit AI）/ 2027届校招实习入口（具身智能产品/解决方案/机器人产品）。因当前实习主要北京、后续应届offer可base深圳需确认，放入扩源与公司池，不进主表和地图。
-- 次选新增：1；智子芯元（深圳）科技有限责任公司 / 产品经理（Agent方向）。深圳、薪资达标、Agent方向匹配，但完整JD触发猎聘反爬且底层技术风险偏高，放入次选二次确认。
-- 排除新增：2；Reap / Technical Product Manager, AI Platform 因8年以上经验与深技术平台要求排除；深圳中博纳网络科技有限公司（鱼泡直聘线索）/ AI+机器人产品经理 因5-10年经验、强ROS/SLAM/机械臂/嵌入式要求、低薪和鱼泡低可信来源排除。
-- 公司池新增：2；千寻智能（Spirit AI）、智子芯元（深圳）科技有限责任公司。
-- 已扫描但未新增：腾讯校招/实习、国家大学生就业服务平台、国聘/央国企入口、JobsDB/HKSTP/香港科技园、LinkedIn、鱼泡直聘、机器人/AI硬件、36氪/风投公司池线索。OPPO 2027届寻梦实习入口已在存量表中，不重复新增。
-- 未上图原因：本轮新增/补充线索均没有核验到岗位城市对应的精确办公地址及高德GCJ-02/HK坐标，或为排除/公司池线索，按规则不上地图。
 
 ## 下架/疑似下架
 - 无下架/疑似下架变化
@@ -43,7 +34,7 @@
 - P1｜腾讯（企业微信）｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜腾讯（微信）｜广州｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 - P1｜路特创新｜深圳-南山区｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
-- P2｜Apple｜深圳/上海; 深圳/长沙｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
+- P2｜Apple｜深圳; 深圳/上海; 深圳/长沙｜未找到可核验到楼宇/园区的办公地址和坐标，暂不上图
 
 ## 待复核清单
 - source_coverage_20260617.csv
@@ -250,11 +241,11 @@
 - jobs.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs.json`
 - jobs_delta.json: `C:\Users\Yang\Documents\New project\interview-os\latest\jobs_delta.json`
 - job_sources.json: `C:\Users\Yang\Documents\New project\interview-os\latest\job_sources.json`
-- jobsCount: 271
-- newJobsCount: 0
-- updatedJobsCount: 1
+- jobsCount: 276
+- newJobsCount: 2
+- updatedJobsCount: 0
 - removedJobsCount: 0
-- hash: `b1c8f6371a4580186c89d0bd5f5c5ea27c882cbc1d2d9918ab1195b340f5be77`
+- hash: `cea75509e0d8a3fc15c425d226f204e681ab2b14cf10ae46dd060792dc1333b1`
 - GitHub upload: pending git commit/push from automation workspace
 - GitHub raw:
   - https://raw.githubusercontent.com/Yang-lab1/training-work/main/latest/manifest.json
