@@ -1788,6 +1788,123 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   line-height: 1.45;
 }
 
+.call-end-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 0 6px;
+  border-top: 1px solid var(--line);
+}
+
+.call-end-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.call-end-summary strong {
+  display: block;
+  margin: 8px 0 6px;
+  font-size: clamp(44px, 7vw, 76px);
+  line-height: .95;
+}
+
+.call-end-summary p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.call-end-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.call-end-actions button {
+  white-space: nowrap;
+}
+
+.mock-feedback-list {
+  display: grid;
+  gap: 22px;
+}
+
+.mock-feedback-list > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mock-feedback-list h2 {
+  margin: 4px 0 0;
+  font-size: clamp(28px, 4vw, 48px);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.mock-feedback-list > header button,
+.mock-feedback-card-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.mock-feedback-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mock-feedback-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+}
+
+.mock-feedback-card-head span,
+.mock-feedback-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mock-feedback-card-head strong {
+  display: block;
+  margin-top: 5px;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.mock-feedback-card-head p {
+  max-width: 860px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.mock-feedback-score {
+  min-width: 90px;
+  text-align: right;
+}
+
+.mock-feedback-score strong {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1;
+}
+
 .review-detail .feedback-detail-list {
   margin-top: 12px;
 }

@@ -1146,17 +1146,24 @@ function App() {
     }))
   }
 
-  async function startMockInterview(interviewType: MockInterviewType = 'job_pack_mock') {
-    if (!selectedJob) {
+  async function startMockInterview(interviewType: MockInterviewType = 'job_pack_mock', sourceSession?: MockInterviewSession) {
+    const targetJob = sourceSession?.selectedJob || selectedJob
+    const targetJobPack = targetJob
+      ? jobPacks.find((pack) => pack.id === sourceSession?.jobPackId)
+        || jobPacks.find((pack) => pack.selectedJobId === targetJob.id)
+      : undefined
+    const targetKnowledgePack = targetJob
+      ? companyKnowledgePacks.find((pack) => pack.id === sourceSession?.companyKnowledgePackId)
+        || companyKnowledgePacks.find((pack) => pack.selectedJobId === targetJob.id)
+      : undefined
+    if (!targetJob) {
       setMockInterviewMessage('请先选择目标岗位。')
       setActiveView('materials')
       return
     }
-    if (!currentJobPack || !currentKnowledgePack) {
-      setMockInterviewMessage(jobPackLoading || companyKnowledgeLoading ? '面试资料正在后台准备，请稍候。' : '面试资料尚未准备完成，请重试。')
-      if (!currentJobPack && !jobPackLoading) void generateJobPack(selectedJob)
-      if (currentJobPack && !currentKnowledgePack && !companyKnowledgeLoading) void generateCompanyKnowledgePack({ silent: true })
-      return
+    if (!targetJobPack && !jobPackLoading) void generateJobPack(targetJob)
+    if (!targetKnowledgePack && selectedJob?.id === targetJob.id && !companyKnowledgeLoading) {
+      void generateCompanyKnowledgePack({ silent: true })
     }
     setMockInterviewLoading('start')
     setMockInterviewMessage('')
@@ -1166,9 +1173,9 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskType: 'generate_mock_interview',
-          selectedJob,
-          jobPack: currentJobPack?.jobPack,
-          companyKnowledgePack: currentKnowledgePack?.companyKnowledgePack,
+          selectedJob: targetJob,
+          jobPack: targetJobPack?.jobPack,
+          companyKnowledgePack: targetKnowledgePack?.companyKnowledgePack,
           questionBank,
           realInterviewReviews: realInterviews.map((interview) => interview.reviewReport).filter(Boolean).slice(0, 8),
           cvText: cvTextState.text.slice(0, 6000),
@@ -1180,9 +1187,9 @@ function App() {
       if (!response.ok || !result.success) throw new Error(result.success ? '模拟面试生成失败。' : result.error)
       const session: MockInterviewSession = {
         id: `mock-interview-${Date.now()}`,
-        selectedJob,
-        jobPackId: currentJobPack?.id,
-        companyKnowledgePackId: currentKnowledgePack?.id,
+        selectedJob: targetJob,
+        jobPackId: targetJobPack?.id,
+        companyKnowledgePackId: targetKnowledgePack?.id,
         status: 'in_progress',
         uiState: 'waiting_room',
         createdAt: new Date().toISOString(),
@@ -2347,6 +2354,10 @@ function App() {
               <Metric label="已完成" value={`${state.history.filter((item) => item.aiFeedbackStatus === 'completed').length}`} />
             </div>
             <RecordList records={state.history} mode="feedback" {...sharedRecordProps} />
+            <MockInterviewFeedbackList
+              sessions={mockInterviews}
+              onOpenMockInterview={() => setActiveView('mockInterview')}
+            />
           </Page>
         )}
 
@@ -2404,7 +2415,7 @@ function App() {
                         <span>{currentJobPack && currentKnowledgePack ? '面试资料已就绪' : jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败') ? '面试资料暂时没准备好' : '面试资料正在后台准备'}</span>
                         {(!currentJobPack || !currentKnowledgePack) && !jobPackMessage.includes('失败') && !jobPackMessage.includes('超时') && !companyKnowledgeMessage.includes('失败') && <i aria-hidden="true" />}
                       </div>
-                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading) || jobPackLoading || companyKnowledgeLoading || !currentJobPack || !currentKnowledgePack}>
+                      <button className="primary-button" type="button" onClick={() => void startMockInterview(selectedMockType)} disabled={Boolean(mockInterviewLoading)}>
                         <MessagesSquare size={17} />{mockInterviewLoading === 'start' ? '正在载入面试…' : '开始模拟面试'}
                       </button>
                       {(!currentJobPack || !currentKnowledgePack) && (jobPackMessage.includes('失败') || jobPackMessage.includes('超时') || companyKnowledgeMessage.includes('失败')) && (
@@ -2433,7 +2444,8 @@ function App() {
                     onEnterRoom={() => enterMockInterviewRoom(activeMockInterview.id)}
                     onReturnToBriefing={() => returnMockInterviewToBriefing(activeMockInterview.id)}
                     onFinish={() => void finishMockInterview(activeMockInterview.id)}
-                    onRestart={() => void startMockInterview(activeMockInterview.interviewType)}
+                    onRestart={() => void startMockInterview(activeMockInterview.interviewType, activeMockInterview)}
+                    onViewFeedback={() => setActiveView('feedback')}
                     onDelete={() => deleteMockInterview(activeMockInterview.id)}
                     onProviderCall={recordProviderCall}
                   />
@@ -2702,6 +2714,7 @@ function MockInterviewPanel({
   onReturnToBriefing,
   onFinish,
   onRestart,
+  onViewFeedback,
   onDelete,
   onProviderCall,
 }: {
@@ -2720,6 +2733,7 @@ function MockInterviewPanel({
   onReturnToBriefing: () => void
   onFinish: () => void
   onRestart: () => void
+  onViewFeedback: () => void
   onDelete: () => void
   onProviderCall?: (call: Omit<ProviderCallRecord, 'at'>) => void
 }) {
@@ -3147,11 +3161,22 @@ function MockInterviewPanel({
             <p>{session.answers.length} 个回答 · {session.finalReport ? '整场复盘已生成' : '等待生成整场复盘'}</p>
           </div>
           <div className="review-room-actions">
-            <button className="primary-button" type="button" onClick={onRestart} disabled={loading === 'start'} aria-label="再来一轮模拟面试" title="再来一轮模拟面试"><MessagesSquare size={16} />{loading === 'start' ? '准备中' : '再来一轮'}</button>
             <button className="danger-text" type="button" onClick={onDelete}><Trash2 size={15} />删除</button>
           </div>
         </header>
-        {session.finalReport ? <InterviewFinalReportView finalReport={session.finalReport} answers={session.answers} questions={session.questions} /> : (
+        {session.finalReport ? (
+          <div className="call-end-summary">
+            <div>
+              <span>本轮已结束</span>
+              <strong>{session.finalReport.report.overallScore}</strong>
+              <p>{session.finalReport.report.summary}</p>
+            </div>
+            <div className="call-end-actions">
+              <button className="primary-button" type="button" onClick={onRestart} disabled={loading === 'start'}><MessagesSquare size={16} />{loading === 'start' ? '准备中' : '再来一轮'}</button>
+              <button type="button" onClick={onViewFeedback}>查看完整反馈</button>
+            </div>
+          </div>
+        ) : (
           <button className="primary-button" type="button" onClick={onFinish} disabled={loading === 'report' || !session.answers.length}><Sparkles size={15} />{loading === 'report' ? '复盘中…' : '生成整场复盘'}</button>
         )}
       </section>
@@ -3376,6 +3401,42 @@ function InterviewFinalReportView({ finalReport, answers, questions }: { finalRe
         </dl>
       </details>
     </article>
+  )
+}
+
+function MockInterviewFeedbackList({ sessions, onOpenMockInterview }: { sessions: MockInterviewSession[]; onOpenMockInterview: () => void }) {
+  const completed = sessions.filter((session) => session.finalReport)
+  return (
+    <section className="mock-feedback-list" data-testid="mock-interview-feedback-list">
+      <header>
+        <div>
+          <span className="eyebrow">模拟面试复盘</span>
+          <h2>整场表现和下一轮训练</h2>
+        </div>
+        <button type="button" onClick={onOpenMockInterview}><MessagesSquare size={15} />回到面试舱</button>
+      </header>
+      {completed.length ? completed.map((session) => (
+        <article className="mock-feedback-card" key={session.id}>
+          <div className="mock-feedback-card-head">
+            <div>
+              <span>{session.selectedJob.companyName}</span>
+              <strong>{session.selectedJob.jobTitle}</strong>
+              <p>{session.finalReport?.report.summary}</p>
+            </div>
+            <div className="mock-feedback-score">
+              <span>总分</span>
+              <strong>{session.finalReport?.report.overallScore}</strong>
+            </div>
+          </div>
+          {session.finalReport && <InterviewFinalReportView finalReport={session.finalReport} answers={session.answers} questions={session.questions} />}
+        </article>
+      )) : (
+        <div className="compact-empty">
+          <p className="empty-state">还没有模拟面试复盘。</p>
+          <button className="primary-button" type="button" onClick={onOpenMockInterview}><MessagesSquare size={17} />开始一轮模拟面试</button>
+        </div>
+      )}
+    </section>
   )
 }
 

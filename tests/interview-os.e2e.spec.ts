@@ -472,8 +472,23 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
 
   await page.getByRole('button', { name: '挂断' }).click()
   await expect(page.getByTestId('interview-review-room')).toBeVisible()
+  await expect(page.locator('.call-end-summary')).toBeVisible()
+  await expect(page.locator('.call-end-summary .primary-button')).toBeEnabled()
+  await page.locator('.call-end-summary .primary-button').click()
+  await expect(page.getByTestId('interview-prep-brief')).toBeVisible()
+  await page.locator('.interview-briefing-actions .primary-button').click()
+  await expect(page.getByTestId('interview-room')).toBeVisible()
+  await expect(page.locator('.call-start-button')).toBeVisible()
+  await page.locator('.call-start-button').click()
+  await expect(page.getByTestId('interview-dialogue')).toBeVisible()
+  await page.waitForFunction(() => {
+    const sessions = JSON.parse(localStorage.getItem('interview_os_mock_interviews') || '[]') as StoredMockInterviewForTest[]
+    return sessions.some((session) => session.answers?.some((answer) => answer.aiFeedbackStatus === 'completed' && answer.aiFeedback))
+  }, null, { timeout: 10000 })
+  await page.locator('.top-nav nav button').nth(3).click()
+  await expect(page.getByTestId('mock-interview-feedback-list')).toBeVisible()
   await expect(page.locator('.review-summary-report')).toContainText('84')
-  await expect(page.locator('.review-summary-report')).toContainText('可背回答版本')
+  await expect(page.locator('.review-summary-report details')).toHaveCount(2)
 
   await page.locator('.account-menu summary').click()
   await page.locator('.account-menu-panel button').filter({ hasText: '系统诊断' }).click()
@@ -501,7 +516,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   expect(backup.selectedJob.jobTitle).toBe('AI Product Manager')
   expect(backup.jobUserStatus[backup.selectedJob.id]).toBe('preparing')
   expect(backup.jobPacks).toHaveLength(1)
-  expect(backup.mockInterviews[0].finalReport.report.overallScore).toBe(84)
+  expect(backup.mockInterviews.some((session: StoredMockInterviewForTest) => session.finalReport?.report?.overallScore === 84)).toBe(true)
   expect(backup.providerState.lastTextCall.providerUsed).toBe('mock')
   expect(backup.providerState.lastAsrCall.providerUsed).toBe('mock')
   expect(backup.remoteJobData.hash).toBe('fixture-hash-remote-sync')
@@ -523,7 +538,7 @@ test('dogfood: Daily Driver workbench, shortlist, immersive interview, diagnosti
   expect(restored.selectedJob.jobTitle).toBe('AI Product Manager')
   expect(restored.status[restored.selectedJob.id]).toBe('preparing')
   expect(restored.packs).toHaveLength(1)
-  expect(restored.interviews[0].finalReport.report.overallScore).toBe(84)
+  expect(restored.interviews.some((session: StoredMockInterviewForTest) => session.finalReport?.report?.overallScore === 84)).toBe(true)
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(hasHorizontalOverflow).toBe(false)

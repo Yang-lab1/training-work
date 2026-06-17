@@ -20,3 +20,6 @@
 - P0：完成豆包真实流式 ASR provider，让 `/api/transcribe` 对真实音频 Blob 不再 fallback mock。
 - P1：继续把模拟面试底层从“分段录制 + 自动转写/分析”升级为真正的连续语音通话能力，需要接入实时语音或流式 ASR/对话 provider。
 - 面试舱视觉仍需继续按真实会议软件打磨：更少状态文案、更自然的等待/接入/通话中状态、摄像头预览与通话控制更贴近 Zoom / 腾讯会议。
+- 2026-06-17：豆包 TTS 面试官声音已接入 `/api/synthesize-speech`，生产环境 UTF-8 smoke 通过：`provider=doubao`、`model=seed-tts-2.0`、`isFallback=false`、返回 `audio/mpeg`。PowerShell 字符串直传中文会导致豆包返回 `No readable text!`，浏览器 fetch 与 UTF-8 字节请求正常。
+- 2026-06-17：新增/修正 TTS provider 三段式兜底：V3 SSE、V3 HTTP chunked、旧 V1；补充常用中文音色名到 speaker id 映射，例如“小天” -> `zh_male_taocheng_uranus_bigtts`。
+- 2026-06-17：本轮修正模拟面试完成后的产品流：面试舱只显示短结束态与“再来一轮 / 查看完整反馈”；完整模拟面试复盘归入“反馈”页；“再来一轮”会基于当前/历史岗位重新创建 session，并先进入面试前知识包。
